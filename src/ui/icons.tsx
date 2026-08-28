@@ -227,6 +227,46 @@ function ShardGlyph() {
   );
 }
 
+export function SpeakerIcon({
+  muted = false,
+  className,
+}: {
+  muted?: boolean;
+  className?: string;
+}) {
+  return (
+    <svg className={className ?? 'glyph'} viewBox="0 0 32 32" aria-hidden="true">
+      <path d="M6.5 12.2h5.2L18 7.4v17.2l-6.3-4.8H6.5z" fill="#c9b59a" />
+      {muted ? (
+        <path
+          d="M21.2 12.2l7.2 7.2M28.4 12.2l-7.2 7.2"
+          stroke="#e07a6a"
+          strokeWidth="2.1"
+          strokeLinecap="round"
+          fill="none"
+        />
+      ) : (
+        <>
+          <path
+            d="M21.4 11.2c1.8 1.6 1.8 8 0 9.6"
+            stroke="#e0b44a"
+            strokeWidth="1.8"
+            fill="none"
+            strokeLinecap="round"
+          />
+          <path
+            d="M24.6 8.4c3.4 3.2 3.4 12 0 15.2"
+            stroke="#e0b44a"
+            strokeWidth="1.8"
+            fill="none"
+            strokeLinecap="round"
+          />
+        </>
+      )}
+    </svg>
+  );
+}
+
 export function ItemIcon({ id, className }: { id: ItemId; className?: string }) {
   const glyph =
     id === 'gold-pouch' ? (

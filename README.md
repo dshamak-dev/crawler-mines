@@ -38,4 +38,6 @@ Chests roll a named drop (gold pouch, rusty key, torch charm, gem, or relic shar
 
 A mid-floor refresh restores the live board (Zustand + localStorage): sealed chests, found/broken counts, floor, and whether this floor already paid out. Inner loot still stays sealed until a successful clear, and that grant cannot fire twice. The title menu offers **Resume** if you leave a run; a reload drops you back on the floor.
 
-Difficulties: Easy 8x8, Medium 9x12, Hard 12x16, plus a 5-floor campaign with rising mine density and more chests.
+Audio (`public/audio/`): cozy BGM on the title and Easy/Medium/Hard, campaign-depths only while a Campaign floor is active; mute persists in localStorage. SFX play on dig, flag, chest, blast, wreck, clear, and UI (deny is hooked for paid entry).
+
+Difficulties: Easy 8x8, Medium 9x12, Hard 12x16, plus a 5-floor campaign with rising mine density and more chests. Title **Start** opens a sheet to pick a mode.
