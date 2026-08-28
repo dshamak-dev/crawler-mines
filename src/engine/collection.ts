@@ -12,15 +12,18 @@ export const COLLECTION_KEY = 'crawler-mines-collection';
 export interface KeyStore {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
+  removeItem?(key: string): void;
 }
 
 export interface CollectionState {
   gold: number;
   items: Inventory;
+  /** Floor instance whose rewards were already banked. Blocks a second wallet/pack grant. */
+  lastGrantKey: string | null;
 }
 
 export function emptyCollection(): CollectionState {
-  return { gold: 0, items: emptyInventory() };
+  return { gold: 0, items: emptyInventory(), lastGrantKey: null };
 }
 
 function memoryFallback(): KeyStore {
@@ -56,9 +59,14 @@ export function loadCollection(store: KeyStore = defaultStore()): CollectionStat
       v?: number;
       gold?: unknown;
       items?: Record<string, unknown>;
+      lastGrantKey?: unknown;
     };
     if (!parsed || typeof parsed !== 'object') return state;
     state.gold = clampGold(parsed.gold);
+    state.lastGrantKey =
+      typeof parsed.lastGrantKey === 'string' && parsed.lastGrantKey.length > 0
+        ? parsed.lastGrantKey
+        : null;
     const items = parsed.items;
     if (!items || typeof items !== 'object') return state;
     for (const [key, value] of Object.entries(items)) {
@@ -82,7 +90,12 @@ export function saveCollection(
   }
   store.setItem(
     COLLECTION_KEY,
-    JSON.stringify({ v: 1, gold: clampGold(state.gold), items }),
+    JSON.stringify({
+      v: 1,
+      gold: clampGold(state.gold),
+      items,
+      lastGrantKey: state.lastGrantKey,
+    }),
   );
 }
 
@@ -90,7 +103,9 @@ export function applyRewards(
   state: CollectionState,
   rewards: ReadonlyArray<{ itemId: ItemId; gold: number }>,
   store: KeyStore = defaultStore(),
+  grantKey: string | null = null,
 ): CollectionState {
+  if (grantKey && state.lastGrantKey === grantKey) return state;
   let gold = clampGold(state.gold);
   let items = { ...state.items, 'gold-pouch': 0 };
   for (const r of rewards) {
@@ -100,7 +115,7 @@ export function applyRewards(
       items = addItem(items, r.itemId);
     }
   }
-  const next = { gold, items };
+  const next = { gold, items, lastGrantKey: grantKey ?? state.lastGrantKey };
   saveCollection(next, store);
   return next;
 }

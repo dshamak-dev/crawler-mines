@@ -42,6 +42,8 @@ export interface Game {
   inventory: Inventory;
   firstClickDone: boolean;
   status: GameStatus;
+  /** Inner loot already applied to this floor. Survives reload so clear cannot pay twice. */
+  rewardsGranted: boolean;
 }
 
 export interface ChestReward {
@@ -70,6 +72,11 @@ export const CAMPAIGN_FLOORS: FloorConfig[] = [
   { width: 9, height: 12, mines: 22, chests: 11, chestValue: 18 },
   { width: 12, height: 16, mines: 42, chests: 16, chestValue: 25 },
 ];
+
+export function configFor(mode: Difficulty, floor: number): FloorConfig {
+  if (mode === 'campaign') return CAMPAIGN_FLOORS[floor];
+  return DIFFICULTIES[mode];
+}
 
 export function newCell(partial: Partial<Cell> = {}): Cell {
   return {

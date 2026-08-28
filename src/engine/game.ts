@@ -90,6 +90,7 @@ function revealFlood(game: Game, start: number, events: GameEvent[]): number[] {
 
 /** Grant inner items from intact chests. Call only once the floor is cleared. */
 export function grantIntactLoot(game: Game): ChestReward[] {
+  if (game.rewardsGranted) return [];
   const rewards: ChestReward[] = [];
   for (let i = 0; i < game.cells.length; i++) {
     const c = game.cells[i];
@@ -100,6 +101,7 @@ export function grantIntactLoot(game: Game): ChestReward[] {
     }
     rewards.push({ index: i, itemId: c.loot, gold: c.gold });
   }
+  game.rewardsGranted = true;
   return rewards;
 }
 
