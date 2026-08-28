@@ -1,4 +1,4 @@
-import { emptyInventory, goldForLoot, rollLoot, type ItemId } from './loot';
+import { emptyInventory, goldForLoot, rollLoot, tierForLoot, type ChestTier, type ItemId } from './loot';
 import { type Cell, type FloorConfig, type Game, type Rng, newCell } from './types';
 
 export const DIRS: ReadonlyArray<readonly [number, number]> = [
@@ -83,6 +83,7 @@ export function createGame(config: FloorConfig, rng: Rng): Game {
     const loot = rollLoot(rng);
     cells[i].kind = 'chest';
     cells[i].loot = loot;
+    cells[i].tier = tierForLoot(loot);
     cells[i].gold = goldForLoot(loot, chestValue);
   }
   const banned = new Set(chestIdx);
@@ -112,6 +113,7 @@ export function createGameFromLayout(
   rows: string[],
   chestValue = 10,
   loot: ItemId = 'gold-pouch',
+  tier?: ChestTier,
 ): Game {
   const height = rows.length;
   const width = rows[0].length;
@@ -130,6 +132,7 @@ export function createGameFromLayout(
           newCell({
             kind: 'chest',
             loot,
+            tier: tier ?? tierForLoot(loot),
             gold: goldForLoot(loot, chestValue),
           }),
         );
@@ -207,13 +210,16 @@ export function ensureFirstClickSafe(game: Game, index: number, rng: Rng): void 
     cell.kind = 'chest';
     cell.gold = destCell.gold;
     cell.loot = destCell.loot;
+    cell.tier = destCell.tier;
     destCell.kind = 'mine';
     destCell.gold = 0;
     destCell.loot = null;
+    destCell.tier = null;
   } else {
     cell.kind = 'empty';
     cell.gold = 0;
     cell.loot = null;
+    cell.tier = null;
     destCell.kind = 'mine';
   }
 

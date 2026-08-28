@@ -3,6 +3,7 @@ export type {
   CellKind,
   CellState,
   CellVisual,
+  ChestReward,
   Difficulty,
   FloorConfig,
   Game,
@@ -16,17 +17,21 @@ export {
   cellVisual,
   newCell,
 } from './types';
-export type { Inventory, ItemDef, ItemId } from './loot';
+export type { Inventory, ItemDef, ItemId, ChestTier } from './loot';
 export {
   ITEMS,
   ITEM_IDS,
+  CHEST_TIERS,
+  TIER_COPY,
   addItem,
   emptyInventory,
   goldForLoot,
   inventoryTotal,
+  isChestTier,
   isItemId,
   rollLoot,
   stackedEntries,
+  tierForLoot,
 } from './loot';
 export {
   COLLECTION_KEY,
@@ -50,5 +55,6 @@ export {
   mineCount,
   neighbors,
 } from './board';
-export { dig, explodeChain, toggleFlag } from './game';
+export { chestNotices, dig, explodeChain, grantIntactLoot, toggleFlag } from './game';
+export type { ChestNotice } from './game';
 export { mulberry32 } from './rng';

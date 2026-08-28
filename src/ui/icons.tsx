@@ -1,20 +1,52 @@
-import type { ItemId } from '../engine';
+import type { ChestTier, ItemId } from '../engine';
+
+const TIER_PAINT: Record<
+  ChestTier,
+  { body: string; lid: string; band: string; latch: string; shine: string; wreck: string }
+> = {
+  wooden: {
+    body: '#8a6234',
+    lid: '#a07440',
+    band: '#5a4534',
+    latch: '#c9b59a',
+    shine: '#c4a06a',
+    wreck: '#7a5a38',
+  },
+  iron: {
+    body: '#6a7380',
+    lid: '#8a93a0',
+    band: '#3a4048',
+    latch: '#c5d0dc',
+    shine: '#b8c4d0',
+    wreck: '#5c6570',
+  },
+  gilded: {
+    body: '#b8862b',
+    lid: '#d4a017',
+    band: '#8a6419',
+    latch: '#f3d27a',
+    shine: '#f0d78c',
+    wreck: '#8a6a40',
+  },
+};
 
 export function ChestIcon({
   wrecked = false,
+  tier = 'gilded',
   className,
 }: {
   wrecked?: boolean;
+  tier?: ChestTier;
   className?: string;
 }) {
   const svgClass = className ?? 'glyph';
+  const p = TIER_PAINT[tier];
   if (wrecked) {
     return (
       <svg viewBox="0 0 32 32" className={svgClass} aria-hidden="true">
-        {/* same chest box as intact, wood instead of gold, lid torn open */}
         <rect x="6" y="15" width="20" height="10" rx="1.5" fill="#1a1410" />
-        <rect x="5" y="14" width="22" height="12" rx="2" fill="#7a5a38" />
-        <rect x="5" y="14" width="22" height="3.6" fill="#5a4534" />
+        <rect x="5" y="14" width="22" height="12" rx="2" fill={p.wreck} />
+        <rect x="5" y="14" width="22" height="3.6" fill={p.band} />
         <path d="M7 19h18M7 23h18" stroke="#3a2a1c" strokeWidth="1.05" />
         <path
           d="M12 14.4l2.4 5.2-1.8 6.2M20 15l-1.2 5.4 2.4 5.4"
@@ -23,10 +55,9 @@ export function ChestIcon({
           fill="none"
           strokeLinecap="round"
         />
-        {/* lid: same dome, hinged left and cracked */}
         <path
           d="M5 13.2c.2-5.6 4.4-8.6 10.4-8.8 4.8-.2 8.6 1.8 10.2 5.6l-4.4 1.6c-.8-1.8-3-2.8-6-2.6-3.6.2-6.2 2-6.4 4.6H5z"
-          fill="#9a7344"
+          fill={p.lid}
         />
         <path
           d="M15.2 5.2l1.2 4.8 2.4 2.2"
@@ -34,22 +65,29 @@ export function ChestIcon({
           strokeWidth="1.15"
           fill="none"
         />
-        <path d="M23.6 11.2l3.2-3.6.6 4.6z" fill="#8a6a40" />
-        <path d="M24.2 14.2l3.4 1.2-1.2 3.2z" fill="#5c4630" />
-        {/* broken latch hanging off the front */}
-        <rect x="19.6" y="19.2" width="3.2" height="6.2" rx="0.7" fill="#c9b59a" transform="rotate(32 21.2 22.3)" />
+        <path d="M23.6 11.2l3.2-3.6.6 4.6z" fill={p.wreck} />
+        <path d="M24.2 14.2l3.4 1.2-1.2 3.2z" fill={p.band} />
+        <rect
+          x="19.6"
+          y="19.2"
+          width="3.2"
+          height="6.2"
+          rx="0.7"
+          fill={p.latch}
+          transform="rotate(32 21.2 22.3)"
+        />
         <circle cx="22.2" cy="24.8" r="1.15" fill="#4a3828" />
       </svg>
     );
   }
   return (
     <svg viewBox="0 0 32 32" className={svgClass} aria-hidden="true">
-      <rect x="5" y="14" width="22" height="12" rx="2" fill="#b8862b" />
-      <path d="M5 14c0-6 4.5-9 11-9s11 3 11 9" fill="#d4a017" />
-      <rect x="5" y="13" width="22" height="4" fill="#8a6419" />
-      <rect x="14.2" y="12" width="3.6" height="8" rx="1" fill="#f3d27a" />
+      <rect x="5" y="14" width="22" height="12" rx="2" fill={p.body} />
+      <path d="M5 14c0-6 4.5-9 11-9s11 3 11 9" fill={p.lid} />
+      <rect x="5" y="13" width="22" height="4" fill={p.band} />
+      <rect x="14.2" y="12" width="3.6" height="8" rx="1" fill={p.latch} />
       <circle cx="16" cy="20" r="1.6" fill="#6b4a12" />
-      <path d="M7 17h18" stroke="#f0d78c" strokeWidth="0.7" opacity="0.7" />
+      <path d="M7 17h18" stroke={p.shine} strokeWidth="0.7" opacity="0.7" />
     </svg>
   );
 }

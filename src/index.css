@@ -495,7 +495,7 @@ button {
   display: grid;
   place-items: center;
   padding: 24px;
-  z-index: 5;
+  z-index: 8;
 }
 .phone,
 .play-shell,
@@ -550,6 +550,19 @@ button {
 .row-btns {
   display: grid;
   gap: 8px;
+}
+.tablet .report-loot {
+  flex: none;
+  max-height: 168px;
+  margin: 0 0 12px;
+  text-align: left;
+}
+.tablet .report-loot .loot-card {
+  padding: 8px 10px;
+}
+.tablet .report-loot .loot-ico {
+  width: 40px;
+  height: 40px;
 }
 
 @keyframes bomb-pop {
@@ -662,11 +675,11 @@ button {
   font-size: 0.82rem;
   line-height: 1.3;
 }
-.loot-toast-gold {
-  color: var(--gold);
-  font-family: var(--font-display);
-  font-size: 0.9rem;
-  flex-shrink: 0;
+.loot-toast.is-broken {
+  border-color: #6a5348;
+}
+.loot-toast.is-broken .loot-toast-copy strong {
+  color: #e07a6a;
 }
 .loot-toast-more {
   margin-left: auto;

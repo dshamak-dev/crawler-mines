@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { inventoryTotal, stackedEntries, type Inventory } from '../engine';
 import { BagIcon, ItemIcon } from './icons';
 
-const EMPTY_COPY = "Nothing salvaged yet. Open chests. Don't let bombs eat them.";
+const EMPTY_COPY = 'Chests stay sealed until you clear the floor. Bombs can still smash them.';
 
 export default function Collection({
   meta,

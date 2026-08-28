@@ -10,6 +10,41 @@ export const ITEM_IDS = [
 
 export type ItemId = (typeof ITEM_IDS)[number];
 
+export const CHEST_TIERS = ['wooden', 'iron', 'gilded'] as const;
+export type ChestTier = (typeof CHEST_TIERS)[number];
+
+export const TIER_COPY: Record<
+  ChestTier,
+  { name: string; found: string; broken: string }
+> = {
+  wooden: {
+    name: 'Wooden chest',
+    found: 'Found · still sealed',
+    broken: 'Smashed · loot lost',
+  },
+  iron: {
+    name: 'Iron chest',
+    found: 'Found · still sealed',
+    broken: 'Smashed · loot lost',
+  },
+  gilded: {
+    name: 'Gilded chest',
+    found: 'Found · still sealed',
+    broken: 'Smashed · loot lost',
+  },
+};
+
+export function isChestTier(value: unknown): value is ChestTier {
+  return (CHEST_TIERS as readonly string[]).includes(value as string);
+}
+
+/** Visible chest shell. Inner loot stays hidden until the floor is cleared. */
+export function tierForLoot(itemId: ItemId): ChestTier {
+  if (itemId === 'relic-shard') return 'gilded';
+  if (itemId === 'gem' || itemId === 'torch-charm') return 'iron';
+  return 'wooden';
+}
+
 export interface ItemDef {
   id: ItemId;
   name: string;

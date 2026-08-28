@@ -1,4 +1,4 @@
-import type { Inventory, ItemId } from './loot';
+import type { ChestTier, Inventory, ItemId } from './loot';
 
 export type CellKind = 'empty' | 'mine' | 'chest';
 export type CellState = 'hidden' | 'flagged' | 'revealed';
@@ -14,7 +14,9 @@ export interface Cell {
   wrecked: boolean;
   exploded: boolean;
   gold: number;
-  /** Concrete loot rolled into this chest. Stays on wrecks so the miss can flash. */
+  /** Visible shell. Inner loot is never shown until the floor is cleared. */
+  tier: ChestTier | null;
+  /** Rolled at generation; granted only after a successful clear. */
   loot: ItemId | null;
 }
 
@@ -36,17 +38,23 @@ export interface Game {
   goldDestroyed: number;
   chestsOpened: number;
   chestsDestroyed: number;
-  /** This-floor loot actually opened (wrecks never land here). */
+  /** Awarded only after a successful floor clear. Empty during play. */
   inventory: Inventory;
   firstClickDone: boolean;
   status: GameStatus;
 }
 
+export interface ChestReward {
+  index: number;
+  itemId: ItemId;
+  gold: number;
+}
+
 export type GameEvent =
   | { type: 'reveal'; indices: number[] }
   | { type: 'explode'; index: number; wrecked: number[]; wave: number }
-  | { type: 'chest'; index: number; gold: number; itemId: ItemId }
-  | { type: 'cleared' };
+  | { type: 'chest'; index: number; tier: ChestTier }
+  | { type: 'cleared'; rewards: ChestReward[] };
 
 export const DIFFICULTIES: Record<'easy' | 'medium' | 'hard', FloorConfig> = {
   easy: { width: 8, height: 8, mines: 8, chests: 6, chestValue: 10 },
@@ -71,6 +79,7 @@ export function newCell(partial: Partial<Cell> = {}): Cell {
     wrecked: false,
     exploded: false,
     gold: 0,
+    tier: null,
     loot: null,
     ...partial,
   };

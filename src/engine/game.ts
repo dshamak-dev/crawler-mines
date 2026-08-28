@@ -3,12 +3,13 @@ import {
   isWon,
   neighbors,
 } from './board';
-import { addItem } from './loot';
-import type { Game, GameEvent, Rng } from './types';
+import { addItem, type ChestTier } from './loot';
+import type { Cell, ChestReward, Game, GameEvent, Rng } from './types';
 
 /**
  * Detonate a mine and BFS-chain into every 8-adjacent mine (flagged or hidden).
- * Each blast wrecks unrevealed loot in its own neighborhood.
+ * Each blast wrecks un-awarded loot in its own neighborhood, including chests
+ * that were already found — inner items are not safe until the floor is cleared.
  * Already-exploded bombs never re-enter the queue.
  */
 export function explodeChain(game: Game, startIndex: number): GameEvent[] {
@@ -30,11 +31,13 @@ export function explodeChain(game: Game, startIndex: number): GameEvent[] {
     const wrecked: number[] = [];
     for (const n of neighbors(game.width, game.height, index)) {
       const nb = game.cells[n];
-      if (nb.kind === 'chest' && !nb.wrecked && nb.state !== 'revealed') {
+      if (nb.kind === 'chest' && !nb.wrecked) {
+        const wasFound = nb.state === 'revealed';
         nb.wrecked = true;
         nb.state = 'revealed';
         game.chestsDestroyed += 1;
         game.goldDestroyed += nb.gold;
+        if (wasFound) game.chestsOpened = Math.max(0, game.chestsOpened - 1);
         wrecked.push(n);
       } else if (nb.kind === 'mine' && !nb.exploded && !queued.has(n)) {
         queued.add(n);
@@ -69,11 +72,9 @@ function revealFlood(game: Game, start: number, events: GameEvent[]): number[] {
     c.state = 'revealed';
     revealed.push(i);
 
-    if (c.kind === 'chest' && !c.wrecked && c.loot) {
-      game.gold += c.gold;
+    if (c.kind === 'chest' && !c.wrecked && c.tier) {
       game.chestsOpened += 1;
-      game.inventory = addItem(game.inventory, c.loot);
-      events.push({ type: 'chest', index: i, gold: c.gold, itemId: c.loot });
+      events.push({ type: 'chest', index: i, tier: c.tier });
     }
 
     if (c.adjacentMines === 0) {
@@ -85,6 +86,41 @@ function revealFlood(game: Game, start: number, events: GameEvent[]): number[] {
   }
 
   return revealed;
+}
+
+/** Grant inner items from intact chests. Call only once the floor is cleared. */
+export function grantIntactLoot(game: Game): ChestReward[] {
+  const rewards: ChestReward[] = [];
+  for (let i = 0; i < game.cells.length; i++) {
+    const c = game.cells[i];
+    if (c.kind !== 'chest' || c.wrecked || c.state !== 'revealed' || !c.loot) continue;
+    game.gold += c.gold;
+    game.inventory = addItem(game.inventory, c.loot);
+    rewards.push({ index: i, itemId: c.loot, gold: c.gold });
+  }
+  return rewards;
+}
+
+export type ChestNotice = {
+  kind: 'found' | 'broken';
+  tier: ChestTier;
+  index: number;
+};
+
+/** Play-time toasts: chest + tier only. Never inner items. */
+export function chestNotices(events: GameEvent[], cells: Cell[]): ChestNotice[] {
+  const out: ChestNotice[] = [];
+  for (const e of events) {
+    if (e.type === 'chest') {
+      out.push({ kind: 'found', tier: e.tier, index: e.index });
+    } else if (e.type === 'explode') {
+      for (const w of e.wrecked) {
+        const tier = cells[w]?.tier;
+        if (tier) out.push({ kind: 'broken', tier, index: w });
+      }
+    }
+  }
+  return out;
 }
 
 /**
@@ -112,7 +148,7 @@ export function dig(game: Game, index: number, rng: Rng): GameEvent[] {
 
   if (isWon(game)) {
     game.status = 'cleared';
-    events.push({ type: 'cleared' });
+    events.push({ type: 'cleared', rewards: grantIntactLoot(game) });
   }
 
   return events;
