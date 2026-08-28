@@ -6,7 +6,7 @@ import {
   collectLoot,
   createGameFromLayout,
   dig,
-  emptyInventory,
+  emptyCollection,
   inventoryTotal,
   loadCollection,
   mulberry32,
@@ -83,12 +83,12 @@ describe('find/break toasts are tier', () => {
 describe('rewards and collection add only on successful clear', () => {
   it('grants inner items and persists them only after the floor is cleared', () => {
     const store = memoryStore();
-    let meta = emptyInventory();
+    let meta = emptyCollection();
     const game = createGameFromLayout(['.$.', '.*.'], 18, 'rusty-key');
 
     dig(game, 1, mulberry32(1));
     expect(inventoryTotal(game.inventory)).toBe(0);
-    expect(loadCollection(store)).toEqual(emptyInventory());
+    expect(loadCollection(store)).toEqual(emptyCollection());
 
     const last = revealAllSafe(game);
     const cleared = last.find((e) => e.type === 'cleared');
@@ -99,17 +99,39 @@ describe('rewards and collection add only on successful clear', () => {
     expect(game.inventory['rusty-key']).toBe(1);
 
     for (const reward of cleared.rewards) {
-      meta = collectLoot(meta, reward.itemId, store);
+      meta = collectLoot(meta, reward.itemId, store, reward.gold);
     }
-    expect(loadCollection(store)['rusty-key']).toBe(1);
-    expect(stackedEntries(loadCollection(store)).map((row) => row.item.id)).toEqual(['rusty-key']);
+    expect(loadCollection(store).items['rusty-key']).toBe(1);
+    expect(stackedEntries(loadCollection(store).items).map((row) => row.item.id)).toEqual([
+      'rusty-key',
+    ]);
+  });
+
+  it('banks pouch gold into the wallet instead of stacking pouches', () => {
+    const store = memoryStore();
+    let meta = emptyCollection();
+    const game = createGameFromLayout(['.$.', '.*.'], 18, 'gold-pouch');
+    const last = revealAllSafe(game);
+    const cleared = last.find((e) => e.type === 'cleared');
+    expect(game.status).toBe('cleared');
+    expect(game.gold).toBe(18);
+    expect(game.inventory['gold-pouch']).toBe(0);
+    if (!cleared || cleared.type !== 'cleared') throw new Error('expected clear');
+    expect(cleared.rewards).toEqual([{ index: 1, itemId: 'gold-pouch', gold: 18 }]);
+    for (const reward of cleared.rewards) {
+      meta = collectLoot(meta, reward.itemId, store, reward.gold);
+    }
+    const saved = loadCollection(store);
+    expect(saved.gold).toBe(18);
+    expect(saved.items['gold-pouch']).toBe(0);
+    expect(stackedEntries(saved.items)).toEqual([]);
   });
 });
 
 describe('wrecks grant nothing', () => {
   it('a wrecked chest, found or not, never pays loot or collection', () => {
     const store = memoryStore();
-    let meta = emptyInventory();
+    let meta = emptyCollection();
     const game = createGameFromLayout(['*$'], 10, 'torch-charm');
     const events = dig(game, 0, mulberry32(1));
     expect(game.cells[1].wrecked).toBe(true);
@@ -119,10 +141,10 @@ describe('wrecks grant nothing', () => {
     expect(cleared && cleared.type === 'cleared' && cleared.rewards).toEqual([]);
     if (cleared && cleared.type === 'cleared') {
       for (const reward of cleared.rewards) {
-        meta = collectLoot(meta, reward.itemId, store);
+        meta = collectLoot(meta, reward.itemId, store, reward.gold);
       }
     }
-    expect(loadCollection(store)).toEqual(emptyInventory());
+    expect(loadCollection(store)).toEqual(emptyCollection());
 
     const foundThenWrecked = createGameFromLayout(['.$', '*.'], 10, 'gem');
     dig(foundThenWrecked, idx(foundThenWrecked, 1, 0), mulberry32(1));
@@ -133,5 +155,23 @@ describe('wrecks grant nothing', () => {
       expect(boomClear.rewards).toEqual([]);
     }
     expect(inventoryTotal(foundThenWrecked.inventory)).toBe(0);
+  });
+
+  it('a wrecked gold pouch grants no coins', () => {
+    const store = memoryStore();
+    let meta = emptyCollection();
+    const game = createGameFromLayout(['*$'], 25, 'gold-pouch');
+    const events = dig(game, 0, mulberry32(1));
+    expect(game.cells[1].wrecked).toBe(true);
+    expect(game.gold).toBe(0);
+    const cleared = events.find((e) => e.type === 'cleared');
+    expect(cleared && cleared.type === 'cleared' && cleared.rewards).toEqual([]);
+    if (cleared && cleared.type === 'cleared') {
+      for (const reward of cleared.rewards) {
+        meta = collectLoot(meta, reward.itemId, store, reward.gold);
+      }
+    }
+    expect(loadCollection(store).gold).toBe(0);
+    expect(loadCollection(store).items['gold-pouch']).toBe(0);
   });
 });
