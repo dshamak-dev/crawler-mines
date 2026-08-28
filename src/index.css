@@ -226,6 +226,32 @@ button {
   width: 16px;
   height: 16px;
 }
+.stone-btn.start-cta {
+  justify-content: center;
+  min-height: 52px;
+}
+.stone-btn.sound-slot {
+  min-height: 48px;
+}
+.tablet.start-sheet {
+  width: min(340px, 100%);
+  max-height: min(88dvh, 680px);
+  overflow: auto;
+  text-align: left;
+}
+.tablet.start-sheet h2 {
+  text-align: center;
+}
+.tablet.start-sheet .menu-modes {
+  margin: 4px 0 12px;
+}
+.tablet.start-sheet .menu-modes .stone-btn {
+  margin-top: 0;
+  justify-content: space-between;
+}
+.tablet.start-sheet > .stone-btn {
+  justify-content: center;
+}
 
 .play-shell {
   gap: 6px;

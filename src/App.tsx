@@ -227,6 +227,8 @@ export default function App() {
   );
 }
 
+const SOUND_KEY = 'crawler-mines-sound';
+
 function Menu({
   onStart,
   onResume,
@@ -242,12 +244,20 @@ function Menu({
   gold: number;
   meta: CollectionState;
 }) {
+  const [startOpen, setStartOpen] = useState(false);
   const [pending, setPending] = useState<Difficulty | null>(null);
   const quote = pending ? quoteEntry(pending, meta) : null;
+
+  const closeStart = () => {
+    setStartOpen(false);
+    setPending(null);
+  };
 
   const pick = (mode: Difficulty) => {
     const next = quoteEntry(mode, meta);
     if (next.kind === 'free') {
+      setStartOpen(false);
+      setPending(null);
       onStart(mode);
       return;
     }
@@ -256,8 +266,10 @@ function Menu({
 
   const confirm = () => {
     if (!pending || !quote || quote.kind === 'blocked') return;
-    onStart(pending);
+    const mode = pending;
     setPending(null);
+    setStartOpen(false);
+    onStart(mode);
   };
 
   return (
@@ -284,28 +296,44 @@ function Menu({
           </span>
         </button>
         {onResume && resumeCopy && (
-          <button type="button" className="stone-btn gold" onClick={onResume}>
+          <button type="button" className="stone-btn" onClick={onResume}>
             Resume <span>{resumeCopy}</span>
           </button>
         )}
-        <div className="menu-modes">
-          <button type="button" className="stone-btn" onClick={() => pick('easy')}>
-            Easy <span>8x8</span>
-          </button>
-          <button type="button" className="stone-btn" onClick={() => pick('medium')}>
-            Medium <span>9x12</span>
-          </button>
-          <ModeButton mode="hard" label="Hard" size="12x16" meta={meta} onPick={pick} />
-          <ModeButton
-            mode="campaign"
-            label="Campaign"
-            size="5 floors"
-            gold
-            meta={meta}
-            onPick={pick}
-          />
-        </div>
+        <button type="button" className="stone-btn gold start-cta" onClick={() => setStartOpen(true)}>
+          Start
+        </button>
+        <SoundSlot />
       </nav>
+      {startOpen && !pending && (
+        <div
+          className="overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="start-title"
+          onClick={closeStart}
+        >
+          <div className="tablet start-sheet" onClick={(e) => e.stopPropagation()}>
+            <h2 id="start-title">Start</h2>
+            <div className="menu-modes">
+              <ModeButton mode="easy" label="Easy" size="8x8" meta={meta} onPick={pick} />
+              <ModeButton mode="medium" label="Medium" size="9x12" meta={meta} onPick={pick} />
+              <ModeButton mode="hard" label="Hard" size="12x16" meta={meta} onPick={pick} />
+              <ModeButton
+                mode="campaign"
+                label="Campaign"
+                size="5 floors"
+                gold
+                meta={meta}
+                onPick={pick}
+              />
+            </div>
+            <button type="button" className="stone-btn" onClick={closeStart}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
       {quote && pending && (
         <div
           className="overlay"
@@ -346,6 +374,39 @@ function Menu({
   );
 }
 
+function SoundSlot() {
+  const [on, setOn] = useState(() => {
+    try {
+      return localStorage.getItem(SOUND_KEY) !== '0';
+    } catch {
+      return true;
+    }
+  });
+
+  const toggle = () => {
+    const next = !on;
+    setOn(next);
+    try {
+      localStorage.setItem(SOUND_KEY, next ? '1' : '0');
+    } catch {
+      /* private mode */
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      className="stone-btn sound-slot"
+      onClick={toggle}
+      aria-pressed={on}
+      aria-label={`Sound ${on ? 'on' : 'off'}`}
+    >
+      Sound
+      <span>{on ? 'On' : 'Off'}</span>
+    </button>
+  );
+}
+
 function ModeButton({
   mode,
   label,
@@ -362,6 +423,7 @@ function ModeButton({
   onPick: (mode: Difficulty) => void;
 }) {
   const quote = quoteEntry(mode, meta);
+  const free = quote.kind === 'free';
   return (
     <button
       type="button"
@@ -371,18 +433,22 @@ function ModeButton({
       {label}
       <span className="mode-meta">
         <span>{size}</span>
-        <span className="mode-ticket">
-          <span className="mode-price">
-            <GoldIcon />
-            {quote.cost}
-          </span>
-          {quote.keyCount > 0 && quote.keyId ? (
-            <span className="mode-key">
-              <ItemIcon id={quote.keyId} />
-              ×{quote.keyCount}
+        {free ? (
+          <span className="mode-ticket">free</span>
+        ) : (
+          <span className="mode-ticket">
+            <span className="mode-price">
+              <GoldIcon />
+              {quote.cost}
             </span>
-          ) : null}
-        </span>
+            {quote.keyCount > 0 && quote.keyId ? (
+              <span className="mode-key">
+                <ItemIcon id={quote.keyId} />
+                ×{quote.keyCount}
+              </span>
+            ) : null}
+          </span>
+        )}
       </span>
     </button>
   );
