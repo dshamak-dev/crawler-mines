@@ -26,6 +26,8 @@ Classic minesweeper kills you when you click a mine. Here the mine explodes wher
 - Zeros flood-fill like the classic game.
 - **Flag** with a ~400ms long-press, or flip the Dig/Flag toggle in the thumb zone. Flagged cells will not explode until you unflag and tap them (a chain from a neighbor still sets them off).
 
-Score is gold from chests you opened *before* they were destroyed. After a floor: gold earned vs gold destroyed.
+Score is gold from **gold pouches** you opened *before* they were destroyed. After a floor: gold earned vs gold destroyed.
+
+Chests drop a named item (gold pouch, rusty key, torch charm, gem, or relic shard) into your **collection**. Intact opens pop the item; wrecked chests grant nothing and show a broken chest, not generic rubble. Collection lives in the title menu and the in-run pack button, and persists across runs.
 
 Difficulties: Easy 8x8, Medium 9x12, Hard 12x16, plus a 5-floor campaign with rising mine density and more chests.

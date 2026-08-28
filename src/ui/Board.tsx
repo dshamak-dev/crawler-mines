@@ -4,8 +4,9 @@ import {
   type Cell,
   type Game,
   type GameEvent,
+  type ItemId,
 } from '../engine';
-import { BombIcon, ChestIcon, FlagIcon } from './icons';
+import { BombIcon, ChestIcon, FlagIcon, ItemIcon } from './icons';
 import { BLAST_STAGGER_MS, prefersReducedMotion } from './motion';
 
 const LONG_MS = 400;
@@ -28,36 +29,50 @@ export interface BlastFx {
   wave: number;
 }
 
+export interface LostFx {
+  id: number;
+  index: number;
+  itemId: ItemId;
+  wave: number;
+}
+
 interface BoardProps {
   game: Game;
   flagMode: boolean;
   cellPx: number;
   blasts: BlastFx[];
   sparkles: Array<{ id: number; index: number }>;
+  lostLoot: LostFx[];
   shaking: boolean;
   onDig: (index: number) => void;
   onFlag: (index: number) => void;
 }
 
-export function collectFx(events: GameEvent[], id0: number): {
+export function collectFx(events: GameEvent[], cells: Cell[], id0: number): {
   blasts: BlastFx[];
   sparkles: Array<{ id: number; index: number }>;
+  lostLoot: LostFx[];
   wrecked: boolean;
   nextId: number;
 } {
   let id = id0;
   const blasts: BlastFx[] = [];
   const sparkles: Array<{ id: number; index: number }> = [];
+  const lostLoot: LostFx[] = [];
   let wrecked = false;
   for (const e of events) {
     if (e.type === 'explode') {
       blasts.push({ id: id++, index: e.index, wrecked: e.wrecked, wave: e.wave });
       if (e.wrecked.length > 0) wrecked = true;
+      for (const w of e.wrecked) {
+        const loot = cells[w]?.loot;
+        if (loot) lostLoot.push({ id: id++, index: w, itemId: loot, wave: e.wave });
+      }
     } else if (e.type === 'chest') {
       sparkles.push({ id: id++, index: e.index });
     }
   }
-  return { blasts, sparkles, wrecked, nextId: id };
+  return { blasts, sparkles, lostLoot, wrecked, nextId: id };
 }
 
 export default function Board({
@@ -66,6 +81,7 @@ export default function Board({
   cellPx,
   blasts,
   sparkles,
+  lostLoot,
   shaking,
   onDig,
   onFlag,
@@ -128,6 +144,16 @@ export default function Board({
             cellPx={cellPx}
             delay={0}
             kind="gold"
+          />
+        ))}
+        {lostLoot.map((lost) => (
+          <LostFlash
+            key={lost.id}
+            index={lost.index}
+            itemId={lost.itemId}
+            width={game.width}
+            cellPx={cellPx}
+            delay={reduce ? 0 : lost.wave * BLAST_STAGGER_MS}
           />
         ))}
       </div>
@@ -244,6 +270,34 @@ function DungeonCell({
   );
 }
 
+function LostFlash({
+  index,
+  itemId,
+  width,
+  cellPx,
+  delay,
+}: {
+  index: number;
+  itemId: ItemId;
+  width: number;
+  cellPx: number;
+  delay: number;
+}) {
+  const gap = 3;
+  const col = index % width;
+  const row = Math.floor(index / width);
+  const x = col * (cellPx + gap) + cellPx / 2;
+  const y = row * (cellPx + gap) + cellPx / 2;
+  return (
+    <span
+      className="lost-flash"
+      style={{ left: x, top: y, animationDelay: `${delay}ms` }}
+    >
+      <ItemIcon id={itemId} />
+    </span>
+  );
+}
+
 function Burst({
   index,
   width,
@@ -284,7 +338,7 @@ function ariaFor(visual: string, n: number): string {
     case 'chest':
       return 'Treasure';
     case 'wrecked':
-      return 'Wrecked chest';
+      return 'Broken chest';
     case 'exploded':
       return 'Detonated bomb';
     default:

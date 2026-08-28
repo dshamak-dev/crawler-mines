@@ -45,6 +45,7 @@ describe('board generation', () => {
       expect(c.kind === 'mine' && c.gold > 0).toBe(false);
     }
     expect(mineCount(game)).toBe(DIFFICULTIES.hard.mines);
+    expect(game.cells.every((c) => c.kind !== 'mine' || c.loot === null)).toBe(true);
   });
 
   it('computes adjacency as the count of neighboring mines', () => {
@@ -119,6 +120,7 @@ describe('flood fill', () => {
     expect(chest.wrecked).toBe(false);
     expect(game.gold).toBe(25);
     expect(game.chestsOpened).toBe(1);
+    expect(game.inventory['gold-pouch']).toBe(1);
   });
 });
 
@@ -169,6 +171,7 @@ describe('explosion destroys neighboring loot', () => {
     expect(game.gold).toBe(0);
     expect(game.chestsDestroyed).toBe(2);
     expect(game.goldDestroyed).toBe(20);
+    expect(game.inventory['gold-pouch']).toBe(0);
     expect(chestsRemaining(game)).toBe(0);
   });
 

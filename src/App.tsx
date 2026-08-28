@@ -2,20 +2,27 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   CAMPAIGN_FLOORS,
   DIFFICULTIES,
+  addItem,
   chestsRemaining,
   cloneGame,
   createGame,
   dig,
+  emptyInventory,
+  loadCollection,
+  saveCollection,
   toggleFlag,
   type Difficulty,
   type FloorConfig,
   type Game,
+  type Inventory,
 } from './engine';
-import Board, { collectFx, useBoardCellSize, type BlastFx } from './ui/Board';
-import { FlagIcon, GoldIcon, ShovelIcon, TorchIcon } from './ui/icons';
+import Board, { collectFx, useBoardCellSize, type BlastFx, type LostFx } from './ui/Board';
+import Collection from './ui/Collection';
+import LootQueue, { type LootToast } from './ui/LootToast';
+import { BagIcon, FlagIcon, GoldIcon, ShovelIcon, TorchIcon } from './ui/icons';
 import { chainDuration, prefersReducedMotion } from './ui/motion';
 
-type Screen = 'menu' | 'play';
+type Screen = 'menu' | 'play' | 'collection';
 const TUTORIAL_KEY = 'crawler-mines-tutorial';
 
 interface Run {
@@ -55,11 +62,22 @@ export default function App() {
   const [report, setReport] = useState<FloorReport | null>(null);
   const [blasts, setBlasts] = useState<BlastFx[]>([]);
   const [sparkles, setSparkles] = useState<Array<{ id: number; index: number }>>([]);
+  const [lostLoot, setLostLoot] = useState<LostFx[]>([]);
   const [shaking, setShaking] = useState(false);
+  const [meta, setMeta] = useState<Inventory>(() => loadCollection());
+  const [runLoot, setRunLoot] = useState<Inventory>(() => emptyInventory());
+  const [lootQueue, setLootQueue] = useState<LootToast[]>([]);
+  const [collectionFrom, setCollectionFrom] = useState<Screen>('menu');
   const fxId = useRef(1);
+  const toastId = useRef(1);
   const clearTimer = useRef<number | null>(null);
   const runRef = useRef(run);
   runRef.current = run;
+
+  const openCollection = (from: Screen) => {
+    setCollectionFrom(from);
+    setScreen('collection');
+  };
 
   const start = (mode: Difficulty) => {
     setRun(freshRun(mode));
@@ -67,6 +85,9 @@ export default function App() {
     setReport(null);
     setBlasts([]);
     setSparkles([]);
+    setLostLoot([]);
+    setLootQueue([]);
+    setRunLoot(emptyInventory());
     setShaking(false);
     setScreen('play');
     const seen = localStorage.getItem(TUTORIAL_KEY) === '1';
@@ -78,11 +99,12 @@ export default function App() {
     setTutorial(false);
   };
 
-  const applyFx = useCallback((events: ReturnType<typeof dig>, after?: () => void) => {
-    const packed = collectFx(events, fxId.current);
+  const applyFx = useCallback((events: ReturnType<typeof dig>, cells: Game['cells'], after?: () => void) => {
+    const packed = collectFx(events, cells, fxId.current);
     fxId.current = packed.nextId;
     if (packed.blasts.length) setBlasts(packed.blasts);
     if (packed.sparkles.length) setSparkles(packed.sparkles);
+    if (packed.lostLoot.length) setLostLoot(packed.lostLoot);
     if (packed.wrecked && !prefersReducedMotion()) {
       setShaking(true);
       window.setTimeout(() => setShaking(false), 520);
@@ -94,6 +116,30 @@ export default function App() {
     }
   }, []);
 
+  const bankLoot = useCallback((events: ReturnType<typeof dig>) => {
+    const found = events.filter((e): e is Extract<typeof e, { type: 'chest' }> => e.type === 'chest');
+    if (found.length === 0) return;
+    setMeta((prev) => {
+      let next = prev;
+      for (const e of found) next = addItem(next, e.itemId);
+      saveCollection(next);
+      return next;
+    });
+    setRunLoot((prev) => {
+      let next = prev;
+      for (const e of found) next = addItem(next, e.itemId);
+      return next;
+    });
+    setLootQueue((prev) => [
+      ...prev,
+      ...found.map((e) => ({
+        id: toastId.current++,
+        itemId: e.itemId,
+        gold: e.gold,
+      })),
+    ]);
+  }, []);
+
   const mutate = useCallback(
     (fn: (g: Game) => ReturnType<typeof dig> | void) => {
       const prev = runRef.current;
@@ -103,9 +149,11 @@ export default function App() {
       const next = { ...prev, game };
       runRef.current = next;
       setRun(next);
+      bankLoot(events);
       const cleared = events.some((e) => e.type === 'cleared');
       applyFx(
         events,
+        game.cells,
         cleared
           ? () => {
               const cur = runRef.current;
@@ -127,7 +175,7 @@ export default function App() {
           : undefined,
       );
     },
-    [applyFx],
+    [applyFx, bankLoot],
   );
 
   const onDig = useCallback(
@@ -163,6 +211,8 @@ export default function App() {
     setReport(null);
     setBlasts([]);
     setSparkles([]);
+    setLostLoot([]);
+    setLootQueue([]);
     setFlagMode(false);
   };
 
@@ -175,13 +225,25 @@ export default function App() {
     setReport(null);
     setBlasts([]);
     setSparkles([]);
+    setLostLoot([]);
+    setLootQueue([]);
   };
+
+  const dismissToast = useCallback((id: number) => {
+    setLootQueue((prev) => prev.filter((t) => t.id !== id));
+  }, []);
 
   return (
     <div className="stage">
       <div className="phone">
-        {screen === 'menu' || !run ? (
-          <Menu onStart={start} />
+        {screen === 'collection' ? (
+          <Collection
+            meta={meta}
+            runLoot={runLoot}
+            onBack={() => setScreen(collectionFrom === 'play' && run ? 'play' : 'menu')}
+          />
+        ) : screen === 'menu' || !run ? (
+          <Menu onStart={start} onCollection={() => openCollection('menu')} />
         ) : (
           <Play
             run={run}
@@ -189,9 +251,12 @@ export default function App() {
             setFlagMode={setFlagMode}
             blasts={blasts}
             sparkles={sparkles}
+            lostLoot={lostLoot}
             shaking={shaking}
             tutorial={tutorial}
             report={report}
+            lootQueue={lootQueue}
+            onDismissToast={dismissToast}
             onDig={onDig}
             onFlag={onFlag}
             onMenu={() => {
@@ -199,6 +264,7 @@ export default function App() {
               setRun(null);
               setReport(null);
             }}
+            onCollection={() => openCollection('play')}
             onDismissTutorial={dismissTutorial}
             onNext={nextFloor}
             onRetry={retryFloor}
@@ -209,7 +275,13 @@ export default function App() {
   );
 }
 
-function Menu({ onStart }: { onStart: (m: Difficulty) => void }) {
+function Menu({
+  onStart,
+  onCollection,
+}: {
+  onStart: (m: Difficulty) => void;
+  onCollection: () => void;
+}) {
   return (
     <div className="shell menu-shell">
       <header className="title-block">
@@ -235,6 +307,12 @@ function Menu({ onStart }: { onStart: (m: Difficulty) => void }) {
         <button className="stone-btn gold" onClick={() => onStart('campaign')}>
           Campaign <span>5 floors</span>
         </button>
+        <button className="stone-btn" onClick={onCollection}>
+          Collection
+          <span className="menu-bag">
+            <BagIcon /> Pack
+          </span>
+        </button>
       </nav>
     </div>
   );
@@ -246,12 +324,16 @@ function Play({
   setFlagMode,
   blasts,
   sparkles,
+  lostLoot,
   shaking,
   tutorial,
   report,
+  lootQueue,
+  onDismissToast,
   onDig,
   onFlag,
   onMenu,
+  onCollection,
   onDismissTutorial,
   onNext,
   onRetry,
@@ -261,12 +343,16 @@ function Play({
   setFlagMode: (v: boolean) => void;
   blasts: BlastFx[];
   sparkles: Array<{ id: number; index: number }>;
+  lostLoot: LostFx[];
   shaking: boolean;
   tutorial: boolean;
   report: FloorReport | null;
+  lootQueue: LootToast[];
+  onDismissToast: (id: number) => void;
   onDig: (i: number) => void;
   onFlag: (i: number) => void;
   onMenu: () => void;
+  onCollection: () => void;
   onDismissTutorial: () => void;
   onNext: () => void;
   onRetry: () => void;
@@ -306,6 +392,9 @@ function Play({
             </span>
           </span>
         </div>
+        <button className="ghost bag-btn" onClick={onCollection} aria-label="Open collection">
+          <BagIcon />
+        </button>
         <span className="floor-pill">{floorLabel}</span>
       </header>
 
@@ -316,11 +405,14 @@ function Play({
           cellPx={px}
           blasts={blasts}
           sparkles={sparkles}
+          lostLoot={lostLoot}
           shaking={shaking}
           onDig={onDig}
           onFlag={onFlag}
         />
       </div>
+
+      <LootQueue queue={lootQueue} onDismiss={onDismissToast} />
 
       <footer className="dock">
         <div className="toggle" role="group" aria-label="Dig or flag">
