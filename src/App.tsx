@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { playDeny, sfxFromEvents, useGameAudio } from './audio';
 import {
+  BOSS_COPY,
   CAMPAIGN_FLOORS,
   ITEMS,
   chestNotices,
@@ -41,6 +42,7 @@ export default function App() {
   const retryFloorAction = useGameStore((s) => s.retryFloor);
   const applyDig = useGameStore((s) => s.applyDig);
   const applyFlag = useGameStore((s) => s.applyFlag);
+  const dismissBossReveal = useGameStore((s) => s.dismissBossReveal);
 
   const [screen, setScreen] = useState<Screen>(() => (run ? 'play' : 'menu'));
   const [flagMode, setFlagMode] = useState(false);
@@ -254,6 +256,10 @@ export default function App() {
               openCollection('play');
             }}
             onDismissTutorial={dismissTutorial}
+            onDismissBossReveal={() => {
+              cueUi();
+              dismissBossReveal();
+            }}
             onNext={nextFloor}
             onRetry={retryFloor}
           />
@@ -282,6 +288,7 @@ function Play({
   onMenu,
   onCollection,
   onDismissTutorial,
+  onDismissBossReveal,
   onNext,
   onRetry,
 }: {
@@ -303,6 +310,7 @@ function Play({
   onMenu: () => void;
   onCollection: () => void;
   onDismissTutorial: () => void;
+  onDismissBossReveal: () => void;
   onNext: () => void;
   onRetry: () => void;
 }) {
@@ -312,13 +320,15 @@ function Play({
     mode === 'campaign' ? `Floor ${floor + 1}/${CAMPAIGN_FLOORS.length}` : mode;
   const salvage = report ? stackedEntries(report.loot) : [];
   const boss = game.boss;
+  const bossName = boss ? BOSS_COPY[boss.id].name : 'Boss';
   const showReplay = report && report.outcome !== 'lost' && report.outcome !== 'victory';
   const goldCopy =
     report?.outcome === 'stashed'
-      ? 'Held until Gluttony falls.'
+      ? 'Held until the boss falls.'
       : report?.outcome === 'victory'
         ? 'Stash dumped into your wallet.'
         : 'Pouched gold, now in your wallet.';
+  const revealBoss = Boolean(run.bossRevealPending && boss && boss.lives > 0 && !report);
 
   return (
     <div className="shell play-shell">
@@ -342,10 +352,10 @@ function Play({
             </span>
           </span>
           {boss && (
-            <span className="stat boss-stat" title="Gluttony lives">
-              <span className="stat-label">Gluttony</span>
+            <span className="stat boss-stat" title={`${bossName} lives`}>
+              <span className="stat-label">{bossName}</span>
               <span className="stat-row">
-                <BossIcon className="stat-ico" />
+                <BossIcon id={boss.id} className="stat-ico" />
                 {Math.max(0, boss.lives)}
               </span>
             </span>
@@ -405,7 +415,7 @@ function Play({
         </p>
       </footer>
 
-      {tutorial && (
+      {tutorial && !revealBoss && (
         <div className="overlay" onClick={onDismissTutorial} role="dialog">
           <div className="tablet" onClick={(e) => e.stopPropagation()}>
             <h2>First descent</h2>
@@ -425,6 +435,28 @@ function Play({
         </div>
       )}
 
+      {revealBoss && boss && (
+        <div className="overlay" onClick={onDismissBossReveal} role="dialog" aria-label="Boss reveal">
+          <div className="tablet boss-reveal" onClick={(e) => e.stopPropagation()}>
+            <div className="boss-reveal-icon" aria-hidden="true">
+              <BossIcon id={boss.id} />
+            </div>
+            <h2>{BOSS_COPY[boss.id].name}</h2>
+            <p>{BOSS_COPY[boss.id].blurb}</p>
+            <button
+              type="button"
+              className="stone-btn gold"
+              onClick={() => {
+                onUi();
+                onDismissBossReveal();
+              }}
+            >
+              Face it
+            </button>
+          </div>
+        </div>
+      )}
+
       {report && (
         <div className="overlay" role="dialog">
           <div className="tablet">
@@ -432,13 +464,13 @@ function Play({
               {report.outcome === 'lost'
                 ? 'Campaign failed'
                 : report.outcome === 'victory'
-                  ? 'Gluttony defeated'
+                  ? `${bossName} defeated`
                   : report.lastFloor && mode === 'campaign'
                     ? 'Dungeon cleared'
                     : 'Floor cleared'}
             </h2>
             {report.outcome === 'lost' ? (
-              <p className="muted">Gluttony kept the stash. Every coin and relic is gone.</p>
+              <p className="muted">The boss kept the stash. Every coin and relic is gone.</p>
             ) : (
               <>
                 <div className="tally">
@@ -452,7 +484,12 @@ function Play({
                   </div>
                 </div>
                 {report.outcome === 'stashed' && (
-                  <p className="muted">Loot is stashed until Gluttony falls.</p>
+                  <p className="muted">Loot is stashed until the boss falls.</p>
+                )}
+                {report.bossHead && (
+                  <p className="bonus-line">
+                    Trophy <ItemIcon id={report.bossHead} /> {ITEMS[report.bossHead].name}
+                  </p>
                 )}
                 {report.bonusKey && (
                   <p className="bonus-line">
@@ -477,7 +514,7 @@ function Play({
                       <li
                         key={item.id}
                         className={`loot-card${isTicketKey(item.id) ? ' is-ticket' : ''}${
-                          report.bonusKey === item.id ? ' is-bonus' : ''
+                          report.bonusKey === item.id || report.bossHead === item.id ? ' is-bonus' : ''
                         }`}
                       >
                         <span className="loot-ico">

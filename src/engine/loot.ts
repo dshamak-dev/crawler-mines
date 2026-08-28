@@ -8,6 +8,8 @@ export const ITEM_IDS = [
   'relic-shard',
   'hard-key',
   'campaign-key',
+  'gluttony-head',
+  'wrath-head',
 ] as const;
 
 export type ItemId = (typeof ITEM_IDS)[number];
@@ -104,6 +106,18 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     flavor: 'One free five-floor descent. No refund.',
     grantsGold: false,
   },
+  'gluttony-head': {
+    id: 'gluttony-head',
+    name: 'Gluttony head',
+    flavor: 'A trophy from the flag-eater. Stacks.',
+    grantsGold: false,
+  },
+  'wrath-head': {
+    id: 'wrath-head',
+    name: 'Wrath head',
+    flavor: 'A trophy from the slam-hunter. Stacks.',
+    grantsGold: false,
+  },
 };
 
 const BASE_LOOT_TABLE: ReadonlyArray<{ itemId: ItemId; weight: number }> = [
@@ -141,6 +155,8 @@ export function emptyInventory(): Inventory {
     'relic-shard': 0,
     'hard-key': 0,
     'campaign-key': 0,
+    'gluttony-head': 0,
+    'wrath-head': 0,
   };
 }
 

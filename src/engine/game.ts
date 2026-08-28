@@ -58,9 +58,58 @@ export function toggleFlag(game: Game, index: number): boolean {
   return true;
 }
 
+function resolveBossSlam(game: Game, mineIndex: number): GameEvent[] {
+  const boss = game.boss;
+  if (!boss || boss.lives <= 0) return [];
+  const before = boss.lives;
+  const events = explodeChain(game, mineIndex);
+  // Slam always costs Wrath 1 life even if blast neighborhood math misses.
+  if (boss.lives === before && boss.lives > 0) {
+    boss.lives -= 1;
+    events.push({ type: 'boss-hit', lives: boss.lives });
+  }
+  return events;
+}
+
+function finishBossTurn(game: Game, bossEvents: GameEvent[]): GameEvent[] {
+  const events: GameEvent[] = [];
+  for (const e of bossEvents) {
+    if (e.type === 'boss-slam') {
+      events.push(...resolveBossSlam(game, e.index));
+    } else {
+      events.push(e);
+    }
+  }
+  if (game.boss && game.boss.lives <= 0) {
+    game.status = 'cleared';
+    game.turn = 'player';
+    events.push({ type: 'boss-death' });
+    events.push({ type: 'cleared', rewards: grantIntactLoot(game) });
+    return events;
+  }
+  if (allSafeRevealed(game) && game.boss && game.boss.lives > 0) {
+    game.status = 'lost';
+    game.turn = 'player';
+    events.push({ type: 'lost' });
+    return events;
+  }
+  game.turn = 'player';
+  return events;
+}
+
+/** Reload must finish a persisted boss turn instead of skipping it. */
+export function resolvePendingBossTurn(game: Game): void {
+  if (game.status !== 'playing' || !game.boss) {
+    game.turn = 'player';
+    return;
+  }
+  if (game.turn !== 'boss') return;
+  finishBossTurn(game, stepBoss(game));
+}
+
 /**
  * After a successful dig or flag: resolve boss kill / campaign lose, else
- * Gluttony takes one move. Player + boss are one atomic action for persist.
+ * the floor boss takes one move. Player + boss are one atomic action for persist.
  */
 export function afterPlayerAction(game: Game): GameEvent[] {
   const events: GameEvent[] = [];
@@ -81,8 +130,7 @@ export function afterPlayerAction(game: Game): GameEvent[] {
       return events;
     }
     game.turn = 'boss';
-    events.push(...stepBoss(game));
-    game.turn = 'player';
+    events.push(...finishBossTurn(game, stepBoss(game)));
     return events;
   }
 
@@ -96,6 +144,7 @@ export function afterPlayerAction(game: Game): GameEvent[] {
 /** Flag or unflag a hidden cell, then the boss acts if this is a boss floor. */
 export function flag(game: Game, index: number): GameEvent[] {
   if (!toggleFlag(game, index)) return [];
+  game.lastPlayerAction = index;
   return afterPlayerAction(game);
 }
 
@@ -192,6 +241,7 @@ export function dig(game: Game, index: number, rng: Rng): GameEvent[] {
     if (indices.length > 0) events.push({ type: 'reveal', indices });
   }
 
+  game.lastPlayerAction = index;
   events.push(...afterPlayerAction(game));
   return events;
 }

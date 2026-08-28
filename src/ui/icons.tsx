@@ -281,7 +281,36 @@ export function SpeakerIcon({
   );
 }
 
-export function BossIcon({ className }: { className?: string }) {
+export function BossIcon({
+  className,
+  id = 'gluttony',
+}: {
+  className?: string;
+  id?: 'gluttony' | 'wrath';
+}) {
+  if (id === 'wrath') {
+    return (
+      <svg viewBox="0 0 32 32" className={className ?? 'glyph'} aria-hidden="true">
+        <ellipse cx="16" cy="19" rx="11.2" ry="9.2" fill="#4a1210" />
+        <ellipse cx="16" cy="17.4" rx="10.4" ry="8.4" fill="#a32a22" />
+        <path d="M7.2 16.4c1.8-4.6 4.6-7.2 8.8-7.2s7 2.6 8.8 7.2" fill="#c43b30" />
+        <path d="M8.4 8.2l-2.6-4.6 3.2-.4 2.2 4.2z" fill="#e0b44a" />
+        <path d="M23.6 8.2l2.6-4.6-3.2-.4-2.2 4.2z" fill="#e0b44a" />
+        <circle cx="12.2" cy="16.2" r="2.3" fill="#1a1014" />
+        <circle cx="19.8" cy="16.2" r="2.3" fill="#1a1014" />
+        <circle cx="12.7" cy="15.7" r="0.85" fill="#f6d27a" />
+        <circle cx="20.3" cy="15.7" r="0.85" fill="#f6d27a" />
+        <path d="M11.4 21.4h9.2l-1.2 3.2h-6.8z" fill="#1a1014" />
+        <path
+          d="M12.4 21.4l1.6 2.6 1.4-2 1.4 2 1.6-2.6"
+          stroke="#f6d27a"
+          strokeWidth="1.1"
+          fill="none"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
   return (
     <svg viewBox="0 0 32 32" className={className ?? 'glyph'} aria-hidden="true">
       <ellipse cx="16" cy="19" rx="11.2" ry="9.2" fill="#3a1848" />
@@ -308,6 +337,23 @@ export function BossIcon({ className }: { className?: string }) {
   );
 }
 
+function HeadGlyph({ kind }: { kind: 'gluttony' | 'wrath' }) {
+  const body = kind === 'wrath' ? '#a32a22' : '#6b2d7a';
+  const shine = kind === 'wrath' ? '#c43b30' : '#8a3d98';
+  return (
+    <svg viewBox="0 0 32 32" className="glyph" aria-hidden="true">
+      <ellipse cx="16" cy="18" rx="9.4" ry="8.2" fill="#1a1014" />
+      <ellipse cx="16" cy="17" rx="8.6" ry="7.4" fill={body} />
+      <path d="M9.2 15.2c1.4-3.6 3.6-5.6 6.8-5.6s5.4 2 6.8 5.6" fill={shine} />
+      <circle cx="12.8" cy="16.2" r="1.7" fill="#1a1014" />
+      <circle cx="19.2" cy="16.2" r="1.7" fill="#1a1014" />
+      <path d="M13 20.6h6s-.3 2.4-3 2.4-3-2.4-3-2.4z" fill="#1a1014" />
+      <path d="M11.2 8.4l1.6-3.2 1.4 1.2-1.2 2.8z" fill="#e0b44a" />
+      <path d="M20.8 8.4l-1.6-3.2-1.4 1.2 1.2 2.8z" fill="#e0b44a" />
+    </svg>
+  );
+}
+
 export function ItemIcon({ id, className }: { id: ItemId; className?: string }) {
   const glyph =
     id === 'gold-pouch' ? (
@@ -322,6 +368,10 @@ export function ItemIcon({ id, className }: { id: ItemId; className?: string }) 
       <CharmGlyph />
     ) : id === 'gem' ? (
       <GemGlyph />
+    ) : id === 'gluttony-head' ? (
+      <HeadGlyph kind="gluttony" />
+    ) : id === 'wrath-head' ? (
+      <HeadGlyph kind="wrath" />
     ) : (
       <ShardGlyph />
     );

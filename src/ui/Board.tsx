@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 import {
+  BOSS_COPY,
   cellVisual,
+  type BossId,
   type Cell,
   type Game,
   type GameEvent,
@@ -105,6 +107,7 @@ export default function Board({
             wreckWave={wreckWave.get(i)}
             reduce={reduce}
             bossHere={game.boss != null && game.boss.index === i && game.boss.lives > 0}
+            bossId={game.boss?.id ?? 'gluttony'}
             onDig={onDig}
             onFlag={onFlag}
           />
@@ -144,6 +147,7 @@ function DungeonCell({
   wreckWave,
   reduce,
   bossHere,
+  bossId,
   onDig,
   onFlag,
 }: {
@@ -154,6 +158,7 @@ function DungeonCell({
   wreckWave?: number;
   reduce: boolean;
   bossHere: boolean;
+  bossId: BossId;
   onDig: (i: number) => void;
   onFlag: (i: number) => void;
 }) {
@@ -213,8 +218,9 @@ function DungeonCell({
           ? wreckWave * BLAST_STAGGER_MS
           : 0;
 
+  const bossName = BOSS_COPY[bossId].name;
   const label = bossHere
-    ? `Gluttony${visual === 'number' ? `, ${cell.adjacentMines} adjacent bombs` : ''}`
+    ? `${bossName}${visual === 'number' ? `, ${cell.adjacentMines} adjacent bombs` : ''}`
     : ariaFor(visual, cell.adjacentMines, cell.tier);
 
   return (
@@ -249,7 +255,7 @@ function DungeonCell({
           {cell.adjacentMines}
         </span>
       ) : null}
-      {bossHere ? <BossIcon className="boss-glyph" /> : null}
+      {bossHere ? <BossIcon id={bossId} className="boss-glyph" /> : null}
     </button>
   );
 }

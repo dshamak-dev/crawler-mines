@@ -1,6 +1,8 @@
 import { emptyInventory, goldForLoot, rollLoot, tierForLoot, type ChestTier, type ItemId } from './loot';
+import { rollBossId } from './boss';
 import {
   BOSS_MAX_LIVES,
+  type BossId,
   type BossState,
   type Cell,
   type Difficulty,
@@ -109,7 +111,7 @@ export function createGame(config: FloorConfig, rng: Rng, mode: Difficulty = 'ea
     const spawn = pickUnique(1, total, occupied, rng);
     const index = spawn[0];
     cells[index].state = 'revealed';
-    boss = { index, lives };
+    boss = { id: rollBossId(rng), index, lives };
   }
   return {
     width,
@@ -127,15 +129,17 @@ export function createGame(config: FloorConfig, rng: Rng, mode: Difficulty = 'ea
     rewardsGranted: false,
     boss,
     turn: 'player',
+    lastPlayerAction: null,
   };
 }
 
-/** Build a board from a layout for tests. `.` empty, `*` mine, `$` chest, `B` Gluttony spawn. */
+/** Build a board from a layout for tests. `.` empty, `*` mine, `$` chest, `B` boss spawn. */
 export function createGameFromLayout(
   rows: string[],
   chestValue = 10,
   loot: ItemId = 'gold-pouch',
   tier?: ChestTier,
+  bossId: BossId = 'gluttony',
 ): Game {
   const height = rows.length;
   const width = rows[0].length;
@@ -183,8 +187,9 @@ export function createGameFromLayout(
     firstClickDone: true,
     status: 'playing',
     rewardsGranted: false,
-    boss: bossIndex >= 0 ? { index: bossIndex, lives: BOSS_MAX_LIVES } : null,
+    boss: bossIndex >= 0 ? { id: bossId, index: bossIndex, lives: BOSS_MAX_LIVES } : null,
     turn: 'player',
+    lastPlayerAction: null,
   };
 }
 

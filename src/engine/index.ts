@@ -1,4 +1,5 @@
 export type {
+  BossId,
   BossState,
   Cell,
   CellKind,
@@ -14,6 +15,7 @@ export type {
   Turn,
 } from './types';
 export {
+  BOSS_IDS,
   BOSS_MAX_LIVES,
   CAMPAIGN_FLOORS,
   DIFFICULTIES,
@@ -76,17 +78,22 @@ export {
   explodeChain,
   flag,
   grantIntactLoot,
+  resolvePendingBossTurn,
   toggleFlag,
 } from './game';
 export type { ChestNotice } from './game';
 export {
+  BOSS_COPY,
   chebyshev,
   flaggedCells,
   firstStepToward,
+  headItemId,
   hitBossFromBlasts,
+  isBossId,
   isWalkable,
   isWounded,
-  resolvePendingBossTurn,
+  rollBossId,
+  smashChest,
   stepBoss,
 } from './boss';
 export { emptyStash, mergeStash, rollBonusKey, stashToRewards } from './stash';
