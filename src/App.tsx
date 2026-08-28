@@ -1,0 +1,397 @@
+import { useCallback, useMemo, useRef, useState } from 'react';
+import {
+  CAMPAIGN_FLOORS,
+  DIFFICULTIES,
+  chestsRemaining,
+  cloneGame,
+  createGame,
+  dig,
+  toggleFlag,
+  type Difficulty,
+  type FloorConfig,
+  type Game,
+} from './engine';
+import Board, { collectFx, useBoardCellSize, type BlastFx } from './ui/Board';
+import { FlagIcon, GoldIcon, ShovelIcon, TorchIcon } from './ui/icons';
+import { chainDuration, prefersReducedMotion } from './ui/motion';
+
+type Screen = 'menu' | 'play';
+const TUTORIAL_KEY = 'crawler-mines-tutorial';
+
+interface Run {
+  mode: Difficulty;
+  floor: number;
+  game: Game;
+  runGold: number;
+}
+
+interface FloorReport {
+  gold: number;
+  destroyed: number;
+  opened: number;
+  wrecked: number;
+  lastFloor: boolean;
+}
+
+function configFor(mode: Difficulty, floor: number): FloorConfig {
+  if (mode === 'campaign') return CAMPAIGN_FLOORS[floor];
+  return DIFFICULTIES[mode];
+}
+
+function freshRun(mode: Difficulty): Run {
+  return {
+    mode,
+    floor: 0,
+    game: createGame(configFor(mode, 0), Math.random),
+    runGold: 0,
+  };
+}
+
+export default function App() {
+  const [screen, setScreen] = useState<Screen>('menu');
+  const [run, setRun] = useState<Run | null>(null);
+  const [flagMode, setFlagMode] = useState(false);
+  const [tutorial, setTutorial] = useState(false);
+  const [report, setReport] = useState<FloorReport | null>(null);
+  const [blasts, setBlasts] = useState<BlastFx[]>([]);
+  const [sparkles, setSparkles] = useState<Array<{ id: number; index: number }>>([]);
+  const [shaking, setShaking] = useState(false);
+  const fxId = useRef(1);
+  const clearTimer = useRef<number | null>(null);
+  const runRef = useRef(run);
+  runRef.current = run;
+
+  const start = (mode: Difficulty) => {
+    setRun(freshRun(mode));
+    setFlagMode(false);
+    setReport(null);
+    setBlasts([]);
+    setSparkles([]);
+    setShaking(false);
+    setScreen('play');
+    const seen = localStorage.getItem(TUTORIAL_KEY) === '1';
+    setTutorial(!seen);
+  };
+
+  const dismissTutorial = () => {
+    localStorage.setItem(TUTORIAL_KEY, '1');
+    setTutorial(false);
+  };
+
+  const applyFx = useCallback((events: ReturnType<typeof dig>, after?: () => void) => {
+    const packed = collectFx(events, fxId.current);
+    fxId.current = packed.nextId;
+    if (packed.blasts.length) setBlasts(packed.blasts);
+    if (packed.sparkles.length) setSparkles(packed.sparkles);
+    if (packed.wrecked && !prefersReducedMotion()) {
+      setShaking(true);
+      window.setTimeout(() => setShaking(false), 520);
+    }
+    const maxWave = packed.blasts.reduce((m, b) => Math.max(m, b.wave), 0);
+    if (after) {
+      if (clearTimer.current) window.clearTimeout(clearTimer.current);
+      clearTimer.current = window.setTimeout(after, chainDuration(maxWave));
+    }
+  }, []);
+
+  const mutate = useCallback(
+    (fn: (g: Game) => ReturnType<typeof dig> | void) => {
+      const prev = runRef.current;
+      if (!prev || prev.game.status !== 'playing') return;
+      const game = cloneGame(prev.game);
+      const events = fn(game) ?? [];
+      const next = { ...prev, game };
+      runRef.current = next;
+      setRun(next);
+      const cleared = events.some((e) => e.type === 'cleared');
+      applyFx(
+        events,
+        cleared
+          ? () => {
+              const cur = runRef.current;
+              if (!cur) return;
+              const last =
+                cur.mode !== 'campaign' ||
+                cur.floor >= CAMPAIGN_FLOORS.length - 1;
+              setReport({
+                gold: cur.game.gold,
+                destroyed: cur.game.goldDestroyed,
+                opened: cur.game.chestsOpened,
+                wrecked: cur.game.chestsDestroyed,
+                lastFloor: last,
+              });
+              const updated = { ...cur, runGold: cur.runGold + cur.game.gold };
+              runRef.current = updated;
+              setRun(updated);
+            }
+          : undefined,
+      );
+    },
+    [applyFx],
+  );
+
+  const onDig = useCallback(
+    (index: number) => {
+      mutate((g) => dig(g, index, Math.random));
+    },
+    [mutate],
+  );
+
+  const onFlag = useCallback(
+    (index: number) => {
+      mutate((g) => {
+        toggleFlag(g, index);
+      });
+    },
+    [mutate],
+  );
+
+  const nextFloor = () => {
+    if (!run) return;
+    if (run.mode !== 'campaign' || run.floor >= CAMPAIGN_FLOORS.length - 1) {
+      setScreen('menu');
+      setRun(null);
+      setReport(null);
+      return;
+    }
+    const floor = run.floor + 1;
+    setRun({
+      ...run,
+      floor,
+      game: createGame(configFor('campaign', floor), Math.random),
+    });
+    setReport(null);
+    setBlasts([]);
+    setSparkles([]);
+    setFlagMode(false);
+  };
+
+  const retryFloor = () => {
+    if (!run) return;
+    setRun({
+      ...run,
+      game: createGame(configFor(run.mode, run.floor), Math.random),
+    });
+    setReport(null);
+    setBlasts([]);
+    setSparkles([]);
+  };
+
+  return (
+    <div className="stage">
+      <div className="phone">
+        {screen === 'menu' || !run ? (
+          <Menu onStart={start} />
+        ) : (
+          <Play
+            run={run}
+            flagMode={flagMode}
+            setFlagMode={setFlagMode}
+            blasts={blasts}
+            sparkles={sparkles}
+            shaking={shaking}
+            tutorial={tutorial}
+            report={report}
+            onDig={onDig}
+            onFlag={onFlag}
+            onMenu={() => {
+              setScreen('menu');
+              setRun(null);
+              setReport(null);
+            }}
+            onDismissTutorial={dismissTutorial}
+            onNext={nextFloor}
+            onRetry={retryFloor}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Menu({ onStart }: { onStart: (m: Difficulty) => void }) {
+  return (
+    <div className="shell menu-shell">
+      <header className="title-block">
+        <TorchIcon />
+        <h1>Crawler Mines</h1>
+        <p className="tagline">Bombs don&apos;t kill you. They kill the loot.</p>
+      </header>
+      <ul className="rules-chip">
+        <li>Clear every safe tile.</li>
+        <li>Blasts chain into nearby bombs.</li>
+        <li>Long-press to flag.</li>
+      </ul>
+      <nav className="menu-nav">
+        <button className="stone-btn" onClick={() => onStart('easy')}>
+          Easy <span>8x8</span>
+        </button>
+        <button className="stone-btn" onClick={() => onStart('medium')}>
+          Medium <span>9x12</span>
+        </button>
+        <button className="stone-btn" onClick={() => onStart('hard')}>
+          Hard <span>12x16</span>
+        </button>
+        <button className="stone-btn gold" onClick={() => onStart('campaign')}>
+          Campaign <span>5 floors</span>
+        </button>
+      </nav>
+    </div>
+  );
+}
+
+function Play({
+  run,
+  flagMode,
+  setFlagMode,
+  blasts,
+  sparkles,
+  shaking,
+  tutorial,
+  report,
+  onDig,
+  onFlag,
+  onMenu,
+  onDismissTutorial,
+  onNext,
+  onRetry,
+}: {
+  run: Run;
+  flagMode: boolean;
+  setFlagMode: (v: boolean) => void;
+  blasts: BlastFx[];
+  sparkles: Array<{ id: number; index: number }>;
+  shaking: boolean;
+  tutorial: boolean;
+  report: FloorReport | null;
+  onDig: (i: number) => void;
+  onFlag: (i: number) => void;
+  onMenu: () => void;
+  onDismissTutorial: () => void;
+  onNext: () => void;
+  onRetry: () => void;
+}) {
+  const { game, mode, floor, runGold } = run;
+  const { ref, px } = useBoardCellSize(game.width, game.height);
+  const remaining = useMemo(() => chestsRemaining(game), [game]);
+  const floorLabel =
+    mode === 'campaign' ? `Floor ${floor + 1}/${CAMPAIGN_FLOORS.length}` : mode;
+
+  return (
+    <div className="shell play-shell">
+      <header className="hud">
+        <button className="ghost" onClick={onMenu} aria-label="Back to menu">
+          {'\u2039'}
+        </button>
+        <div className="hud-stats">
+          <span className="stat gold-stat">
+            <span className="stat-label">Gold</span>
+            <span className="stat-row">
+              <GoldIcon className="stat-ico" />
+              {runGold + (report ? 0 : game.gold)}
+            </span>
+          </span>
+          <span className="stat" title="Chests remaining">
+            <span className="stat-label">Left</span>
+            <span className="stat-row">
+              <span className="dot chest-dot" />
+              {remaining}
+            </span>
+          </span>
+          <span className="stat wreck" title="Chests destroyed">
+            <span className="stat-label">Wrecked</span>
+            <span className="stat-row">
+              <span className="dot wreck-dot" />
+              {game.chestsDestroyed}
+            </span>
+          </span>
+        </div>
+        <span className="floor-pill">{floorLabel}</span>
+      </header>
+
+      <div className="board-wrap" ref={ref}>
+        <Board
+          game={game}
+          flagMode={flagMode}
+          cellPx={px}
+          blasts={blasts}
+          sparkles={sparkles}
+          shaking={shaking}
+          onDig={onDig}
+          onFlag={onFlag}
+        />
+      </div>
+
+      <footer className="dock">
+        <div className="toggle" role="group" aria-label="Dig or flag">
+          <button
+            className={`toggle-btn${!flagMode ? ' on' : ''}`}
+            onClick={() => setFlagMode(false)}
+          >
+            <ShovelIcon />
+            Dig
+          </button>
+          <button
+            className={`toggle-btn${flagMode ? ' on flag' : ''}`}
+            onClick={() => setFlagMode(true)}
+          >
+            <FlagIcon />
+            Flag
+          </button>
+        </div>
+        <p className="hint">Tap to {flagMode ? 'flag' : 'dig'} · hold 400ms to flag</p>
+      </footer>
+
+      {tutorial && (
+        <div className="overlay" onClick={onDismissTutorial} role="dialog">
+          <div className="tablet" onClick={(e) => e.stopPropagation()}>
+            <h2>First descent</h2>
+            <p>Bombs don&apos;t kill you. They kill the loot next to them.</p>
+            <p>Clear every safe tile. Blasts chain — a bomb sets off its neighbors.</p>
+            <button className="stone-btn gold" onClick={onDismissTutorial}>
+              I understand
+            </button>
+          </div>
+        </div>
+      )}
+
+      {report && (
+        <div className="overlay" role="dialog">
+          <div className="tablet">
+            <h2>{report.lastFloor && mode === 'campaign' ? 'Dungeon cleared' : 'Floor cleared'}</h2>
+            <div className="tally">
+              <div>
+                <em>Gold earned</em>
+                <strong className="pos">{report.gold}</strong>
+              </div>
+              <div>
+                <em>Gold destroyed</em>
+                <strong className="neg">{report.destroyed}</strong>
+              </div>
+            </div>
+            <p className="muted">
+              {report.opened} chests looted · {report.wrecked} wrecked
+            </p>
+            {mode === 'campaign' && (
+              <p className="muted">Run gold {runGold}</p>
+            )}
+            <div className="row-btns">
+              {mode === 'campaign' && !report.lastFloor ? (
+                <button className="stone-btn gold" onClick={onNext}>
+                  Descend
+                </button>
+              ) : (
+                <button className="stone-btn gold" onClick={onNext}>
+                  {mode === 'campaign' ? 'Return' : 'Menu'}
+                </button>
+              )}
+              <button className="stone-btn" onClick={onRetry}>
+                Replay floor
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
