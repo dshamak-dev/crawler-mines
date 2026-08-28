@@ -1,3 +1,4 @@
+import { emptyInventory, goldForLoot, rollLoot, type ItemId } from './loot';
 import { type Cell, type FloorConfig, type Game, type Rng, newCell } from './types';
 
 export const DIRS: ReadonlyArray<readonly [number, number]> = [
@@ -79,8 +80,10 @@ export function createGame(config: FloorConfig, rng: Rng): Game {
   const cells: Cell[] = Array.from({ length: total }, () => newCell());
   const chestIdx = pickUnique(chests, total, new Set(), rng);
   for (const i of chestIdx) {
+    const loot = rollLoot(rng);
     cells[i].kind = 'chest';
-    cells[i].gold = chestValue;
+    cells[i].loot = loot;
+    cells[i].gold = goldForLoot(loot, chestValue);
   }
   const banned = new Set(chestIdx);
   const mineIdx = pickUnique(mines, total, banned, rng);
@@ -98,13 +101,18 @@ export function createGame(config: FloorConfig, rng: Rng): Game {
     goldDestroyed: 0,
     chestsOpened: 0,
     chestsDestroyed: 0,
+    inventory: emptyInventory(),
     firstClickDone: false,
     status: 'playing',
   };
 }
 
 /** Build a board from a layout for tests. `.` empty, `*` mine, `$` chest. */
-export function createGameFromLayout(rows: string[], chestValue = 10): Game {
+export function createGameFromLayout(
+  rows: string[],
+  chestValue = 10,
+  loot: ItemId = 'gold-pouch',
+): Game {
   const height = rows.length;
   const width = rows[0].length;
   const cells: Cell[] = [];
@@ -118,7 +126,13 @@ export function createGameFromLayout(rows: string[], chestValue = 10): Game {
         cells.push(newCell({ kind: 'mine' }));
         mines++;
       } else if (ch === '$') {
-        cells.push(newCell({ kind: 'chest', gold: chestValue }));
+        cells.push(
+          newCell({
+            kind: 'chest',
+            loot,
+            gold: goldForLoot(loot, chestValue),
+          }),
+        );
         chests++;
       } else {
         cells.push(newCell());
@@ -136,6 +150,7 @@ export function createGameFromLayout(rows: string[], chestValue = 10): Game {
     goldDestroyed: 0,
     chestsOpened: 0,
     chestsDestroyed: 0,
+    inventory: emptyInventory(),
     firstClickDone: true,
     status: 'playing',
   };
@@ -145,6 +160,7 @@ export function cloneGame(game: Game): Game {
   return {
     ...game,
     cells: game.cells.map((c) => ({ ...c })),
+    inventory: { ...game.inventory },
   };
 }
 
@@ -190,11 +206,14 @@ export function ensureFirstClickSafe(game: Game, index: number, rng: Rng): void 
   if (destCell.kind === 'chest') {
     cell.kind = 'chest';
     cell.gold = destCell.gold;
+    cell.loot = destCell.loot;
     destCell.kind = 'mine';
     destCell.gold = 0;
+    destCell.loot = null;
   } else {
     cell.kind = 'empty';
     cell.gold = 0;
+    cell.loot = null;
     destCell.kind = 'mine';
   }
 

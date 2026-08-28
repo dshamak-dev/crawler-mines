@@ -1,3 +1,5 @@
+import type { Inventory, ItemId } from './loot';
+
 export type CellKind = 'empty' | 'mine' | 'chest';
 export type CellState = 'hidden' | 'flagged' | 'revealed';
 export type GameStatus = 'playing' | 'cleared';
@@ -12,6 +14,8 @@ export interface Cell {
   wrecked: boolean;
   exploded: boolean;
   gold: number;
+  /** Concrete loot rolled into this chest. Stays on wrecks so the miss can flash. */
+  loot: ItemId | null;
 }
 
 export interface FloorConfig {
@@ -32,6 +36,8 @@ export interface Game {
   goldDestroyed: number;
   chestsOpened: number;
   chestsDestroyed: number;
+  /** This-floor loot actually opened (wrecks never land here). */
+  inventory: Inventory;
   firstClickDone: boolean;
   status: GameStatus;
 }
@@ -39,7 +45,7 @@ export interface Game {
 export type GameEvent =
   | { type: 'reveal'; indices: number[] }
   | { type: 'explode'; index: number; wrecked: number[]; wave: number }
-  | { type: 'chest'; index: number; gold: number }
+  | { type: 'chest'; index: number; gold: number; itemId: ItemId }
   | { type: 'cleared' };
 
 export const DIFFICULTIES: Record<'easy' | 'medium' | 'hard', FloorConfig> = {
@@ -65,6 +71,7 @@ export function newCell(partial: Partial<Cell> = {}): Cell {
     wrecked: false,
     exploded: false,
     gold: 0,
+    loot: null,
     ...partial,
   };
 }

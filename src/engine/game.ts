@@ -3,6 +3,7 @@ import {
   isWon,
   neighbors,
 } from './board';
+import { addItem } from './loot';
 import type { Game, GameEvent, Rng } from './types';
 
 /**
@@ -68,10 +69,11 @@ function revealFlood(game: Game, start: number, events: GameEvent[]): number[] {
     c.state = 'revealed';
     revealed.push(i);
 
-    if (c.kind === 'chest' && !c.wrecked) {
+    if (c.kind === 'chest' && !c.wrecked && c.loot) {
       game.gold += c.gold;
       game.chestsOpened += 1;
-      events.push({ type: 'chest', index: i, gold: c.gold });
+      game.inventory = addItem(game.inventory, c.loot);
+      events.push({ type: 'chest', index: i, gold: c.gold, itemId: c.loot });
     }
 
     if (c.adjacentMines === 0) {
