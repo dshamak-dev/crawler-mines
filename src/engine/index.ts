@@ -31,6 +31,8 @@ export {
   isChestTier,
   isCollectible,
   isItemId,
+  isTicketKey,
+  removeItem,
   rollLoot,
   stackedEntries,
   tierForLoot,
@@ -62,6 +64,18 @@ export {
 export { chestNotices, dig, explodeChain, grantIntactLoot, toggleFlag } from './game';
 export type { ChestNotice } from './game';
 export { mulberry32 } from './rng';
+export {
+  CAMPAIGN_COST,
+  HARD_COST,
+  confirmCopy,
+  confirmLabel,
+  entryCost,
+  entryKeyId,
+  isPaidMode,
+  quoteEntry,
+  spendEntry,
+} from './ticket';
+export type { EntryKind, EntryQuote, PaidMode } from './ticket';
 export {
   RUN_KEY,
   bankFloor,

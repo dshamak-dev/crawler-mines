@@ -193,6 +193,39 @@ button {
   background: linear-gradient(180deg, #6b4e1e, #3d2c12);
   color: var(--gold-2);
 }
+.stone-btn.is-locked {
+  opacity: 0.58;
+}
+.stone-btn.is-locked:active {
+  transform: none;
+  box-shadow: 0 3px 0 #1a1410, inset 0 1px 0 rgba(255, 220, 160, 0.12);
+}
+.stone-btn .mode-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.stone-btn .mode-ticket,
+.stone-btn .mode-ticket span {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--gold-2);
+  font-family: var(--font-ui);
+  letter-spacing: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.stone-btn .mode-price,
+.stone-btn .mode-key {
+  gap: 4px;
+}
+.stone-btn .mode-price .glyph,
+.stone-btn .mode-key .glyph {
+  width: 16px;
+  height: 16px;
+}
 
 .play-shell {
   gap: 6px;
@@ -881,6 +914,9 @@ button {
   color: var(--gold);
   font-size: 1.05rem;
   flex-shrink: 0;
+}
+.loot-card.is-ticket {
+  border-color: rgba(201, 180, 255, 0.35);
 }
 .collection-back {
   width: 100%;

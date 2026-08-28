@@ -2,7 +2,12 @@ import { useCallback, useRef, useState } from 'react';
 import {
   CAMPAIGN_FLOORS,
   chestNotices,
+  confirmCopy,
+  confirmLabel,
+  isTicketKey,
+  quoteEntry,
   stackedEntries,
+  type CollectionState,
   type Difficulty,
   type GameEvent,
 } from './engine';
@@ -69,7 +74,8 @@ export default function App() {
   };
 
   const start = (mode: Difficulty) => {
-    startRun(mode);
+    const ok = startRun(mode);
+    if (!ok) return;
     clearFx();
     setScreen('play');
     try {
@@ -188,6 +194,7 @@ export default function App() {
             resumeCopy={run ? resumeLabel(run) : null}
             onCollection={() => openCollection('menu')}
             gold={meta.gold}
+            meta={meta}
           />
         ) : (
           <Play
@@ -226,13 +233,33 @@ function Menu({
   resumeCopy,
   onCollection,
   gold,
+  meta,
 }: {
   onStart: (m: Difficulty) => void;
   onResume?: () => void;
   resumeCopy: string | null;
   onCollection: () => void;
   gold: number;
+  meta: CollectionState;
 }) {
+  const [pending, setPending] = useState<Difficulty | null>(null);
+  const quote = pending ? quoteEntry(pending, meta) : null;
+
+  const pick = (mode: Difficulty) => {
+    const next = quoteEntry(mode, meta);
+    if (next.kind === 'free') {
+      onStart(mode);
+      return;
+    }
+    setPending(mode);
+  };
+
+  const confirm = () => {
+    if (!pending || !quote || quote.kind === 'blocked') return;
+    onStart(pending);
+    setPending(null);
+  };
+
   return (
     <div className="shell menu-shell">
       <header className="title-block">
@@ -262,21 +289,102 @@ function Menu({
           </button>
         )}
         <div className="menu-modes">
-          <button className="stone-btn" onClick={() => onStart('easy')}>
+          <button type="button" className="stone-btn" onClick={() => pick('easy')}>
             Easy <span>8x8</span>
           </button>
-          <button className="stone-btn" onClick={() => onStart('medium')}>
+          <button type="button" className="stone-btn" onClick={() => pick('medium')}>
             Medium <span>9x12</span>
           </button>
-          <button className="stone-btn" onClick={() => onStart('hard')}>
-            Hard <span>12x16</span>
-          </button>
-          <button className="stone-btn gold" onClick={() => onStart('campaign')}>
-            Campaign <span>5 floors</span>
-          </button>
+          <ModeButton mode="hard" label="Hard" size="12x16" meta={meta} onPick={pick} />
+          <ModeButton
+            mode="campaign"
+            label="Campaign"
+            size="5 floors"
+            gold
+            meta={meta}
+            onPick={pick}
+          />
         </div>
       </nav>
+      {quote && pending && (
+        <div
+          className="overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="entry-title"
+          onClick={() => setPending(null)}
+        >
+          <div className="tablet" onClick={(e) => e.stopPropagation()}>
+            <h2 id="entry-title">
+              {quote.kind === 'blocked'
+                ? pending === 'hard'
+                  ? "Can't enter Hard"
+                  : "Can't enter Campaign"
+                : pending === 'hard'
+                  ? 'Enter Hard?'
+                  : 'Enter Campaign?'}
+            </h2>
+            <p>{confirmCopy(quote)}</p>
+            {quote.kind === 'blocked' ? (
+              <button type="button" className="stone-btn gold" onClick={() => setPending(null)}>
+                Got it
+              </button>
+            ) : (
+              <div className="row-btns">
+                <button type="button" className="stone-btn gold" onClick={confirm}>
+                  {confirmLabel(quote)}
+                </button>
+                <button type="button" className="stone-btn" onClick={() => setPending(null)}>
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+function ModeButton({
+  mode,
+  label,
+  size,
+  gold,
+  meta,
+  onPick,
+}: {
+  mode: Difficulty;
+  label: string;
+  size: string;
+  gold?: boolean;
+  meta: CollectionState;
+  onPick: (mode: Difficulty) => void;
+}) {
+  const quote = quoteEntry(mode, meta);
+  return (
+    <button
+      type="button"
+      className={`stone-btn${gold ? ' gold' : ''}${quote.kind === 'blocked' ? ' is-locked' : ''}`}
+      onClick={() => onPick(mode)}
+    >
+      {label}
+      <span className="mode-meta">
+        <span>{size}</span>
+        <span className="mode-ticket">
+          <span className="mode-price">
+            <GoldIcon />
+            {quote.cost}
+          </span>
+          {quote.keyCount > 0 && quote.keyId ? (
+            <span className="mode-key">
+              <ItemIcon id={quote.keyId} />
+              ×{quote.keyCount}
+            </span>
+          ) : null}
+        </span>
+      </span>
+    </button>
   );
 }
 
@@ -428,7 +536,7 @@ function Play({
                   </li>
                 )}
                 {salvage.map(({ item, count }) => (
-                  <li key={item.id} className="loot-card">
+                  <li key={item.id} className={`loot-card${isTicketKey(item.id) ? ' is-ticket' : ''}`}>
                     <span className="loot-ico">
                       <ItemIcon id={item.id} />
                     </span>

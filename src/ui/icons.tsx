@@ -28,6 +28,14 @@ const TIER_PAINT: Record<
     shine: '#f0d78c',
     wreck: '#8a6a40',
   },
+  rare: {
+    body: '#4a2d6a',
+    lid: '#6b3d8a',
+    band: '#2a1840',
+    latch: '#e0b44a',
+    shine: '#c9b4ff',
+    wreck: '#3a2850',
+  },
 };
 
 export function ChestIcon({
@@ -182,12 +190,18 @@ function GoldPouchGlyph() {
   );
 }
 
-function KeyGlyph() {
+function KeyGlyph({
+  body = '#a38452',
+  ring = '#8a7348',
+}: {
+  body?: string;
+  ring?: string;
+}) {
   return (
     <svg viewBox="0 0 32 32" className="glyph" aria-hidden="true">
-      <circle cx="11" cy="12" r="5.4" fill="#8a7348" />
+      <circle cx="11" cy="12" r="5.4" fill={ring} />
       <circle cx="11" cy="12" r="2.2" fill="#1a1512" />
-      <path d="M15.4 13.2h12.2v3.1H24l-.2 5.4h-3.1l-.2-5.4h-2.2l-.3 3.6h-3z" fill="#a38452" />
+      <path d="M15.4 13.2h12.2v3.1H24l-.2 5.4h-3.1l-.2-5.4h-2.2l-.3 3.6h-3z" fill={body} />
       <path d="M8.4 10.2l1.6-1.2" stroke="#c9b59a" strokeWidth="0.9" />
     </svg>
   );
@@ -233,6 +247,10 @@ export function ItemIcon({ id, className }: { id: ItemId; className?: string }) 
       <GoldPouchGlyph />
     ) : id === 'rusty-key' ? (
       <KeyGlyph />
+    ) : id === 'hard-key' ? (
+      <KeyGlyph body="#8a93a0" ring="#6a7380" />
+    ) : id === 'campaign-key' ? (
+      <KeyGlyph body="#e0b44a" ring="#d4a017" />
     ) : id === 'torch-charm' ? (
       <CharmGlyph />
     ) : id === 'gem' ? (

@@ -14,6 +14,7 @@ import {
   newGrantKey,
   recoverBank,
   RUN_KEY,
+  spendEntry,
   toggleFlag,
   type CollectionState,
   type Difficulty,
@@ -31,7 +32,7 @@ export interface GameStoreState {
   meta: CollectionState;
   run: Run | null;
   runLoot: Inventory;
-  start: (mode: Difficulty, rng?: Rng) => void;
+  start: (mode: Difficulty, rng?: Rng) => boolean;
   abandon: () => void;
   nextFloor: (rng?: Rng) => void;
   retryFloor: (rng?: Rng) => void;
@@ -75,10 +76,14 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
         run: loaded.run,
         runLoot: recovered.runLoot,
         start: (mode, rng = Math.random) => {
+          const spent = spendEntry(get().meta, mode, keyStore);
+          if (!spent) return false;
           set({
+            meta: spent,
             run: freshRun(mode, rng),
             runLoot: emptyInventory(),
           });
+          return true;
         },
         abandon: () => {
           set({ run: null, runLoot: emptyInventory() });
