@@ -1,5 +1,13 @@
 import { coords, neighbors } from './board';
-import { BOSS_MAX_LIVES, type Game, type GameEvent } from './types';
+import {
+  BOSS_IDS,
+  BOSS_MAX_LIVES,
+  type BossId,
+  type BossState,
+  type Game,
+  type GameEvent,
+  type Rng,
+} from './types';
 
 /** Open non-bomb: revealed empty / number / chest / wreck. Never hidden or mine. */
 export function isWalkable(game: Game, index: number): boolean {
@@ -22,9 +30,33 @@ export function flaggedCells(game: Game): number[] {
   return out;
 }
 
-/** Wounded after the first hit until death — may smash intact sealed chests. */
+/** Wounded after the first hit until death — Gluttony may smash intact sealed chests. */
 export function isWounded(boss: { lives: number }): boolean {
   return boss.lives > 0 && boss.lives < BOSS_MAX_LIVES;
+}
+
+export function isBossId(value: unknown): value is BossId {
+  return typeof value === 'string' && (BOSS_IDS as readonly string[]).includes(value);
+}
+
+/** Equal-weight Gluttony / Wrath roll for a fresh campaign floor-5 board. */
+export function rollBossId(rng: Rng): BossId {
+  return rng() < 0.5 ? 'gluttony' : 'wrath';
+}
+
+export const BOSS_COPY: Record<BossId, { name: string; blurb: string }> = {
+  gluttony: {
+    name: 'Gluttony',
+    blurb: 'Eats the closest flag. After a hit, smashes sealed chests when no flags remain.',
+  },
+  wrath: {
+    name: 'Wrath',
+    blurb: 'Hunts your last dig or flag. Smashes adjacent chests. Slams a mine when stuck.',
+  },
+};
+
+export function headItemId(id: BossId): 'gluttony-head' | 'wrath-head' {
+  return id === 'wrath' ? 'wrath-head' : 'gluttony-head';
 }
 
 function healthyChestIndices(game: Game): number[] {
@@ -44,6 +76,13 @@ function adjacentHealthyChests(game: Game, index: number): number[] {
   return neighbors(game.width, game.height, index).filter((n) => {
     const cell = game.cells[n];
     return cell.kind === 'chest' && !cell.wrecked;
+  });
+}
+
+function adjacentUnexplodedMines(game: Game, index: number): number[] {
+  return neighbors(game.width, game.height, index).filter((n) => {
+    const cell = game.cells[n];
+    return cell.kind === 'mine' && !cell.exploded;
   });
 }
 
@@ -119,7 +158,16 @@ function walkableNeighborsOfChests(game: Game, chests: readonly number[]): Set<n
   return goals;
 }
 
-function smashChest(game: Game, index: number): GameEvent | null {
+function huntGoals(game: Game, target: number): Set<number> {
+  if (isWalkable(game, target)) return new Set([target]);
+  const goals = new Set<number>();
+  for (const n of neighbors(game.width, game.height, target)) {
+    if (isWalkable(game, n)) goals.add(n);
+  }
+  return goals;
+}
+
+export function smashChest(game: Game, index: number): GameEvent | null {
   const cell = game.cells[index];
   if (!cell || cell.kind !== 'chest' || cell.wrecked) return null;
   const wasFound = cell.state === 'revealed';
@@ -132,15 +180,7 @@ function smashChest(game: Game, index: number): GameEvent | null {
   return tier ? { type: 'boss-smash-chest', index, tier } : null;
 }
 
-/**
- * One Gluttony action: eat an adjacent flag, else (when wounded) smash or
- * step toward the nearest intact sealed chest, else step toward the nearest
- * flag on open non-bomb cells, else wait.
- */
-export function stepBoss(game: Game): GameEvent[] {
-  const boss = game.boss;
-  if (!boss || game.status !== 'playing' || boss.lives <= 0) return [];
-
+function stepGluttony(game: Game, boss: BossState): GameEvent[] {
   const flags = flaggedCells(game);
   if (flags.length > 0) {
     const nextTo = adjacentFlags(game, boss.index, flags);
@@ -177,15 +217,43 @@ export function stepBoss(game: Game): GameEvent[] {
   return [{ type: 'boss-move', index: step }];
 }
 
-/** Reload must finish a persisted boss turn instead of skipping it. */
-export function resolvePendingBossTurn(game: Game): void {
-  if (game.status !== 'playing' || !game.boss) {
-    game.turn = 'player';
-    return;
+function stepWrath(game: Game, boss: BossState): GameEvent[] {
+  const nextChest = adjacentHealthyChests(game, boss.index);
+  if (nextChest.length > 0) {
+    const target = pickNearest(game.width, boss.index, nextChest);
+    const smashed = smashChest(game, target);
+    return smashed ? [smashed] : [];
   }
-  if (game.turn !== 'boss') return;
-  stepBoss(game);
-  game.turn = 'player';
+
+  const last = game.lastPlayerAction;
+  if (last == null || last < 0 || last >= game.cells.length) return [];
+
+  const goals = huntGoals(game, last);
+  if (goals.has(boss.index)) return [];
+
+  const step = firstStepToward(game, boss.index, goals);
+  if (step != null && step !== boss.index) {
+    boss.index = step;
+    return [{ type: 'boss-move', index: step }];
+  }
+
+  const mines = adjacentUnexplodedMines(game, boss.index);
+  if (mines.length === 0) return [];
+
+  const target = pickNearest(game.width, boss.index, mines);
+  return [{ type: 'boss-slam', index: target }];
+}
+
+/**
+ * One boss action. Gluttony: flags first, then wounded chest smash.
+ * Wrath: adjacent chest smash, hunt last action, else mine-slam (self-hit).
+ * A `boss-slam` event must be resolved by the game layer via explodeChain.
+ */
+export function stepBoss(game: Game): GameEvent[] {
+  const boss = game.boss;
+  if (!boss || game.status !== 'playing' || boss.lives <= 0) return [];
+  if (boss.id === 'wrath') return stepWrath(game, boss);
+  return stepGluttony(game, boss);
 }
 
 /** Each exploding mine whose 8-neighborhood contains the boss deals 1 life. */

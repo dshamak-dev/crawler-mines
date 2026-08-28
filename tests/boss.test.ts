@@ -2,21 +2,22 @@ import { describe, expect, it } from 'vitest';
 import {
   BOSS_MAX_LIVES,
   CAMPAIGN_COST,
+  DIFFICULTIES,
   allSafeRevealed,
   cloneGame,
   createGame,
   createGameFromLayout,
   configFor,
   dig,
-  emptyCollection,
   emptyInventory,
   emptyStash,
   flag,
   isLost,
   isWalkable,
-  isWon,
   loadCollection,
   mulberry32,
+  rollBonusKey,
+  rollBossId,
   saveCollection,
   stepBoss,
   toggleFlag,
@@ -71,6 +72,39 @@ function revealHiddenSafe(
   }
 }
 
+function killBoss(
+  store: ReturnType<typeof createGameStore>,
+  rng: () => number,
+): GameEvent[] {
+  const allEvents: GameEvent[] = [];
+  for (let hit = 0; hit < BOSS_MAX_LIVES + 2; hit++) {
+    const g = store.getState().run?.game;
+    if (!g || g.status !== 'playing') break;
+    const mine = g.cells.findIndex((c) => c.kind === 'mine' && !c.exploded);
+    if (mine < 0) break;
+    allEvents.push(...store.getState().applyDig(mine, rng));
+  }
+  return allEvents;
+}
+
+/** Fixed sequence: first values for digs (unused when firstClickDone), then settle rolls. */
+function seqRng(values: number[]): () => number {
+  let i = 0;
+  return () => {
+    const v = values[Math.min(i, values.length - 1)] ?? 0;
+    i += 1;
+    return v;
+  };
+}
+
+describe('Hard has no boss', () => {
+  it('hard config and generated boards never spawn a boss', () => {
+    expect(DIFFICULTIES.hard.bossLives).toBeUndefined();
+    const game = createGame(configFor('hard', 0), mulberry32(3), 'hard');
+    expect(game.boss).toBeNull();
+  });
+});
+
 describe('campaign floors before last do not pay wallet', () => {
   it('stashes pouch gold and items instead of banking', () => {
     const { store } = withWallet(150);
@@ -87,6 +121,7 @@ describe('campaign floors before last do not pay wallet', () => {
         grantKey: 'camp-f0',
         campaignStash: emptyStash(),
         bonusKey: null,
+        bossRevealPending: false,
       },
     });
     const rng = mulberry32(1);
@@ -116,6 +151,7 @@ describe('campaign floors before last do not pay wallet', () => {
         grantKey: 'camp-f1',
         campaignStash: { gold: 10, items: emptyInventory() },
         bonusKey: null,
+        bossRevealPending: false,
       },
       runLoot: emptyInventory(),
     });
@@ -126,6 +162,87 @@ describe('campaign floors before last do not pay wallet', () => {
     expect(s.getState().run?.campaignStash?.gold).toBe(32);
     expect(s.getState().meta.gold).toBe(50);
     expect(loadCollection(store).gold).toBe(50);
+  });
+});
+
+describe('floor 5 rolls and persists boss id', () => {
+  it('rolls Gluttony or Wrath with equal weight and persists across resume', () => {
+    expect(rollBossId(() => 0.49)).toBe('gluttony');
+    expect(rollBossId(() => 0.5)).toBe('wrath');
+
+    const { store } = withWallet(100);
+    const s1 = createGameStore(store);
+    const game = createGameFromLayout(['B.*', '...'], 10, 'gold-pouch', undefined, 'wrath');
+    dig(game, idx(game, 1, 0), mulberry32(1));
+    s1.setState({
+      meta: loadCollection(store),
+      run: {
+        mode: 'campaign',
+        floor: 4,
+        game: cloneGame(game),
+        grantKey: 'boss-roll',
+        campaignStash: emptyStash(),
+        bonusKey: null,
+        bossRevealPending: true,
+      },
+      runLoot: emptyInventory(),
+    });
+    expect(s1.getState().run?.game.boss?.id).toBe('wrath');
+    expect(s1.getState().run?.bossRevealPending).toBe(true);
+
+    const s2 = createGameStore(store);
+    expect(s2.getState().run?.game.boss?.id).toBe('wrath');
+    expect(s2.getState().run?.bossRevealPending).toBe(false);
+  });
+
+  it('descending onto floor 5 marks reveal pending and does not name bosses on earlier floors', () => {
+    const { store } = withWallet(100);
+    const s = createGameStore(store);
+    expect(s.getState().start('campaign', mulberry32(8))).toBe(true);
+    expect(s.getState().run?.game.boss).toBeNull();
+    expect(s.getState().run?.bossRevealPending).toBe(false);
+
+    s.setState({
+      run: {
+        ...s.getState().run!,
+        floor: 3,
+        game: createGame(configFor('campaign', 3), mulberry32(1), 'campaign'),
+        campaignStash: emptyStash(),
+        bossRevealPending: false,
+      },
+    });
+    expect(s.getState().run?.game.boss).toBeNull();
+    s.getState().nextFloor(mulberry32(11));
+    expect(s.getState().run?.floor).toBe(4);
+    expect(s.getState().run?.game.boss).not.toBeNull();
+    expect(s.getState().run?.bossRevealPending).toBe(true);
+    expect(['gluttony', 'wrath']).toContain(s.getState().run?.game.boss?.id);
+  });
+
+  it('resume skips popup and does not reroll the boss id', () => {
+    const { store } = withWallet(100);
+    const s1 = createGameStore(store);
+    const game = createGameFromLayout(['B..', '...'], 10, 'gold-pouch', undefined, 'gluttony');
+    s1.setState({
+      meta: loadCollection(store),
+      run: {
+        mode: 'campaign',
+        floor: 4,
+        game,
+        grantKey: 'boss-keep',
+        campaignStash: { gold: 3, items: emptyInventory() },
+        bonusKey: null,
+        bossRevealPending: true,
+      },
+      runLoot: emptyInventory(),
+    });
+    s1.getState().dismissBossReveal();
+    expect(s1.getState().run?.bossRevealPending).toBe(false);
+
+    const s2 = createGameStore(store);
+    expect(s2.getState().run?.game.boss?.id).toBe('gluttony');
+    expect(s2.getState().run?.bossRevealPending).toBe(false);
+    expect(s2.getState().run?.campaignStash?.gold).toBe(3);
   });
 });
 
@@ -231,6 +348,52 @@ describe('Gluttony movement', () => {
   });
 });
 
+describe('Wrath movement and combat', () => {
+  it('hunts the last dig cell and ignores flags as food', () => {
+    const game = createGameFromLayout(['B...', '....'], 10, 'gold-pouch', undefined, 'wrath');
+    const digCell = idx(game, 3, 0);
+    const flagCell = idx(game, 0, 1);
+    for (const i of [idx(game, 1, 0), idx(game, 2, 0), digCell]) {
+      game.cells[i].state = 'revealed';
+    }
+    game.lastPlayerAction = digCell;
+    expect(toggleFlag(game, flagCell)).toBe(true);
+    expect(game.cells[flagCell].state).toBe('flagged');
+    const moved = stepBoss(game);
+    expect(moved.some((e) => e.type === 'boss-eat-flag')).toBe(false);
+    expect(moved).toEqual([{ type: 'boss-move', index: idx(game, 1, 0) }]);
+    expect(game.cells[flagCell].state).toBe('flagged');
+  });
+
+  it('smashes an adjacent healthy sealed chest from life 1', () => {
+    const game = createGameFromLayout(['B$.', '...'], 10, 'gem', undefined, 'wrath');
+    const chest = idx(game, 1, 0);
+    expect(game.boss?.lives).toBe(BOSS_MAX_LIVES);
+    const events = stepBoss(game);
+    expect(events).toEqual([{ type: 'boss-smash-chest', index: chest, tier: 'iron' }]);
+    expect(game.cells[chest].wrecked).toBe(true);
+    expect(game.chestsDestroyed).toBe(1);
+  });
+
+  it('mine-slams when it cannot path to the last action and takes 1 life', () => {
+    const game = createGameFromLayout(['B*.', '...', '...'], 10, 'gold-pouch', undefined, 'wrath');
+    const far = idx(game, 2, 2);
+    const events = flag(game, far);
+    expect(game.lastPlayerAction).toBe(far);
+    expect(events.some((e) => e.type === 'explode')).toBe(true);
+    expect(events.filter((e) => e.type === 'boss-hit')).toHaveLength(1);
+    expect(game.boss?.lives).toBe(BOSS_MAX_LIVES - 1);
+    expect(game.cells[idx(game, 1, 0)].exploded).toBe(true);
+  });
+
+  it('waits when there is no path and no neighboring mine', () => {
+    const game = createGameFromLayout(['B.', '..'], 10, 'gold-pouch', undefined, 'wrath');
+    game.lastPlayerAction = idx(game, 1, 1);
+    expect(stepBoss(game)).toEqual([]);
+    expect(game.boss?.lives).toBe(BOSS_MAX_LIVES);
+  });
+});
+
 describe('Gluttony combat', () => {
   it('starts with 3 lives on the boss floor', () => {
     const game = createGame(configFor('campaign', 4), mulberry32(9));
@@ -260,7 +423,7 @@ describe('Gluttony combat', () => {
     expect(game.boss?.lives).toBe(BOSS_MAX_LIVES - 1);
   });
 
-  it('losing with a living boss after all safe cells open wipes the stash', () => {
+  it('losing with a living boss after all safe cells open grants nothing', () => {
     const { store } = withWallet(80);
     const s = createGameStore(store);
     const game = createGameFromLayout(['B.', '*.']);
@@ -276,6 +439,7 @@ describe('Gluttony combat', () => {
           items: { ...emptyInventory(), gem: 2, 'rusty-key': 1 },
         },
         bonusKey: null,
+        bossRevealPending: false,
       },
       runLoot: { ...emptyInventory(), gem: 2, 'rusty-key': 1 },
     });
@@ -291,12 +455,23 @@ describe('Gluttony combat', () => {
     expect(s.getState().meta.gold).toBe(80);
     expect(loadCollection(store).gold).toBe(80);
     expect(loadCollection(store).items.gem).toBe(0);
+    expect(loadCollection(store).items['gluttony-head']).toBe(0);
+    expect(loadCollection(store).items['hard-key']).toBe(0);
+    expect(loadCollection(store).items['campaign-key']).toBe(0);
+  });
+});
+
+describe('boss win rewards', () => {
+  it('25% chance of a bonus key then 50/50 hard vs campaign; otherwise null', () => {
+    expect(rollBonusKey(() => 0.25)).toBeNull();
+    expect(rollBonusKey(seqRng([0.24, 0.4]))).toBe('hard-key');
+    expect(rollBonusKey(seqRng([0.1, 0.6]))).toBe('campaign-key');
   });
 
-  it('killing Gluttony grants stash plus a random key', () => {
-    const { store } = withWallet(12);
+  it('killing Gluttony always grants a stacked head and optionally a key', () => {
+    const { store } = withWallet(12, { 'gluttony-head': 1 });
     const s = createGameStore(store);
-    const game = createGameFromLayout(['*..', '.B.', '*.*']);
+    const game = createGameFromLayout(['*..', '.B.', '*.*'], 10, 'gold-pouch', undefined, 'gluttony');
     const stashItems = { ...emptyInventory(), 'torch-charm': 1 };
     s.setState({
       meta: loadCollection(store),
@@ -307,28 +482,48 @@ describe('Gluttony combat', () => {
         grantKey: 'boss-win',
         campaignStash: { gold: 25, items: stashItems },
         bonusKey: null,
+        bossRevealPending: false,
       },
       runLoot: { ...stashItems },
     });
-    const rng = mulberry32(21);
-    const allEvents: GameEvent[] = [];
-    for (let hit = 0; hit < BOSS_MAX_LIVES; hit++) {
-      const g = s.getState().run?.game;
-      if (!g || g.status !== 'playing') break;
-      const mine = g.cells.findIndex((c) => c.kind === 'mine' && !c.exploded);
-      if (mine < 0) break;
-      allEvents.push(...s.getState().applyDig(mine, rng));
-    }
-    expect(allEvents.some((e) => e.type === 'boss-death')).toBe(true);
+    // After digs (no rng use when firstClickDone), settleCampaign rolls bonus: miss the 25%.
+    const events = killBoss(s, seqRng([0.9, 0.9, 0.9, 0.9]));
+    expect(events.some((e) => e.type === 'boss-death')).toBe(true);
     expect(s.getState().run?.game.status).toBe('cleared');
-    const bonus = s.getState().run?.bonusKey;
-    expect(bonus === 'hard-key' || bonus === 'campaign-key').toBe(true);
+    expect(s.getState().run?.bonusKey).toBeNull();
     const paid = loadCollection(store);
     expect(paid.gold).toBe(37);
     expect(paid.items['torch-charm']).toBe(1);
-    expect(paid.items[bonus!]).toBe(1);
+    expect(paid.items['gluttony-head']).toBe(2);
+    expect(paid.items['hard-key']).toBe(0);
+    expect(paid.items['campaign-key']).toBe(0);
     expect(paid.lastGrantKey).toBe('boss-win');
-    expect(s.getState().run?.campaignStash?.items[bonus!]).toBe(1);
+  });
+
+  it('killing Wrath grants wrath-head and a rolled hard-key inside the 25%', () => {
+    const { store } = withWallet(0);
+    const s = createGameStore(store);
+    const game = createGameFromLayout(['*..', '.B.', '*.*'], 10, 'gold-pouch', undefined, 'wrath');
+    s.setState({
+      meta: loadCollection(store),
+      run: {
+        mode: 'campaign',
+        floor: 4,
+        game,
+        grantKey: 'wrath-win',
+        campaignStash: { gold: 5, items: emptyInventory() },
+        bonusKey: null,
+        bossRevealPending: false,
+      },
+      runLoot: emptyInventory(),
+    });
+    const events = killBoss(s, seqRng([0.1, 0.2]));
+    expect(events.some((e) => e.type === 'boss-death')).toBe(true);
+    expect(s.getState().run?.bonusKey).toBe('hard-key');
+    const paid = loadCollection(store);
+    expect(paid.items['wrath-head']).toBe(1);
+    expect(paid.items['hard-key']).toBe(1);
+    expect(paid.items['gluttony-head']).toBe(0);
   });
 });
 
@@ -347,6 +542,7 @@ describe('campaign resume does not charge gold', () => {
         grantKey: s1.getState().run!.grantKey,
         campaignStash: emptyStash(),
         bonusKey: null,
+        bossRevealPending: false,
       },
     });
     s1.getState().applyDig(1, mulberry32(1));
@@ -379,6 +575,7 @@ describe('campaign resume does not charge gold', () => {
         grantKey: 'boss-live',
         campaignStash: { gold: 7, items: emptyInventory() },
         bonusKey: null,
+        bossRevealPending: false,
       },
       runLoot: emptyInventory(),
     });
@@ -395,11 +592,12 @@ describe('campaign resume does not charge gold', () => {
   });
 });
 
-describe('last campaign floor spawns Gluttony', () => {
+describe('last campaign floor spawns a boss', () => {
   it('reveals the boss cell at start and does not sit on a mine or chest', () => {
     const game = createGame(configFor('campaign', 4), mulberry32(9));
     expect(game.boss).not.toBeNull();
     expect(game.boss?.lives).toBe(BOSS_MAX_LIVES);
+    expect(['gluttony', 'wrath']).toContain(game.boss?.id);
     const cell = game.cells[game.boss!.index];
     expect(cell.state).toBe('revealed');
     expect(cell.kind).toBe('empty');

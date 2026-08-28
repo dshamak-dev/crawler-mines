@@ -39,6 +39,8 @@ export function stashToRewards(
   return out;
 }
 
-export function rollBonusKey(rng: Rng): 'hard-key' | 'campaign-key' {
+/** 25% of boss wins roll a bonus key; inside that, 50/50 hard vs campaign. */
+export function rollBonusKey(rng: Rng): 'hard-key' | 'campaign-key' | null {
+  if (rng() >= 0.25) return null;
   return rng() < 0.5 ? 'hard-key' : 'campaign-key';
 }

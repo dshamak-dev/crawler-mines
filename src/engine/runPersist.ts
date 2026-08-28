@@ -1,7 +1,8 @@
 import { cloneGame } from './board';
-import { clampBossLives, resolvePendingBossTurn } from './boss';
+import { clampBossLives, isBossId } from './boss';
 import type { CollectionState, KeyStore } from './collection';
 import { applyRewards } from './collection';
+import { resolvePendingBossTurn } from './game';
 import {
   addItem,
   emptyInventory,
@@ -33,6 +34,8 @@ export interface Run {
   grantKey: string;
   campaignStash?: CampaignStash;
   bonusKey?: ItemId | null;
+  /** Fresh floor-5 entry shows the boss reveal once; resume skips it. */
+  bossRevealPending?: boolean;
 }
 
 export type FloorOutcome = 'cleared' | 'stashed' | 'victory' | 'lost';
@@ -45,6 +48,7 @@ export interface FloorReport {
   gold: number;
   outcome: FloorOutcome;
   bonusKey: ItemId | null;
+  bossHead: ItemId | null;
 }
 
 export interface PersistedRunSlice {
@@ -75,6 +79,13 @@ export function floorReport(run: Run): FloorReport {
   const victory = run.mode === 'campaign' && lastFloor && run.game.status === 'cleared';
   const stashed = run.mode === 'campaign' && !lastFloor && run.game.status === 'cleared';
   const stash = runStash(run);
+  const bossId = run.game.boss?.id;
+  const bossHead =
+    victory && bossId === 'wrath'
+      ? 'wrath-head'
+      : victory && bossId
+        ? 'gluttony-head'
+        : null;
   return {
     opened: run.game.chestsOpened,
     wrecked: run.game.chestsDestroyed,
@@ -83,6 +94,7 @@ export function floorReport(run: Run): FloorReport {
     gold: victory ? stash.gold : run.game.gold,
     outcome: lost ? 'lost' : victory ? 'victory' : stashed ? 'stashed' : 'cleared',
     bonusKey: victory ? (run.bonusKey ?? null) : null,
+    bossHead,
   };
 }
 
@@ -119,7 +131,8 @@ function sanitizeBoss(raw: unknown, cellCount: number): BossState | null {
   if (!raw || typeof raw !== 'object') return null;
   const b = raw as Record<string, unknown>;
   if (!isInt(b.index) || b.index < 0 || b.index >= cellCount) return null;
-  return { index: b.index, lives: clampBossLives(b.lives) };
+  const id = isBossId(b.id) ? b.id : 'gluttony';
+  return { id, index: b.index, lives: clampBossLives(b.lives) };
 }
 
 function sanitizeCell(raw: unknown): Cell | null {
@@ -172,6 +185,10 @@ function sanitizeGame(raw: unknown): Game | null {
   const rewardsGranted = g.rewardsGranted === true;
   const boss = sanitizeBoss(g.boss, cells.length);
   const turn: Turn = TURNS.includes(g.turn as Turn) ? (g.turn as Turn) : 'player';
+  const lastPlayerAction =
+    isInt(g.lastPlayerAction) && g.lastPlayerAction >= 0 && g.lastPlayerAction < cells.length
+      ? g.lastPlayerAction
+      : null;
   const game: Game = {
     width: g.width,
     height: g.height,
@@ -188,6 +205,7 @@ function sanitizeGame(raw: unknown): Game | null {
     rewardsGranted,
     boss,
     turn,
+    lastPlayerAction,
   };
   resolvePendingBossTurn(game);
   return game;
@@ -213,6 +231,8 @@ export function sanitizeRun(raw: unknown): Run | null {
     grantKey: r.grantKey,
     campaignStash: sanitizeStash(r.campaignStash),
     bonusKey,
+    // Resume never re-shows the floor-5 intro.
+    bossRevealPending: false,
   };
 }
 

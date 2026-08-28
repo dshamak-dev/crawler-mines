@@ -8,7 +8,11 @@ export type Turn = 'player' | 'boss';
 
 export const BOSS_MAX_LIVES = 3;
 
+export const BOSS_IDS = ['gluttony', 'wrath'] as const;
+export type BossId = (typeof BOSS_IDS)[number];
+
 export interface BossState {
+  id: BossId;
   index: number;
   lives: number;
 }
@@ -34,7 +38,7 @@ export interface FloorConfig {
   mines: number;
   chests: number;
   chestValue: number;
-  /** Last campaign floor: Gluttony lives. Absent on normal floors. */
+  /** Campaign floor 5 only. Absent on Hard and earlier campaign floors. */
   bossLives?: number;
 }
 
@@ -56,6 +60,8 @@ export interface Game {
   rewardsGranted: boolean;
   boss: BossState | null;
   turn: Turn;
+  /** Last successful dig or flag/unflag cell. Wrath hunts this. */
+  lastPlayerAction: number | null;
 }
 
 export interface ChestReward {
@@ -73,6 +79,7 @@ export type GameEvent =
   | { type: 'boss-move'; index: number }
   | { type: 'boss-eat-flag'; index: number }
   | { type: 'boss-smash-chest'; index: number; tier: ChestTier }
+  | { type: 'boss-slam'; index: number }
   | { type: 'boss-hit'; lives: number }
   | { type: 'boss-death' };
 
@@ -82,7 +89,7 @@ export const DIFFICULTIES: Record<'easy' | 'medium' | 'hard', FloorConfig> = {
   hard: { width: 12, height: 16, mines: 32, chests: 16, chestValue: 20 },
 };
 
-/** Sequential campaign: rising mine density and more chests. */
+/** Sequential campaign: rising mine density and more chests. Boss only on floor 5. */
 export const CAMPAIGN_FLOORS: FloorConfig[] = [
   { width: 8, height: 8, mines: 7, chests: 5, chestValue: 10 },
   { width: 8, height: 9, mines: 11, chests: 6, chestValue: 12 },

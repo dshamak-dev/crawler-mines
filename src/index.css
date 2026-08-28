@@ -627,6 +627,15 @@ button {
   margin-top: 8px;
   justify-content: center;
 }
+.boss-reveal-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+.boss-reveal-icon .glyph {
+  width: 64px;
+  height: 64px;
+}
 .tally {
   display: grid;
   grid-template-columns: 1fr 1fr;

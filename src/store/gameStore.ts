@@ -12,6 +12,7 @@ import {
   emptyInventory,
   emptyStash,
   flag,
+  headItemId,
   isCampaignFinale,
   loadCollection,
   loadRun,
@@ -44,6 +45,7 @@ export interface GameStoreState {
   abandon: () => void;
   nextFloor: (rng?: Rng) => void;
   retryFloor: (rng?: Rng) => void;
+  dismissBossReveal: () => void;
   applyDig: (index: number, rng?: Rng) => GameEvent[];
   applyFlag: (index: number, rng?: Rng) => GameEvent[];
 }
@@ -64,13 +66,15 @@ function asStateStorage(store: KeyStore): StateStorage {
 }
 
 function freshRun(mode: Difficulty, rng: Rng, stash = emptyStash()): Run {
+  const game = createGame(configFor(mode, 0), rng, mode);
   return {
     mode,
     floor: 0,
-    game: createGame(configFor(mode, 0), rng, mode),
+    game,
     grantKey: newGrantKey(),
     campaignStash: stash,
     bonusKey: null,
+    bossRevealPending: false,
   };
 }
 
@@ -116,8 +120,13 @@ function settleCampaign(
   let nextLoot = { ...stash.items };
 
   if (isCampaignFinale(run.mode, run.floor)) {
+    const bossId = run.game.boss?.id ?? 'gluttony';
+    const head = headItemId(bossId);
+    stash = { gold: stash.gold, items: addItem(stash.items, head) };
     bonusKey = rollBonusKey(rng);
-    stash = { gold: stash.gold, items: addItem(stash.items, bonusKey) };
+    if (bonusKey) {
+      stash = { gold: stash.gold, items: addItem(stash.items, bonusKey) };
+    }
     nextLoot = { ...stash.items };
     const banked = bankFloor(nextMeta, emptyInventory(), stashToRewards(stash), run.grantKey, keyStore);
     nextMeta = banked.meta;
@@ -159,14 +168,16 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
             return;
           }
           const floor = run.floor + 1;
+          const game = createGame(configFor('campaign', floor), rng, 'campaign');
           set({
             run: {
               mode: 'campaign',
               floor,
-              game: createGame(configFor('campaign', floor), rng, 'campaign'),
+              game,
               grantKey: newGrantKey(),
               campaignStash: runStash(run),
               bonusKey: null,
+              bossRevealPending: Boolean(game.boss),
             },
           });
         },
@@ -176,18 +187,26 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
           if (run.mode === 'campaign' && isCampaignFinale(run.mode, run.floor) && run.game.status !== 'playing') {
             return;
           }
+          const game = createGame(configFor(run.mode, run.floor), rng, run.mode);
           set({
             run: {
               ...run,
-              game: createGame(configFor(run.mode, run.floor), rng, run.mode),
+              game,
               grantKey: newGrantKey(),
               bonusKey: null,
+              bossRevealPending: Boolean(game.boss),
             },
           });
+        },
+        dismissBossReveal: () => {
+          const { run } = get();
+          if (!run || !run.bossRevealPending) return;
+          set({ run: { ...run, bossRevealPending: false } });
         },
         applyDig: (index, rng = Math.random) => {
           const { run, meta, runLoot } = get();
           if (!run || run.game.status !== 'playing') return [];
+          if (run.bossRevealPending) return [];
           const game = cloneGame(run.game);
           const events = dig(game, index, rng);
           const settled = settleCampaign(run, events, meta, runLoot, rng, keyStore);
@@ -206,6 +225,7 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
         applyFlag: (index, rng = Math.random) => {
           const { run, meta, runLoot } = get();
           if (!run || run.game.status !== 'playing') return [];
+          if (run.bossRevealPending) return [];
           const game = cloneGame(run.game);
           const events = flag(game, index);
           if (events.length === 0 && game.cells[index]?.state === run.game.cells[index]?.state) {
