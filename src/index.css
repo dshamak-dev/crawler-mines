@@ -164,6 +164,25 @@ button {
   gap: 10px;
 }
 
+.start-btn {
+  justify-content: center;
+  min-height: 56px;
+  font-size: 1.12rem;
+}
+
+.sound-row {
+  min-height: 52px;
+}
+
+.sound-row.is-muted {
+  color: var(--muted);
+}
+
+.mute-btn {
+  flex-shrink: 0;
+}
+
+
 .stone-btn {
   appearance: none;
   border: 1px solid #5a4a38;
@@ -532,6 +551,19 @@ button {
   width: 100%;
   margin-top: 8px;
   justify-content: center;
+}
+.start-sheet {
+  text-align: center;
+}
+.start-sheet .menu-modes {
+  margin: 8px 0 4px;
+}
+.start-sheet .menu-modes .stone-btn {
+  margin-top: 0;
+  justify-content: space-between;
+}
+.start-sheet > .stone-btn.gold {
+  justify-content: space-between;
 }
 .tally {
   display: grid;
