@@ -59,8 +59,8 @@ export function toggleFlag(game: Game, index: number): boolean {
 }
 
 /**
- * After a successful dig or flag: resolve boss kill / campaign lose, else the
- * Flag Eater takes one move. Player + boss are one atomic action for persist.
+ * After a successful dig or flag: resolve boss kill / campaign lose, else
+ * Gluttony takes one move. Player + boss are one atomic action for persist.
  */
 export function afterPlayerAction(game: Game): GameEvent[] {
   const events: GameEvent[] = [];
@@ -162,6 +162,8 @@ export function chestNotices(events: GameEvent[], cells: Cell[]): ChestNotice[] 
         const tier = cells[w]?.tier;
         if (tier) out.push({ kind: 'broken', tier, index: w });
       }
+    } else if (e.type === 'boss-smash-chest') {
+      out.push({ kind: 'broken', tier: e.tier, index: e.index });
     }
   }
   return out;

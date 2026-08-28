@@ -6,7 +6,7 @@ export type GameStatus = 'playing' | 'cleared' | 'lost';
 export type Difficulty = 'easy' | 'medium' | 'hard' | 'campaign';
 export type Turn = 'player' | 'boss';
 
-export const BOSS_MAX_LIVES = 2;
+export const BOSS_MAX_LIVES = 3;
 
 export interface BossState {
   index: number;
@@ -34,7 +34,7 @@ export interface FloorConfig {
   mines: number;
   chests: number;
   chestValue: number;
-  /** Last campaign floor: Flag Eater lives. Absent on normal floors. */
+  /** Last campaign floor: Gluttony lives. Absent on normal floors. */
   bossLives?: number;
 }
 
@@ -72,6 +72,7 @@ export type GameEvent =
   | { type: 'lost' }
   | { type: 'boss-move'; index: number }
   | { type: 'boss-eat-flag'; index: number }
+  | { type: 'boss-smash-chest'; index: number; tier: ChestTier }
   | { type: 'boss-hit'; lives: number }
   | { type: 'boss-death' };
 

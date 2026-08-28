@@ -1,4 +1,4 @@
-import type { Rng } from './types';
+import type { Difficulty, Rng } from './types';
 
 export const ITEM_IDS = [
   'gold-pouch',
@@ -106,15 +106,29 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   },
 };
 
-const LOOT_TABLE: ReadonlyArray<{ itemId: ItemId; weight: number }> = [
+const BASE_LOOT_TABLE: ReadonlyArray<{ itemId: ItemId; weight: number }> = [
   { itemId: 'gold-pouch', weight: 34 },
   { itemId: 'rusty-key', weight: 22 },
   { itemId: 'torch-charm', weight: 18 },
   { itemId: 'gem', weight: 16 },
   { itemId: 'relic-shard', weight: 10 },
   { itemId: 'hard-key', weight: 3 },
-  { itemId: 'campaign-key', weight: 2 },
 ];
+
+/** Hard and Campaign only — about 1% of chests. Easy/Medium never roll this. */
+const CAMPAIGN_KEY_WEIGHT = 1;
+
+export function lootTableFor(mode: Difficulty): ReadonlyArray<{ itemId: ItemId; weight: number }> {
+  if (mode === 'easy' || mode === 'medium') return BASE_LOOT_TABLE;
+  return [...BASE_LOOT_TABLE, { itemId: 'campaign-key', weight: CAMPAIGN_KEY_WEIGHT }];
+}
+
+export function campaignKeyDropRate(mode: Difficulty): number {
+  const table = lootTableFor(mode);
+  const total = table.reduce((sum, row) => sum + row.weight, 0);
+  const row = table.find((r) => r.itemId === 'campaign-key');
+  return row ? row.weight / total : 0;
+}
 
 export type Inventory = Record<ItemId, number>;
 
@@ -134,14 +148,15 @@ export function isItemId(value: unknown): value is ItemId {
   return typeof value === 'string' && (ITEM_IDS as readonly string[]).includes(value);
 }
 
-export function rollLoot(rng: Rng): ItemId {
-  const total = LOOT_TABLE.reduce((sum, row) => sum + row.weight, 0);
+export function rollLoot(rng: Rng, mode: Difficulty = 'easy'): ItemId {
+  const table = lootTableFor(mode);
+  const total = table.reduce((sum, row) => sum + row.weight, 0);
   let ticket = rng() * total;
-  for (const row of LOOT_TABLE) {
+  for (const row of table) {
     ticket -= row.weight;
     if (ticket < 0) return row.itemId;
   }
-  return LOOT_TABLE[LOOT_TABLE.length - 1].itemId;
+  return table[table.length - 1].itemId;
 }
 
 export function goldForLoot(itemId: ItemId, chestValue: number): number {

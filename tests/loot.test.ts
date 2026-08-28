@@ -16,6 +16,7 @@ import {
   inventoryTotal,
   loadCollection,
   mulberry32,
+  campaignKeyDropRate,
   rollLoot,
   saveCollection,
   stackedEntries,
@@ -47,12 +48,43 @@ describe('loot table', () => {
     expect(seen.size).toBeGreaterThan(1);
   });
 
-  it('can roll Hard and Campaign keys as rare inner loot', () => {
-    const rng = mulberry32(7);
-    const seen = new Set<ItemId>();
-    for (let i = 0; i < 2500; i++) seen.add(rollLoot(rng));
-    expect(seen.has('hard-key')).toBe(true);
-    expect(seen.has('campaign-key')).toBe(true);
+  it('can roll Hard keys on any difficulty; Campaign keys only on Hard and Campaign', () => {
+    const easyRng = mulberry32(7);
+    const easySeen = new Set<ItemId>();
+    for (let i = 0; i < 2500; i++) easySeen.add(rollLoot(easyRng, 'easy'));
+    expect(easySeen.has('hard-key')).toBe(true);
+    expect(easySeen.has('campaign-key')).toBe(false);
+
+    const hardRng = mulberry32(7);
+    const hardSeen = new Set<ItemId>();
+    for (let i = 0; i < 2500; i++) hardSeen.add(rollLoot(hardRng, 'hard'));
+    expect(hardSeen.has('hard-key')).toBe(true);
+    expect(hardSeen.has('campaign-key')).toBe(true);
+  });
+
+  it('never rolls campaign-key on Easy or Medium', () => {
+    for (const mode of ['easy', 'medium'] as const) {
+      const rng = mulberry32(99);
+      for (let i = 0; i < 5000; i++) {
+        expect(rollLoot(rng, mode)).not.toBe('campaign-key');
+      }
+    }
+  });
+
+  it('rolls campaign-key at about 1% on Hard and Campaign', () => {
+    for (const mode of ['hard', 'campaign'] as const) {
+      expect(campaignKeyDropRate(mode)).toBeGreaterThan(0.008);
+      expect(campaignKeyDropRate(mode)).toBeLessThan(0.012);
+      const rng = mulberry32(mode === 'hard' ? 42 : 43);
+      let keys = 0;
+      const trials = 20000;
+      for (let i = 0; i < trials; i++) {
+        if (rollLoot(rng, mode) === 'campaign-key') keys += 1;
+      }
+      const rate = keys / trials;
+      expect(rate).toBeGreaterThan(0.005);
+      expect(rate).toBeLessThan(0.02);
+    }
   });
 
   it('only gold pouches convert floor chestValue into gold', () => {
@@ -79,7 +111,7 @@ describe('loot table', () => {
 
 describe('chest loot identity', () => {
   it('stamps every generated chest with a hidden item and a visible tier', () => {
-    const game = createGame(DIFFICULTIES.easy, mulberry32(9));
+    const game = createGame(DIFFICULTIES.easy, mulberry32(9), 'easy');
     const chests = game.cells.filter((c) => c.kind === 'chest');
     expect(chests).toHaveLength(DIFFICULTIES.easy.chests);
     for (const c of chests) {

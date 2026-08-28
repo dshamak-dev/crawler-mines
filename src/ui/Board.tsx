@@ -214,7 +214,7 @@ function DungeonCell({
           : 0;
 
   const label = bossHere
-    ? `Flag Eater${visual === 'number' ? `, ${cell.adjacentMines} adjacent bombs` : ''}`
+    ? `Gluttony${visual === 'number' ? `, ${cell.adjacentMines} adjacent bombs` : ''}`
     : ariaFor(visual, cell.adjacentMines, cell.tier);
 
   return (

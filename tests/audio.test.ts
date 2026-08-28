@@ -9,6 +9,7 @@ import {
   bossFloorActive,
   campaignFloorActive,
   desiredBgm,
+  getAudio,
   loadMuted,
   saveMuted,
   sfxFromEvents,
@@ -53,7 +54,7 @@ describe('BGM routing', () => {
     expect(desiredBgm('collection', 'campaign', 'menu')).toBe('cozy');
   });
 
-  it('uses campaign-depths on campaign floors before the Flag Eater', () => {
+  it('uses campaign-depths on campaign floors before Gluttony', () => {
     expect(desiredBgm('play', 'campaign')).toBe('campaign');
     expect(desiredBgm('play', 'campaign', null, 0)).toBe('campaign');
     expect(desiredBgm('play', 'campaign', null, 3)).toBe('campaign');
@@ -64,7 +65,7 @@ describe('BGM routing', () => {
     expect(bossFloorActive('play', 'campaign', null, 3)).toBe(false);
   });
 
-  it('uses Flag Eater BGM only on the last campaign floor, then cozy on the menu', () => {
+  it('uses Gluttony BGM only on the last campaign floor, then cozy on the menu', () => {
     expect(desiredBgm('play', 'campaign', null, 4)).toBe('boss');
     expect(desiredBgm('collection', 'campaign', 'play', 4)).toBe('boss');
     expect(desiredBgm('menu', 'campaign', null, 4)).toBe('cozy');
@@ -102,7 +103,7 @@ describe('SFX from engine events', () => {
     ).toEqual(['dig', 'clear']);
   });
 
-  it('maps Flag Eater cues without treating a campaign loss as a clear', () => {
+  it('maps Gluttony cues without treating a campaign loss as a clear', () => {
     expect(sfxFromEvents([{ type: 'boss-move', index: 2 }])).toEqual(['boss-move']);
     expect(sfxFromEvents([{ type: 'boss-eat-flag', index: 4 }])).toEqual(['boss-eat-flag']);
     expect(
@@ -119,6 +120,31 @@ describe('SFX from engine events', () => {
       ]),
     ).toEqual(['boss-hit', 'boss-death', 'clear']);
     expect(sfxFromEvents([{ type: 'lost' }])).toEqual(['campaign-lose']);
+    expect(
+      sfxFromEvents([{ type: 'boss-smash-chest', index: 2, tier: 'iron' }]),
+    ).toEqual(['wreck']);
+  });
+});
+
+describe('tab visibility', () => {
+  it('suspends audio when hidden and resumes without unmuting', () => {
+    const audio = getAudio();
+    audio.setMuted(false);
+    const before = audio.isMuted();
+    audio.suspendForHidden();
+    expect(audio.isHiddenSuspended()).toBe(true);
+    expect(audio.isMuted()).toBe(before);
+    audio.resumeFromHidden();
+    expect(audio.isHiddenSuspended()).toBe(false);
+    expect(audio.isMuted()).toBe(before);
+  });
+
+  it('does not resume BGM after hidden when muted', () => {
+    const audio = getAudio();
+    audio.setMuted(true);
+    audio.suspendForHidden();
+    audio.resumeFromHidden();
+    expect(audio.isMuted()).toBe(true);
   });
 });
 

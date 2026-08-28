@@ -67,7 +67,7 @@ function freshRun(mode: Difficulty, rng: Rng, stash = emptyStash()): Run {
   return {
     mode,
     floor: 0,
-    game: createGame(configFor(mode, 0), rng),
+    game: createGame(configFor(mode, 0), rng, mode),
     grantKey: newGrantKey(),
     campaignStash: stash,
     bonusKey: null,
@@ -163,7 +163,7 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
             run: {
               mode: 'campaign',
               floor,
-              game: createGame(configFor('campaign', floor), rng),
+              game: createGame(configFor('campaign', floor), rng, 'campaign'),
               grantKey: newGrantKey(),
               campaignStash: runStash(run),
               bonusKey: null,
@@ -179,7 +179,7 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
           set({
             run: {
               ...run,
-              game: createGame(configFor(run.mode, run.floor), rng),
+              game: createGame(configFor(run.mode, run.floor), rng, run.mode),
               grantKey: newGrantKey(),
               bonusKey: null,
             },

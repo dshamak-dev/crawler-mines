@@ -41,6 +41,7 @@ function makeTrack(src: string, loop: boolean): HTMLAudioElement | null {
 export class GameAudio {
   private muted = loadMuted();
   private unlocked = false;
+  private hiddenSuspended = false;
   private current: BgmId | null = null;
   private pending: BgmId = 'cozy';
   private fadeGen = 0;
@@ -129,7 +130,7 @@ export class GameAudio {
   }
 
   playSfx = (id: SfxId): void => {
-    if (!this.unlocked || this.muted) return;
+    if (!this.unlocked || this.muted || this.hiddenSuspended) return;
     const el = this.sfx[id];
     if (!el) return;
     try {
@@ -142,8 +143,35 @@ export class GameAudio {
     }
   };
 
+  /** Pause BGM/SFX when the tab is hidden; resume point is kept. Does not change mute. */
+  suspendForHidden(): void {
+    this.hiddenSuspended = true;
+    this.fadeGen += 1;
+    for (const el of Object.values(this.bgm)) {
+      if (!el) continue;
+      el.volume = 0;
+      if (!el.paused) el.pause();
+    }
+    for (const el of Object.values(this.sfx)) {
+      if (!el || el.paused) continue;
+      el.pause();
+    }
+  }
+
+  /** Resume from the pause point when visible again, only if Sound is still on. */
+  resumeFromHidden(): void {
+    if (!this.hiddenSuspended) return;
+    this.hiddenSuspended = false;
+    if (this.muted || !this.unlocked) return;
+    this.syncBgm();
+  }
+
+  isHiddenSuspended(): boolean {
+    return this.hiddenSuspended;
+  }
+
   private syncBgm(fromMute = false): void {
-    if (!this.unlocked || this.muted) return;
+    if (!this.unlocked || this.muted || this.hiddenSuspended) return;
     const next = this.pending;
     if (this.current === next) {
       const el = this.bgm[next];
@@ -186,7 +214,7 @@ export class GameAudio {
   ): void {
     const start = performance.now();
     const tick = (now: number) => {
-      if (gen !== this.fadeGen || this.muted) return;
+      if (gen !== this.fadeGen || this.muted || this.hiddenSuspended) return;
       const k = ms <= 0 ? 1 : Math.min(1, (now - start) / ms);
       el.volume = Math.max(0, Math.min(1, from + (to - from) * k));
       if (k < 1) {

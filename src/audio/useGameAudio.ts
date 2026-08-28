@@ -27,6 +27,19 @@ export function useGameAudio(
   }, []);
 
   useEffect(() => {
+    const audio = getAudio();
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        audio.suspendForHidden();
+      } else {
+        audio.resumeFromHidden();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
+
+  useEffect(() => {
     getAudio().setBgm(desiredBgm(screen, mode, collectionFrom, floor));
   }, [screen, mode, collectionFrom, floor]);
 

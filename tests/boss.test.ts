@@ -21,6 +21,7 @@ import {
   stepBoss,
   toggleFlag,
   type CollectionState,
+  type GameEvent,
   type Inventory,
   type KeyStore,
 } from '../src/engine';
@@ -128,7 +129,7 @@ describe('campaign floors before last do not pay wallet', () => {
   });
 });
 
-describe('Flag Eater movement', () => {
+describe('Gluttony movement', () => {
   it('waits when there is no flag', () => {
     const game = createGameFromLayout(['B..', '...', '...']);
     expect(game.boss?.index).toBe(0);
@@ -175,7 +176,38 @@ describe('Flag Eater movement', () => {
     expect(game.cells[f].state).toBe('flagged');
   });
 
-  it('does not wreck a chest by standing on or next to it', () => {
+  it('does not smash chests at full health when no flags', () => {
+    const game = createGameFromLayout(['B$.', '...', '..*']);
+    const chest = idx(game, 1, 0);
+    expect(game.boss?.lives).toBe(BOSS_MAX_LIVES);
+    stepBoss(game);
+    expect(game.cells[chest].wrecked).toBe(false);
+    expect(game.chestsDestroyed).toBe(0);
+  });
+
+  it('smashes an adjacent healthy sealed chest when wounded and no flags', () => {
+    const game = createGameFromLayout(['B$.', '...', '..*']);
+    const chest = idx(game, 1, 0);
+    game.boss!.lives = BOSS_MAX_LIVES - 1;
+    const events = stepBoss(game);
+    expect(events).toEqual([{ type: 'boss-smash-chest', index: chest, tier: 'wooden' }]);
+    expect(game.cells[chest].wrecked).toBe(true);
+    expect(game.chestsDestroyed).toBe(1);
+    expect(game.inventory['gold-pouch']).toBe(0);
+  });
+
+  it('hunts flags before chests when wounded', () => {
+    const game = createGameFromLayout(['B*$', '...']);
+    const chest = idx(game, 2, 0);
+    const flagCell = idx(game, 1, 0);
+    game.boss!.lives = BOSS_MAX_LIVES - 1;
+    toggleFlag(game, flagCell);
+    const events = stepBoss(game);
+    expect(events.some((e) => e.type === 'boss-eat-flag')).toBe(true);
+    expect(game.cells[chest].wrecked).toBe(false);
+  });
+
+  it('does not wreck a chest by standing on or next to it at full health', () => {
     const game = createGameFromLayout(['B$*', '...']);
     const chest = idx(game, 1, 0);
     dig(game, chest, mulberry32(1));
@@ -199,28 +231,33 @@ describe('Flag Eater movement', () => {
   });
 });
 
-describe('Flag Eater combat', () => {
-  it('takes 1 life per adjacent-mine blast and dies on two hits', () => {
-    const game = createGameFromLayout(['*B', '*.']);
-    expect(game.boss?.lives).toBe(BOSS_MAX_LIVES);
-    const events = dig(game, 0, mulberry32(1));
-    const hits = events.filter((e) => e.type === 'boss-hit');
-    expect(hits).toHaveLength(2);
-    expect(game.boss?.lives).toBe(0);
-    expect(events.some((e) => e.type === 'boss-death')).toBe(true);
-    expect(events.some((e) => e.type === 'cleared')).toBe(true);
-    expect(game.status).toBe('cleared');
-    expect(isWon(game)).toBe(true);
+describe('Gluttony combat', () => {
+  it('starts with 3 lives on the boss floor', () => {
+    const game = createGame(configFor('campaign', 4), mulberry32(9));
+    expect(game.boss?.lives).toBe(3);
+  });
+
+  it('takes 1 life per adjacent-mine blast and dies on three hits', () => {
+    const oneHit = createGameFromLayout(['*B', '..']);
+    expect(oneHit.boss?.lives).toBe(BOSS_MAX_LIVES);
+    dig(oneHit, 0, mulberry32(1));
+    expect(oneHit.boss?.lives).toBe(BOSS_MAX_LIVES - 1);
+
+    const finisher = createGameFromLayout(['*B', '..']);
+    finisher.boss!.lives = 1;
+    dig(finisher, 0, mulberry32(1));
+    expect(finisher.boss?.lives).toBe(0);
+    expect(finisher.status).toBe('cleared');
   });
 
   it('already-exploded mines do not re-hit', () => {
     const game = createGameFromLayout(['*B', '..']);
     dig(game, 0, mulberry32(1));
-    expect(game.boss?.lives).toBe(1);
+    expect(game.boss?.lives).toBe(BOSS_MAX_LIVES - 1);
     expect(game.cells[0].exploded).toBe(true);
     const again = dig(game, 0, mulberry32(1));
     expect(again.filter((e) => e.type === 'boss-hit')).toEqual([]);
-    expect(game.boss?.lives).toBe(1);
+    expect(game.boss?.lives).toBe(BOSS_MAX_LIVES - 1);
   });
 
   it('losing with a living boss after all safe cells open wipes the stash', () => {
@@ -246,7 +283,7 @@ describe('Flag Eater combat', () => {
     s.getState().applyDig(idx(game, 1, 0), rng);
     s.getState().applyDig(idx(game, 1, 1), rng);
     expect(s.getState().run?.game.status).toBe('lost');
-    expect(s.getState().run?.game.boss?.lives).toBe(2);
+    expect(s.getState().run?.game.boss?.lives).toBe(BOSS_MAX_LIVES);
     expect(allSafeRevealed(s.getState().run!.game)).toBe(true);
     expect(isLost(s.getState().run!.game)).toBe(true);
     expect(s.getState().run?.campaignStash?.gold).toBe(0);
@@ -256,10 +293,10 @@ describe('Flag Eater combat', () => {
     expect(loadCollection(store).items.gem).toBe(0);
   });
 
-  it('killing the boss with two adjacent-mine hits grants stash plus a random key', () => {
+  it('killing Gluttony grants stash plus a random key', () => {
     const { store } = withWallet(12);
     const s = createGameStore(store);
-    const game = createGameFromLayout(['*B', '*.']);
+    const game = createGameFromLayout(['*..', '.B.', '*.*']);
     const stashItems = { ...emptyInventory(), 'torch-charm': 1 };
     s.setState({
       meta: loadCollection(store),
@@ -274,8 +311,15 @@ describe('Flag Eater combat', () => {
       runLoot: { ...stashItems },
     });
     const rng = mulberry32(21);
-    const events = s.getState().applyDig(0, rng);
-    expect(events.some((e) => e.type === 'boss-death')).toBe(true);
+    const allEvents: GameEvent[] = [];
+    for (let hit = 0; hit < BOSS_MAX_LIVES; hit++) {
+      const g = s.getState().run?.game;
+      if (!g || g.status !== 'playing') break;
+      const mine = g.cells.findIndex((c) => c.kind === 'mine' && !c.exploded);
+      if (mine < 0) break;
+      allEvents.push(...s.getState().applyDig(mine, rng));
+    }
+    expect(allEvents.some((e) => e.type === 'boss-death')).toBe(true);
     expect(s.getState().run?.game.status).toBe('cleared');
     const bonus = s.getState().run?.bonusKey;
     expect(bonus === 'hard-key' || bonus === 'campaign-key').toBe(true);
@@ -344,18 +388,18 @@ describe('campaign resume does not charge gold', () => {
 
     const s2 = createGameStore(store);
     expect(s2.getState().run?.game.boss?.index).toBe(idx(game, 1, 0));
-    expect(s2.getState().run?.game.boss?.lives).toBe(2);
+    expect(s2.getState().run?.game.boss?.lives).toBe(BOSS_MAX_LIVES);
     expect(s2.getState().run?.game.turn).toBe('player');
     expect(s2.getState().run?.campaignStash?.gold).toBe(7);
     expect(s2.getState().meta.gold).toBe(100);
   });
 });
 
-describe('last campaign floor spawns the Flag Eater', () => {
+describe('last campaign floor spawns Gluttony', () => {
   it('reveals the boss cell at start and does not sit on a mine or chest', () => {
     const game = createGame(configFor('campaign', 4), mulberry32(9));
     expect(game.boss).not.toBeNull();
-    expect(game.boss?.lives).toBe(2);
+    expect(game.boss?.lives).toBe(BOSS_MAX_LIVES);
     const cell = game.cells[game.boss!.index];
     expect(cell.state).toBe('revealed');
     expect(cell.kind).toBe('empty');
