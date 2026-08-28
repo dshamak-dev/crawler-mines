@@ -223,8 +223,14 @@ button {
   height: 20px;
 }
 .bag-btn {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(224, 180, 74, 0.45);
+  background: rgba(0, 0, 0, 0.45);
+}
+.bag-btn .glyph {
+  width: 26px;
+  height: 26px;
 }
 .hud-stats {
   flex: 1;

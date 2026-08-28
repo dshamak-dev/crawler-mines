@@ -112,13 +112,12 @@ export function TorchIcon() {
 export function BagIcon({ className }: { className?: string }) {
   return (
     <svg className={className ?? 'glyph'} viewBox="0 0 32 32" aria-hidden="true">
-      <rect x="8" y="7" width="16" height="5.2" rx="2.4" fill="#5a4534" />
-      <rect x="9.2" y="8" width="13.6" height="3.2" rx="1.6" fill="#8a6a40" />
-      <rect x="7" y="11.5" width="18" height="16.5" rx="3.2" fill="#5a4534" />
-      <rect x="8.2" y="12.6" width="15.6" height="14.2" rx="2.4" fill="#8a6a40" />
-      <path d="M7 12.4h18l-2.4 5.6H9.4z" fill="#6b5340" />
-      <path d="M12.2 18.6v6.2M19.8 18.6v6.2" stroke="#c9b59a" strokeWidth="1.7" strokeLinecap="round" />
-      <rect x="14.4" y="14.8" width="3.2" height="2.4" rx="0.5" fill="#e0b44a" />
+      <path d="M11.2 6.2v7.2M20.8 6.2v7.2" stroke="#c9b59a" strokeWidth="2.3" strokeLinecap="round" />
+      <rect x="6.5" y="11.2" width="19" height="17.2" rx="3.4" fill="#5a4534" />
+      <rect x="7.8" y="12.4" width="16.4" height="14.8" rx="2.6" fill="#8a6a40" />
+      <rect x="6.5" y="11.2" width="19" height="6.4" rx="2.8" fill="#6b5340" />
+      <rect x="11.4" y="20.2" width="9.2" height="5.4" rx="1.3" fill="#5a4534" />
+      <rect x="14.4" y="14.6" width="3.2" height="2.2" rx="0.5" fill="#e0b44a" />
     </svg>
   );
 }
