@@ -112,15 +112,17 @@ describe('flood fill', () => {
     expect(game.cells[idx(game, 3, 2)].adjacentMines).toBe(1);
   });
 
-  it('opens a chest on a zero-adjacent flood', () => {
+  it('finds a chest on a zero-adjacent flood without granting inner loot yet', () => {
     const game = createGameFromLayout(['.$...', '.....', '....*'], 25);
     dig(game, idx(game, 0, 0), mulberry32(1));
     const chest = game.cells[idx(game, 1, 0)];
     expect(chest.state).toBe('revealed');
     expect(chest.wrecked).toBe(false);
-    expect(game.gold).toBe(25);
     expect(game.chestsOpened).toBe(1);
-    expect(game.inventory['gold-pouch']).toBe(1);
+    if (game.status !== 'cleared') {
+      expect(game.gold).toBe(0);
+      expect(game.inventory['gold-pouch']).toBe(0);
+    }
   });
 });
 
@@ -195,14 +197,18 @@ describe('explosion destroys neighboring loot', () => {
     }
   });
 
-  it('does not steal gold from a chest that was already revealed', () => {
+  it('wrecks a chest that was already found — loot is not safe until clear', () => {
     const game = createGameFromLayout(['.$', '*.'], 15);
     dig(game, idx(game, 1, 0), mulberry32(1));
-    expect(game.gold).toBe(15);
+    expect(game.chestsOpened).toBe(1);
+    expect(game.gold).toBe(0);
+    expect(game.inventory['gold-pouch']).toBe(0);
     dig(game, idx(game, 0, 1), mulberry32(1));
-    expect(game.cells[idx(game, 1, 0)].wrecked).toBe(false);
-    expect(game.gold).toBe(15);
-    expect(game.chestsDestroyed).toBe(0);
+    expect(game.cells[idx(game, 1, 0)].wrecked).toBe(true);
+    expect(game.gold).toBe(0);
+    expect(game.chestsOpened).toBe(0);
+    expect(game.chestsDestroyed).toBe(1);
+    expect(game.inventory['gold-pouch']).toBe(0);
   });
 
   it('still wrecks a flagged chest caught in a blast', () => {
@@ -305,16 +311,18 @@ describe('win check and scoring', () => {
     expect(game.cells[0].exploded).toBe(true);
   });
 
-  it('counts gold only for treasure revealed without being destroyed', () => {
-    const game = createGameFromLayout(['$.$', '.*.'], 10);
-    dig(game, 0, mulberry32(1));
-    expect(game.gold).toBe(10);
-    dig(game, idx(game, 1, 1), mulberry32(1));
-    expect(game.cells[idx(game, 2, 0)].wrecked).toBe(true);
-    expect(game.gold).toBe(10);
-    expect(game.goldDestroyed).toBe(10);
+  it('grants gold only for intact chests once the floor is cleared', () => {
+    const game = createGameFromLayout(['.$.', '.*.'], 10, 'gold-pouch');
+    dig(game, 1, mulberry32(1));
+    expect(game.gold).toBe(0);
     expect(game.chestsOpened).toBe(1);
-    expect(game.chestsDestroyed).toBe(1);
+    expect(game.inventory['gold-pouch']).toBe(0);
+    expect(game.status).toBe('playing');
+    revealAllSafe(game);
+    expect(game.status).toBe('cleared');
+    expect(game.gold).toBe(10);
+    expect(game.inventory['gold-pouch']).toBe(1);
+    expect(game.chestsDestroyed).toBe(0);
   });
 
   it('wrecked chests count as revealed for the win condition', () => {

@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
-import { ITEMS, type ItemId } from '../engine';
+import { TIER_COPY, type ChestTier } from '../engine';
 import { prefersReducedMotion } from './motion';
-import { ItemIcon } from './icons';
+import { ChestIcon } from './icons';
 
 export interface LootToast {
   id: number;
-  itemId: ItemId;
-  gold: number;
+  kind: 'found' | 'broken';
+  tier: ChestTier;
 }
 
 export default function LootQueue({
@@ -27,25 +27,25 @@ export default function LootQueue({
   }, [current, last, onDismiss]);
 
   if (!current) return null;
-  const item = ITEMS[current.itemId];
+  const copy = TIER_COPY[current.tier];
+  const smashed = current.kind === 'broken';
 
   return (
     <div className="loot-toast-slot">
       <button
         type="button"
-        className="loot-toast"
+        className={`loot-toast${smashed ? ' is-broken' : ''}`}
         key={current.id}
         onClick={() => onDismiss(current.id)}
-        aria-label={`Looted ${item.name}. ${item.flavor}`}
+        aria-label={`${copy.name}. ${smashed ? copy.broken : copy.found}`}
       >
         <span className="loot-toast-ico">
-          <ItemIcon id={current.itemId} />
+          <ChestIcon tier={current.tier} wrecked={smashed} />
         </span>
         <span className="loot-toast-copy">
-          <strong>{item.name}</strong>
-          <em>{item.flavor}</em>
+          <strong>{copy.name}</strong>
+          <em>{smashed ? copy.broken : copy.found}</em>
         </span>
-        {current.gold > 0 && <span className="loot-toast-gold">+{current.gold}</span>}
         {queue.length > 1 && <span className="loot-toast-more">+{queue.length - 1}</span>}
       </button>
     </div>

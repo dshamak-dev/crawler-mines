@@ -17,6 +17,7 @@ import {
   rollLoot,
   saveCollection,
   stackedEntries,
+  tierForLoot,
   type Inventory,
   type ItemId,
   type KeyStore,
@@ -65,46 +66,65 @@ describe('loot table', () => {
 });
 
 describe('chest loot identity', () => {
-  it('stamps every generated chest with a concrete item', () => {
+  it('stamps every generated chest with a hidden item and a visible tier', () => {
     const game = createGame(DIFFICULTIES.easy, mulberry32(9));
     const chests = game.cells.filter((c) => c.kind === 'chest');
     expect(chests).toHaveLength(DIFFICULTIES.easy.chests);
     for (const c of chests) {
       expect(c.loot).not.toBeNull();
       expect(ITEM_IDS).toContain(c.loot);
+      expect(c.tier).toBe(tierForLoot(c.loot as ItemId));
       expect(c.gold).toBe(goldForLoot(c.loot as ItemId, DIFFICULTIES.easy.chestValue));
     }
   });
 
-  it('opens a named item and records it on the floor inventory', () => {
-    const game = createGameFromLayout(['.$', '..'], 12, 'rusty-key');
+  it('finding a chest emits a tier notice and does not record the inner item', () => {
+    const game = createGameFromLayout(['.$', '..', '.*'], 12, 'rusty-key');
     const events = dig(game, idx(game, 1, 0), mulberry32(1));
     const chest = events.find((e) => e.type === 'chest');
-    expect(chest).toMatchObject({ type: 'chest', itemId: 'rusty-key', gold: 0 });
+    expect(chest).toMatchObject({ type: 'chest', tier: 'wooden' });
+    expect(chest && 'itemId' in chest).toBe(false);
     expect(game.gold).toBe(0);
     expect(game.chestsOpened).toBe(1);
-    expect(game.inventory['rusty-key']).toBe(1);
+    expect(game.inventory['rusty-key']).toBe(0);
     expect(game.cells[idx(game, 1, 0)].loot).toBe('rusty-key');
     expect(game.cells[idx(game, 1, 0)].wrecked).toBe(false);
+    expect(game.status).toBe('playing');
   });
 
-  it('gold pouches still pay gold on a successful open', () => {
-    const game = createGameFromLayout(['$..', '...'], 25, 'gold-pouch');
-    const events = dig(game, 0, mulberry32(1));
-    expect(events.some((e) => e.type === 'chest' && e.itemId === 'gold-pouch' && e.gold === 25)).toBe(
-      true,
-    );
+  it('gold pouches pay gold only after a successful clear', () => {
+    const game = createGameFromLayout(['.$.', '.*.'], 25, 'gold-pouch');
+    const mid = dig(game, 1, mulberry32(1));
+    expect(mid.some((e) => e.type === 'chest' && e.tier === 'wooden')).toBe(true);
+    expect(game.gold).toBe(0);
+    expect(game.inventory['gold-pouch']).toBe(0);
+    expect(game.status).toBe('playing');
+    const rng = mulberry32(1);
+    for (let i = 0; i < game.cells.length; i++) {
+      if (game.cells[i].kind !== 'mine' && game.cells[i].state === 'hidden') {
+        dig(game, i, rng);
+      }
+    }
+    expect(game.status).toBe('cleared');
     expect(game.gold).toBe(25);
     expect(game.inventory['gold-pouch']).toBe(1);
   });
 
-  it('stacks two of the same item from separate chests', () => {
-    const game = createGameFromLayout(['$', '*', '$'], 10, 'relic-shard');
+  it('stacks two of the same item from separate chests on clear', () => {
+    const game = createGameFromLayout(['$.$', '.*.'], 10, 'relic-shard');
     dig(game, 0, mulberry32(1));
-    expect(game.inventory['relic-shard']).toBe(1);
+    expect(game.inventory['relic-shard']).toBe(0);
     dig(game, 2, mulberry32(1));
-    expect(game.inventory['relic-shard']).toBe(2);
+    expect(game.inventory['relic-shard']).toBe(0);
     expect(game.chestsOpened).toBe(2);
+    const rng = mulberry32(1);
+    for (let i = 0; i < game.cells.length; i++) {
+      if (game.cells[i].kind !== 'mine' && game.cells[i].state === 'hidden') {
+        dig(game, i, rng);
+      }
+    }
+    expect(game.status).toBe('cleared');
+    expect(game.inventory['relic-shard']).toBe(2);
     expect(game.gold).toBe(0);
   });
 });
@@ -120,24 +140,33 @@ describe('open vs wreck', () => {
     expect(game.chestsDestroyed).toBe(1);
     expect(game.cells[1].wrecked).toBe(true);
     expect(game.cells[1].loot).toBe('torch-charm');
+    expect(game.cells[1].tier).toBe('iron');
     expect(game.cells[1].state).toBe('revealed');
+    const cleared = events.find((e) => e.type === 'cleared');
+    expect(cleared && cleared.type === 'cleared' && cleared.rewards).toEqual([]);
   });
 
-  it('keeps already-looted items when a later blast hits that chest', () => {
+  it('a later blast can still wreck a found chest, and that chest grants nothing', () => {
     const game = createGameFromLayout(['.$', '*.'], 15, 'gem');
     dig(game, idx(game, 1, 0), mulberry32(1));
-    expect(game.inventory.gem).toBe(1);
+    expect(game.chestsOpened).toBe(1);
+    expect(game.inventory.gem).toBe(0);
     dig(game, idx(game, 0, 1), mulberry32(1));
-    expect(game.cells[idx(game, 1, 0)].wrecked).toBe(false);
-    expect(game.inventory.gem).toBe(1);
-    expect(game.chestsDestroyed).toBe(0);
+    expect(game.cells[idx(game, 1, 0)].wrecked).toBe(true);
+    expect(game.inventory.gem).toBe(0);
+    expect(game.chestsDestroyed).toBe(1);
+    expect(game.chestsOpened).toBe(0);
   });
 
-  it('flood-fill opening still grants the rolled item', () => {
-    const game = createGameFromLayout(['.$...', '.....', '....*'], 10, 'gem');
-    dig(game, idx(game, 0, 0), mulberry32(1));
-    expect(game.inventory.gem).toBe(1);
+  it('flood-fill finding still withholds the rolled item until clear', () => {
+    const game = createGameFromLayout(['.$..', '....', '...*'], 10, 'gem');
+    const events = dig(game, idx(game, 0, 0), mulberry32(1));
     expect(game.cells[idx(game, 1, 0)].wrecked).toBe(false);
+    expect(game.cells[idx(game, 1, 0)].state).toBe('revealed');
+    if (game.status !== 'cleared') {
+      expect(game.inventory.gem).toBe(0);
+      expect(events.some((e) => e.type === 'chest' && e.tier === 'iron')).toBe(true);
+    }
   });
 });
 
@@ -178,5 +207,13 @@ describe('item catalog', () => {
       expect(ITEMS[id].name.length).toBeGreaterThan(2);
       expect(ITEMS[id].flavor.length).toBeGreaterThan(8);
     }
+  });
+
+  it('maps inner items to a visible chest tier', () => {
+    expect(tierForLoot('gold-pouch')).toBe('wooden');
+    expect(tierForLoot('rusty-key')).toBe('wooden');
+    expect(tierForLoot('torch-charm')).toBe('iron');
+    expect(tierForLoot('gem')).toBe('iron');
+    expect(tierForLoot('relic-shard')).toBe('gilded');
   });
 });

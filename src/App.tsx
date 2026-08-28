@@ -1,25 +1,26 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   CAMPAIGN_FLOORS,
   DIFFICULTIES,
   addItem,
-  chestsRemaining,
+  chestNotices,
   cloneGame,
   createGame,
   dig,
   emptyInventory,
   loadCollection,
   saveCollection,
+  stackedEntries,
   toggleFlag,
   type Difficulty,
   type FloorConfig,
   type Game,
   type Inventory,
 } from './engine';
-import Board, { collectFx, useBoardCellSize, type BlastFx, type LostFx } from './ui/Board';
+import Board, { collectFx, useBoardCellSize, type BlastFx } from './ui/Board';
 import Collection from './ui/Collection';
 import LootQueue, { type LootToast } from './ui/LootToast';
-import { BagIcon, FlagIcon, GoldIcon, ShovelIcon, TorchIcon } from './ui/icons';
+import { BagIcon, ChestIcon, FlagIcon, ItemIcon, ShovelIcon, TorchIcon } from './ui/icons';
 import { chainDuration, prefersReducedMotion } from './ui/motion';
 
 type Screen = 'menu' | 'play' | 'collection';
@@ -29,15 +30,13 @@ interface Run {
   mode: Difficulty;
   floor: number;
   game: Game;
-  runGold: number;
 }
 
 interface FloorReport {
-  gold: number;
-  destroyed: number;
   opened: number;
   wrecked: number;
   lastFloor: boolean;
+  loot: Inventory;
 }
 
 function configFor(mode: Difficulty, floor: number): FloorConfig {
@@ -50,7 +49,6 @@ function freshRun(mode: Difficulty): Run {
     mode,
     floor: 0,
     game: createGame(configFor(mode, 0), Math.random),
-    runGold: 0,
   };
 }
 
@@ -62,7 +60,6 @@ export default function App() {
   const [report, setReport] = useState<FloorReport | null>(null);
   const [blasts, setBlasts] = useState<BlastFx[]>([]);
   const [sparkles, setSparkles] = useState<Array<{ id: number; index: number }>>([]);
-  const [lostLoot, setLostLoot] = useState<LostFx[]>([]);
   const [shaking, setShaking] = useState(false);
   const [meta, setMeta] = useState<Inventory>(() => loadCollection());
   const [runLoot, setRunLoot] = useState<Inventory>(() => emptyInventory());
@@ -85,7 +82,6 @@ export default function App() {
     setReport(null);
     setBlasts([]);
     setSparkles([]);
-    setLostLoot([]);
     setLootQueue([]);
     setRunLoot(emptyInventory());
     setShaking(false);
@@ -99,12 +95,11 @@ export default function App() {
     setTutorial(false);
   };
 
-  const applyFx = useCallback((events: ReturnType<typeof dig>, cells: Game['cells'], after?: () => void) => {
-    const packed = collectFx(events, cells, fxId.current);
+  const applyFx = useCallback((events: ReturnType<typeof dig>, after?: () => void) => {
+    const packed = collectFx(events, fxId.current);
     fxId.current = packed.nextId;
     if (packed.blasts.length) setBlasts(packed.blasts);
     if (packed.sparkles.length) setSparkles(packed.sparkles);
-    if (packed.lostLoot.length) setLostLoot(packed.lostLoot);
     if (packed.wrecked && !prefersReducedMotion()) {
       setShaking(true);
       window.setTimeout(() => setShaking(false), 520);
@@ -116,28 +111,33 @@ export default function App() {
     }
   }, []);
 
-  const bankLoot = useCallback((events: ReturnType<typeof dig>) => {
-    const found = events.filter((e): e is Extract<typeof e, { type: 'chest' }> => e.type === 'chest');
-    if (found.length === 0) return;
+  const queueChestToasts = useCallback((events: ReturnType<typeof dig>, cells: Game['cells']) => {
+    const notices = chestNotices(events, cells);
+    if (notices.length === 0) return;
+    setLootQueue((prev) => [
+      ...prev,
+      ...notices.map((n) => ({
+        id: toastId.current++,
+        kind: n.kind,
+        tier: n.tier,
+      })),
+    ]);
+  }, []);
+
+  const bankRewards = useCallback((events: ReturnType<typeof dig>) => {
+    const cleared = events.find((e) => e.type === 'cleared');
+    if (!cleared || cleared.type !== 'cleared' || cleared.rewards.length === 0) return;
     setMeta((prev) => {
       let next = prev;
-      for (const e of found) next = addItem(next, e.itemId);
+      for (const r of cleared.rewards) next = addItem(next, r.itemId);
       saveCollection(next);
       return next;
     });
     setRunLoot((prev) => {
       let next = prev;
-      for (const e of found) next = addItem(next, e.itemId);
+      for (const r of cleared.rewards) next = addItem(next, r.itemId);
       return next;
     });
-    setLootQueue((prev) => [
-      ...prev,
-      ...found.map((e) => ({
-        id: toastId.current++,
-        itemId: e.itemId,
-        gold: e.gold,
-      })),
-    ]);
   }, []);
 
   const mutate = useCallback(
@@ -149,11 +149,11 @@ export default function App() {
       const next = { ...prev, game };
       runRef.current = next;
       setRun(next);
-      bankLoot(events);
+      queueChestToasts(events, game.cells);
+      bankRewards(events);
       const cleared = events.some((e) => e.type === 'cleared');
       applyFx(
         events,
-        game.cells,
         cleared
           ? () => {
               const cur = runRef.current;
@@ -161,21 +161,18 @@ export default function App() {
               const last =
                 cur.mode !== 'campaign' ||
                 cur.floor >= CAMPAIGN_FLOORS.length - 1;
+              setLootQueue([]);
               setReport({
-                gold: cur.game.gold,
-                destroyed: cur.game.goldDestroyed,
                 opened: cur.game.chestsOpened,
                 wrecked: cur.game.chestsDestroyed,
                 lastFloor: last,
+                loot: { ...cur.game.inventory },
               });
-              const updated = { ...cur, runGold: cur.runGold + cur.game.gold };
-              runRef.current = updated;
-              setRun(updated);
             }
           : undefined,
       );
     },
-    [applyFx, bankLoot],
+    [applyFx, bankRewards, queueChestToasts],
   );
 
   const onDig = useCallback(
@@ -211,7 +208,6 @@ export default function App() {
     setReport(null);
     setBlasts([]);
     setSparkles([]);
-    setLostLoot([]);
     setLootQueue([]);
     setFlagMode(false);
   };
@@ -225,7 +221,6 @@ export default function App() {
     setReport(null);
     setBlasts([]);
     setSparkles([]);
-    setLostLoot([]);
     setLootQueue([]);
   };
 
@@ -251,7 +246,6 @@ export default function App() {
             setFlagMode={setFlagMode}
             blasts={blasts}
             sparkles={sparkles}
-            lostLoot={lostLoot}
             shaking={shaking}
             tutorial={tutorial}
             report={report}
@@ -324,7 +318,6 @@ function Play({
   setFlagMode,
   blasts,
   sparkles,
-  lostLoot,
   shaking,
   tutorial,
   report,
@@ -343,7 +336,6 @@ function Play({
   setFlagMode: (v: boolean) => void;
   blasts: BlastFx[];
   sparkles: Array<{ id: number; index: number }>;
-  lostLoot: LostFx[];
   shaking: boolean;
   tutorial: boolean;
   report: FloorReport | null;
@@ -357,11 +349,11 @@ function Play({
   onNext: () => void;
   onRetry: () => void;
 }) {
-  const { game, mode, floor, runGold } = run;
+  const { game, mode, floor } = run;
   const { ref, px } = useBoardCellSize(game.width, game.height);
-  const remaining = useMemo(() => chestsRemaining(game), [game]);
   const floorLabel =
     mode === 'campaign' ? `Floor ${floor + 1}/${CAMPAIGN_FLOORS.length}` : mode;
+  const salvage = report ? stackedEntries(report.loot) : [];
 
   return (
     <div className="shell play-shell">
@@ -370,24 +362,17 @@ function Play({
           {'\u2039'}
         </button>
         <div className="hud-stats">
-          <span className="stat gold-stat">
-            <span className="stat-label">Gold</span>
+          <span className="stat found-stat" title="Intact chests found">
+            <span className="stat-label">Found</span>
             <span className="stat-row">
-              <GoldIcon className="stat-ico" />
-              {runGold + (report ? 0 : game.gold)}
-            </span>
-          </span>
-          <span className="stat" title="Chests remaining">
-            <span className="stat-label">Left</span>
-            <span className="stat-row">
-              <span className="dot chest-dot" />
-              {remaining}
+              <ChestIcon className="stat-ico" tier="wooden" />
+              {game.chestsOpened}
             </span>
           </span>
           <span className="stat wreck" title="Chests destroyed">
-            <span className="stat-label">Wrecked</span>
+            <span className="stat-label">Broken</span>
             <span className="stat-row">
-              <span className="dot wreck-dot" />
+              <ChestIcon wrecked className="stat-ico" tier="wooden" />
               {game.chestsDestroyed}
             </span>
           </span>
@@ -405,7 +390,6 @@ function Play({
           cellPx={px}
           blasts={blasts}
           sparkles={sparkles}
-          lostLoot={lostLoot}
           shaking={shaking}
           onDig={onDig}
           onFlag={onFlag}
@@ -453,19 +437,31 @@ function Play({
             <h2>{report.lastFloor && mode === 'campaign' ? 'Dungeon cleared' : 'Floor cleared'}</h2>
             <div className="tally">
               <div>
-                <em>Gold earned</em>
-                <strong className="pos">{report.gold}</strong>
+                <em>Found</em>
+                <strong className="pos">{report.opened}</strong>
               </div>
               <div>
-                <em>Gold destroyed</em>
-                <strong className="neg">{report.destroyed}</strong>
+                <em>Broken</em>
+                <strong className="neg">{report.wrecked}</strong>
               </div>
             </div>
-            <p className="muted">
-              {report.opened} chests looted · {report.wrecked} wrecked
-            </p>
-            {mode === 'campaign' && (
-              <p className="muted">Run gold {runGold}</p>
+            {salvage.length > 0 ? (
+              <ul className="loot-list report-loot">
+                {salvage.map(({ item, count }) => (
+                  <li key={item.id} className="loot-card">
+                    <span className="loot-ico">
+                      <ItemIcon id={item.id} />
+                    </span>
+                    <span className="loot-copy">
+                      <strong>{item.name}</strong>
+                      <em>{item.flavor}</em>
+                    </span>
+                    <span className="loot-count">×{count}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted">No loot survived.</p>
             )}
             <div className="row-btns">
               {mode === 'campaign' && !report.lastFloor ? (
@@ -487,3 +483,4 @@ function Play({
     </div>
   );
 }
+
