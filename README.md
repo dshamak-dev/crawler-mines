@@ -2,6 +2,12 @@
 
 Dungeon-crawler minesweeper for phones. Bombs do **not** end the run — they detonate in place, wreck nearby treasure, and **chain** into neighboring bombs.
 
+## Play it
+
+[https://dshamak-dev.github.io/crawler-mines/](https://dshamak-dev.github.io/crawler-mines/)
+
+In the repo **Settings → Pages**, set Source to **GitHub Actions** (not Deploy from a branch / master / root). Master/root cannot host both the Vite source and the built site.
+
 ## Run
 
 ```bash
