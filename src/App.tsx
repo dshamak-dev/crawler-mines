@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { playDeny, sfxFromEvents, useGameAudio } from './audio';
 import {
   CAMPAIGN_FLOORS,
+  ITEMS,
   chestNotices,
   isTicketKey,
   stackedEntries,
@@ -20,11 +21,16 @@ import Collection from './ui/Collection';
 import LootQueue, { type LootToast } from './ui/LootToast';
 import MuteButton from './ui/MuteButton';
 import TitleMenu from './ui/TitleMenu';
-import { BagIcon, ChestIcon, FlagIcon, GoldIcon, ItemIcon, ShovelIcon } from './ui/icons';
+import { BagIcon, BossIcon, ChestIcon, FlagIcon, GoldIcon, ItemIcon, ShovelIcon } from './ui/icons';
 import { chainDuration, prefersReducedMotion } from './ui/motion';
 
 type Screen = 'menu' | 'play' | 'collection';
 const TUTORIAL_KEY = 'crawler-mines-tutorial';
+
+function reportFor(run: NonNullable<ReturnType<typeof useGameStore.getState>['run']>): FloorReport | null {
+  if (run.game.status === 'cleared' || run.game.status === 'lost') return floorReport(run);
+  return null;
+}
 
 export default function App() {
   const run = useGameStore((s) => s.run);
@@ -46,9 +52,7 @@ export default function App() {
       return false;
     }
   });
-  const [report, setReport] = useState<FloorReport | null>(() =>
-    run?.game.status === 'cleared' ? floorReport(run) : null,
-  );
+  const [report, setReport] = useState<FloorReport | null>(() => (run ? reportFor(run) : null));
   const [blasts, setBlasts] = useState<BlastFx[]>([]);
   const [sparkles, setSparkles] = useState<Array<{ id: number; index: number }>>([]);
   const [shaking, setShaking] = useState(false);
@@ -57,7 +61,12 @@ export default function App() {
   const fxId = useRef(1);
   const toastId = useRef(1);
   const clearTimer = useRef<number | null>(null);
-  const { muted, toggleMuted, playSfx } = useGameAudio(screen, run?.mode ?? null, collectionFrom);
+  const { muted, toggleMuted, playSfx } = useGameAudio(
+    screen,
+    run?.mode ?? null,
+    collectionFrom,
+    run?.floor ?? 0,
+  );
 
   const cueUi = () => playSfx('ui');
 
@@ -93,7 +102,7 @@ export default function App() {
   const resume = () => {
     const current = useGameStore.getState().run;
     if (!current) return;
-    setReport(current.game.status === 'cleared' ? floorReport(current) : null);
+    setReport(reportFor(current));
     setBlasts([]);
     setSparkles([]);
     setLootQueue([]);
@@ -135,6 +144,21 @@ export default function App() {
     ]);
   }, []);
 
+  const finishIfEnded = useCallback((events: GameEvent[]) => {
+    const ended = events.some((e) => e.type === 'cleared' || e.type === 'lost');
+    applyFx(
+      events,
+      ended
+        ? () => {
+            const next = useGameStore.getState().run;
+            if (!next) return;
+            setLootQueue([]);
+            setReport(floorReport(next));
+          }
+        : undefined,
+    );
+  }, [applyFx]);
+
   const onDig = useCallback(
     (index: number) => {
       const events = applyDig(index);
@@ -142,28 +166,18 @@ export default function App() {
       if (!cur || events.length === 0) return;
       for (const id of sfxFromEvents(events)) playSfx(id);
       queueChestToasts(events, cur.game.cells);
-      const cleared = events.some((e) => e.type === 'cleared');
-      applyFx(
-        events,
-        cleared
-          ? () => {
-              const next = useGameStore.getState().run;
-              if (!next) return;
-              setLootQueue([]);
-              setReport(floorReport(next));
-            }
-          : undefined,
-      );
+      finishIfEnded(events);
     },
-    [applyDig, applyFx, playSfx, queueChestToasts],
+    [applyDig, finishIfEnded, playSfx, queueChestToasts],
   );
 
   const onFlag = useCallback(
     (index: number) => {
       const cell = useGameStore.getState().run?.game.cells[index];
       if (!cell || cell.state === 'revealed') return;
-      applyFlag(index);
+      const events = applyFlag(index);
       playSfx('flag');
+      for (const id of sfxFromEvents(events)) playSfx(id);
     },
     [applyFlag, playSfx],
   );
@@ -174,7 +188,6 @@ export default function App() {
     clearFx();
     if (!next) {
       setScreen('menu');
-      return;
     }
   };
 
@@ -298,6 +311,14 @@ function Play({
   const floorLabel =
     mode === 'campaign' ? `Floor ${floor + 1}/${CAMPAIGN_FLOORS.length}` : mode;
   const salvage = report ? stackedEntries(report.loot) : [];
+  const boss = game.boss;
+  const showReplay = report && report.outcome !== 'lost' && report.outcome !== 'victory';
+  const goldCopy =
+    report?.outcome === 'stashed'
+      ? 'Held until the Flag Eater falls.'
+      : report?.outcome === 'victory'
+        ? 'Stash dumped into your wallet.'
+        : 'Pouched gold, now in your wallet.';
 
   return (
     <div className="shell play-shell">
@@ -320,6 +341,15 @@ function Play({
               {game.chestsDestroyed}
             </span>
           </span>
+          {boss && (
+            <span className="stat boss-stat" title="Flag Eater lives">
+              <span className="stat-label">Eater</span>
+              <span className="stat-row">
+                <BossIcon className="stat-ico" />
+                {Math.max(0, boss.lives)}
+              </span>
+            </span>
+          )}
         </div>
         <MuteButton muted={muted} onToggle={onToggleMute} />
         <button type="button" className="ghost bag-btn" onClick={onCollection} aria-label="Open collection">
@@ -368,7 +398,11 @@ function Play({
             Flag
           </button>
         </div>
-        <p className="hint">Tap to {flagMode ? 'flag' : 'dig'} · hold 400ms to flag</p>
+        <p className="hint">
+          {boss
+            ? 'Hit it with a blast. Eating a flag is not a loss.'
+            : `Tap to ${flagMode ? 'flag' : 'dig'} · hold 400ms to flag`}
+        </p>
       </footer>
 
       {tutorial && (
@@ -394,49 +428,76 @@ function Play({
       {report && (
         <div className="overlay" role="dialog">
           <div className="tablet">
-            <h2>{report.lastFloor && mode === 'campaign' ? 'Dungeon cleared' : 'Floor cleared'}</h2>
-            <div className="tally">
-              <div>
-                <em>Found</em>
-                <strong className="pos">{report.opened}</strong>
-              </div>
-              <div>
-                <em>Broken</em>
-                <strong className="neg">{report.wrecked}</strong>
-              </div>
-            </div>
-            {report.gold > 0 || salvage.length > 0 ? (
-              <ul className="loot-list report-loot">
-                {report.gold > 0 && (
-                  <li className="loot-card">
-                    <span className="loot-ico">
-                      <GoldIcon />
-                    </span>
-                    <span className="loot-copy">
-                      <strong>Coins</strong>
-                      <em>Pouched gold, now in your wallet.</em>
-                    </span>
-                    <span className="loot-count">+{report.gold}</span>
-                  </li>
-                )}
-                {salvage.map(({ item, count }) => (
-                  <li key={item.id} className={`loot-card${isTicketKey(item.id) ? ' is-ticket' : ''}`}>
-                    <span className="loot-ico">
-                      <ItemIcon id={item.id} />
-                    </span>
-                    <span className="loot-copy">
-                      <strong>{item.name}</strong>
-                      <em>{item.flavor}</em>
-                    </span>
-                    <span className="loot-count">×{count}</span>
-                  </li>
-                ))}
-              </ul>
+            <h2>
+              {report.outcome === 'lost'
+                ? 'Campaign failed'
+                : report.outcome === 'victory'
+                  ? 'Flag Eater defeated'
+                  : report.lastFloor && mode === 'campaign'
+                    ? 'Dungeon cleared'
+                    : 'Floor cleared'}
+            </h2>
+            {report.outcome === 'lost' ? (
+              <p className="muted">The Flag Eater kept the stash. Every coin and relic is gone.</p>
             ) : (
-              <p className="muted">No loot survived.</p>
+              <>
+                <div className="tally">
+                  <div>
+                    <em>Found</em>
+                    <strong className="pos">{report.opened}</strong>
+                  </div>
+                  <div>
+                    <em>Broken</em>
+                    <strong className="neg">{report.wrecked}</strong>
+                  </div>
+                </div>
+                {report.outcome === 'stashed' && (
+                  <p className="muted">Loot is stashed until the Flag Eater falls.</p>
+                )}
+                {report.bonusKey && (
+                  <p className="bonus-line">
+                    Bonus <ItemIcon id={report.bonusKey} /> {ITEMS[report.bonusKey].name}
+                  </p>
+                )}
+                {report.gold > 0 || salvage.length > 0 ? (
+                  <ul className="loot-list report-loot">
+                    {report.gold > 0 && (
+                      <li className="loot-card">
+                        <span className="loot-ico">
+                          <GoldIcon />
+                        </span>
+                        <span className="loot-copy">
+                          <strong>Coins</strong>
+                          <em>{goldCopy}</em>
+                        </span>
+                        <span className="loot-count">+{report.gold}</span>
+                      </li>
+                    )}
+                    {salvage.map(({ item, count }) => (
+                      <li
+                        key={item.id}
+                        className={`loot-card${isTicketKey(item.id) ? ' is-ticket' : ''}${
+                          report.bonusKey === item.id ? ' is-bonus' : ''
+                        }`}
+                      >
+                        <span className="loot-ico">
+                          <ItemIcon id={item.id} />
+                        </span>
+                        <span className="loot-copy">
+                          <strong>{item.name}</strong>
+                          <em>{item.flavor}</em>
+                        </span>
+                        <span className="loot-count">×{count}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="muted">No loot survived.</p>
+                )}
+              </>
             )}
             <div className="row-btns">
-              {mode === 'campaign' && !report.lastFloor ? (
+              {mode === 'campaign' && report.outcome === 'stashed' ? (
                 <button
                   type="button"
                   className="stone-btn gold"
@@ -459,16 +520,18 @@ function Play({
                   {mode === 'campaign' ? 'Return' : 'Menu'}
                 </button>
               )}
-              <button
-                type="button"
-                className="stone-btn"
-                onClick={() => {
-                  onUi();
-                  onRetry();
-                }}
-              >
-                Replay floor
-              </button>
+              {showReplay && (
+                <button
+                  type="button"
+                  className="stone-btn"
+                  onClick={() => {
+                    onUi();
+                    onRetry();
+                  }}
+                >
+                  Replay floor
+                </button>
+              )}
             </div>
           </div>
         </div>

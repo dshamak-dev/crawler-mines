@@ -1,7 +1,11 @@
 import { loadMuted, saveMuted } from './settings';
 import { bgmUrl, sfxUrl, type BgmId, type SfxId } from './urls';
 
-const BGM_VOL = 0.2;
+const BGM_VOL: Record<BgmId, number> = {
+  cozy: 0.2,
+  campaign: 0.2,
+  boss: 0.24,
+};
 const CROSSFADE_MS = 700;
 const SFX_VOL: Record<SfxId, number> = {
   dig: 0.44,
@@ -12,6 +16,11 @@ const SFX_VOL: Record<SfxId, number> = {
   clear: 0.5,
   ui: 0.38,
   deny: 0.5,
+  'boss-move': 0.5,
+  'boss-eat-flag': 0.56,
+  'boss-hit': 0.62,
+  'boss-death': 0.58,
+  'campaign-lose': 0.55,
 };
 
 function canUseAudio(): boolean {
@@ -42,6 +51,7 @@ export class GameAudio {
     this.bgm = {
       cozy: makeTrack(bgmUrl('cozy'), true),
       campaign: makeTrack(bgmUrl('campaign'), true),
+      boss: makeTrack(bgmUrl('boss'), true),
     };
     this.sfx = {
       dig: makeTrack(sfxUrl('dig'), false),
@@ -52,6 +62,11 @@ export class GameAudio {
       clear: makeTrack(sfxUrl('clear'), false),
       ui: makeTrack(sfxUrl('ui'), false),
       deny: makeTrack(sfxUrl('deny'), false),
+      'boss-move': makeTrack(sfxUrl('boss-move'), false),
+      'boss-eat-flag': makeTrack(sfxUrl('boss-eat-flag'), false),
+      'boss-death': makeTrack(sfxUrl('boss-death'), false),
+      'boss-hit': makeTrack(sfxUrl('boss-hit'), false),
+      'campaign-lose': makeTrack(sfxUrl('campaign-lose'), false),
     };
   }
 
@@ -133,7 +148,7 @@ export class GameAudio {
     if (this.current === next) {
       const el = this.bgm[next];
       if (el && el.paused) {
-        el.volume = BGM_VOL;
+        el.volume = BGM_VOL[next];
         void el.play().catch(() => {
           this.unlocked = false;
         });
@@ -153,7 +168,7 @@ export class GameAudio {
     });
 
     const fadeMs = fromMute || !outgoing || outgoing.paused ? 180 : CROSSFADE_MS;
-    this.ramp(incoming, 0, BGM_VOL, fadeMs, gen);
+    this.ramp(incoming, 0, BGM_VOL[next], fadeMs, gen);
     if (outgoing && outgoing !== incoming) {
       this.ramp(outgoing, outgoing.volume, 0, fadeMs, gen, () => {
         outgoing.pause();

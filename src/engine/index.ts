@@ -1,4 +1,5 @@
 export type {
+  BossState,
   Cell,
   CellKind,
   CellState,
@@ -10,12 +11,15 @@ export type {
   GameEvent,
   GameStatus,
   Rng,
+  Turn,
 } from './types';
 export {
+  BOSS_MAX_LIVES,
   CAMPAIGN_FLOORS,
   DIFFICULTIES,
   cellVisual,
   configFor,
+  isCampaignFinale,
   newCell,
 } from './types';
 export type { Inventory, ItemDef, ItemId, ChestTier } from './loot';
@@ -48,6 +52,7 @@ export {
 } from './collection';
 export type { CollectionState, KeyStore } from './collection';
 export {
+  allSafeRevealed,
   chestCount,
   chestsRemaining,
   cloneGame,
@@ -57,12 +62,32 @@ export {
   createGameFromLayout,
   ensureFirstClickSafe,
   indexOf,
+  isLost,
   isWon,
   mineCount,
   neighbors,
 } from './board';
-export { chestNotices, dig, explodeChain, grantIntactLoot, toggleFlag } from './game';
+export {
+  afterPlayerAction,
+  chestNotices,
+  dig,
+  explodeChain,
+  flag,
+  grantIntactLoot,
+  toggleFlag,
+} from './game';
 export type { ChestNotice } from './game';
+export {
+  chebyshev,
+  flaggedCells,
+  firstStepToward,
+  hitBossFromBlasts,
+  isWalkable,
+  resolvePendingBossTurn,
+  stepBoss,
+} from './boss';
+export { emptyStash, mergeStash, rollBonusKey, stashToRewards } from './stash';
+export type { CampaignStash } from './stash';
 export { mulberry32 } from './rng';
 export {
   CAMPAIGN_COST,
@@ -86,6 +111,7 @@ export {
   recoverBank,
   resumeLabel,
   rewardsFromGame,
+  runStash,
   sanitizeRun,
 } from './runPersist';
-export type { FloorReport, PersistedRunSlice, Run } from './runPersist';
+export type { FloorOutcome, FloorReport, PersistedRunSlice, Run } from './runPersist';

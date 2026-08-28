@@ -1,4 +1,5 @@
 import { cloneGame } from './board';
+import { clampBossLives, resolvePendingBossTurn } from './boss';
 import type { CollectionState, KeyStore } from './collection';
 import { applyRewards } from './collection';
 import {
@@ -7,15 +8,20 @@ import {
   isChestTier,
   isCollectible,
   isItemId,
+  isTicketKey,
   type Inventory,
   type ItemId,
 } from './loot';
+import { emptyStash, stashToRewards, type CampaignStash } from './stash';
 import {
   CAMPAIGN_FLOORS,
+  isCampaignFinale,
+  type BossState,
   type Cell,
   type Difficulty,
   type Game,
   type GameStatus,
+  type Turn,
 } from './types';
 
 export const RUN_KEY = 'crawler-mines-run';
@@ -25,7 +31,11 @@ export interface Run {
   floor: number;
   game: Game;
   grantKey: string;
+  campaignStash?: CampaignStash;
+  bonusKey?: ItemId | null;
 }
+
+export type FloorOutcome = 'cleared' | 'stashed' | 'victory' | 'lost';
 
 export interface FloorReport {
   opened: number;
@@ -33,6 +43,8 @@ export interface FloorReport {
   lastFloor: boolean;
   loot: Inventory;
   gold: number;
+  outcome: FloorOutcome;
+  bonusKey: ItemId | null;
 }
 
 export interface PersistedRunSlice {
@@ -42,7 +54,8 @@ export interface PersistedRunSlice {
 
 const KINDS: ReadonlyArray<Cell['kind']> = ['empty', 'mine', 'chest'];
 const STATES: ReadonlyArray<Cell['state']> = ['hidden', 'flagged', 'revealed'];
-const STATUSES: ReadonlyArray<GameStatus> = ['playing', 'cleared'];
+const STATUSES: ReadonlyArray<GameStatus> = ['playing', 'cleared', 'lost'];
+const TURNS: ReadonlyArray<Turn> = ['player', 'boss'];
 const MODES: ReadonlyArray<Difficulty> = ['easy', 'medium', 'hard', 'campaign'];
 
 export function newGrantKey(): string {
@@ -52,13 +65,24 @@ export function newGrantKey(): string {
   return `g-${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`;
 }
 
+export function runStash(run: Run): CampaignStash {
+  return run.campaignStash ?? emptyStash();
+}
+
 export function floorReport(run: Run): FloorReport {
+  const lastFloor = run.mode !== 'campaign' || isCampaignFinale(run.mode, run.floor);
+  const lost = run.game.status === 'lost';
+  const victory = run.mode === 'campaign' && lastFloor && run.game.status === 'cleared';
+  const stashed = run.mode === 'campaign' && !lastFloor && run.game.status === 'cleared';
+  const stash = runStash(run);
   return {
     opened: run.game.chestsOpened,
     wrecked: run.game.chestsDestroyed,
-    lastFloor: run.mode !== 'campaign' || run.floor >= CAMPAIGN_FLOORS.length - 1,
-    loot: { ...run.game.inventory },
-    gold: run.game.gold,
+    lastFloor,
+    loot: victory ? { ...stash.items } : { ...run.game.inventory },
+    gold: victory ? stash.gold : run.game.gold,
+    outcome: lost ? 'lost' : victory ? 'victory' : stashed ? 'stashed' : 'cleared',
+    bonusKey: victory ? (run.bonusKey ?? null) : null,
   };
 }
 
@@ -82,6 +106,20 @@ function sanitizeInventory(raw: unknown): Inventory {
     if (n > 0) inv[key] = n;
   }
   return inv;
+}
+
+function sanitizeStash(raw: unknown): CampaignStash {
+  if (!raw || typeof raw !== 'object') return emptyStash();
+  const s = raw as Record<string, unknown>;
+  const gold = typeof s.gold === 'number' && Number.isFinite(s.gold) ? Math.max(0, Math.floor(s.gold)) : 0;
+  return { gold, items: sanitizeInventory(s.items) };
+}
+
+function sanitizeBoss(raw: unknown, cellCount: number): BossState | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const b = raw as Record<string, unknown>;
+  if (!isInt(b.index) || b.index < 0 || b.index >= cellCount) return null;
+  return { index: b.index, lives: clampBossLives(b.lives) };
 }
 
 function sanitizeCell(raw: unknown): Cell | null {
@@ -132,7 +170,9 @@ function sanitizeGame(raw: unknown): Game | null {
   if (!STATUSES.includes(g.status as GameStatus)) return null;
   const inventory = sanitizeInventory(g.inventory);
   const rewardsGranted = g.rewardsGranted === true;
-  return {
+  const boss = sanitizeBoss(g.boss, cells.length);
+  const turn: Turn = TURNS.includes(g.turn as Turn) ? (g.turn as Turn) : 'player';
+  const game: Game = {
     width: g.width,
     height: g.height,
     mines: g.mines,
@@ -146,7 +186,11 @@ function sanitizeGame(raw: unknown): Game | null {
     firstClickDone: g.firstClickDone,
     status: g.status as GameStatus,
     rewardsGranted,
+    boss,
+    turn,
   };
+  resolvePendingBossTurn(game);
+  return game;
 }
 
 export function sanitizeRun(raw: unknown): Run | null {
@@ -159,11 +203,16 @@ export function sanitizeRun(raw: unknown): Run | null {
   const game = sanitizeGame(r.game);
   if (!game) return null;
   if (typeof r.grantKey !== 'string' || r.grantKey.length === 0) return null;
+  const bonusRaw = r.bonusKey;
+  const bonusKey =
+    typeof bonusRaw === 'string' && isItemId(bonusRaw) && isTicketKey(bonusRaw) ? bonusRaw : null;
   return {
     mode,
     floor: r.floor,
     game: cloneGame(game),
     grantKey: r.grantKey,
+    campaignStash: sanitizeStash(r.campaignStash),
+    bonusKey,
   };
 }
 
@@ -226,6 +275,14 @@ export function recoverBank(
   store: KeyStore,
 ): { meta: CollectionState; runLoot: Inventory } {
   if (!run) return { meta, runLoot };
+  if (run.game.status === 'lost') return { meta, runLoot };
+  if (run.mode === 'campaign') {
+    if (run.game.status !== 'cleared' || !isCampaignFinale(run.mode, run.floor)) {
+      return { meta, runLoot };
+    }
+    if (meta.lastGrantKey === run.grantKey) return { meta, runLoot };
+    return bankFloor(meta, emptyInventory(), stashToRewards(runStash(run)), run.grantKey, store);
+  }
   if (!run.game.rewardsGranted && run.game.status !== 'cleared') return { meta, runLoot };
   return bankFloor(meta, runLoot, rewardsFromGame(run.game), run.grantKey, store);
 }

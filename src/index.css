@@ -361,6 +361,16 @@ button {
 .stat.wreck {
   color: var(--ash);
 }
+.stat.boss-stat {
+  color: #e0a0ff;
+  border-color: rgba(180, 80, 200, 0.35);
+}
+.stat.boss-stat .stat-label {
+  color: #c9b4ff;
+}
+.hud-stats .stat {
+  max-width: 5.6rem;
+}
 .floor-pill {
   font-family: var(--font-display);
   font-size: 0.68rem;
@@ -430,6 +440,24 @@ button {
 .cell .glyph {
   width: 72%;
   height: 72%;
+}
+.cell .boss-glyph {
+  width: 86%;
+  height: 86%;
+  position: absolute;
+  z-index: 1;
+  filter: drop-shadow(0 0 4px rgba(180, 40, 200, 0.65));
+  pointer-events: none;
+}
+.cell.is-boss {
+  background: radial-gradient(circle at 50% 55%, rgba(140, 40, 160, 0.38), #1a1512 72%);
+  box-shadow:
+    inset 0 0 0 1.5px rgba(201, 180, 255, 0.45),
+    inset 0 2px 4px rgba(0, 0, 0, 0.55);
+}
+.cell .boss-under {
+  opacity: 0.35;
+  font-size: calc(var(--cell) * 0.32);
 }
 .cell:active {
   filter: brightness(1.12);
@@ -950,6 +978,23 @@ button {
 }
 .loot-card.is-ticket {
   border-color: rgba(201, 180, 255, 0.35);
+}
+.loot-card.is-bonus {
+  border-color: rgba(224, 180, 74, 0.55);
+}
+.bonus-line {
+  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--gold-2);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+}
+.bonus-line .glyph {
+  width: 18px;
+  height: 18px;
 }
 .collection-back {
   width: 100%;

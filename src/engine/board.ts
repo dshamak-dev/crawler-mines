@@ -1,5 +1,5 @@
 import { emptyInventory, goldForLoot, rollLoot, tierForLoot, type ChestTier, type ItemId } from './loot';
-import { type Cell, type FloorConfig, type Game, type Rng, newCell } from './types';
+import { type BossState, type Cell, type FloorConfig, type Game, type Rng, newCell } from './types';
 
 export const DIRS: ReadonlyArray<readonly [number, number]> = [
   [-1, -1],
@@ -74,7 +74,8 @@ function pickUnique(
 export function createGame(config: FloorConfig, rng: Rng): Game {
   const { width, height, mines, chests, chestValue } = config;
   const total = width * height;
-  if (mines + chests >= total) {
+  const bossSlots = config.bossLives && config.bossLives > 0 ? 1 : 0;
+  if (mines + chests + bossSlots >= total) {
     throw new Error('Not enough cells for mines and chests');
   }
   const cells: Cell[] = Array.from({ length: total }, () => newCell());
@@ -92,6 +93,15 @@ export function createGame(config: FloorConfig, rng: Rng): Game {
     cells[i].kind = 'mine';
   }
   computeAdjacency(width, height, cells);
+  let boss: BossState | null = null;
+  const lives = config.bossLives;
+  if (lives && lives > 0) {
+    const occupied = new Set([...chestIdx, ...mineIdx]);
+    const spawn = pickUnique(1, total, occupied, rng);
+    const index = spawn[0];
+    cells[index].state = 'revealed';
+    boss = { index, lives };
+  }
   return {
     width,
     height,
@@ -106,10 +116,12 @@ export function createGame(config: FloorConfig, rng: Rng): Game {
     firstClickDone: false,
     status: 'playing',
     rewardsGranted: false,
+    boss,
+    turn: 'player',
   };
 }
 
-/** Build a board from a layout for tests. `.` empty, `*` mine, `$` chest. */
+/** Build a board from a layout for tests. `.` empty, `*` mine, `$` chest, `B` Flag Eater spawn. */
 export function createGameFromLayout(
   rows: string[],
   chestValue = 10,
@@ -121,6 +133,7 @@ export function createGameFromLayout(
   const cells: Cell[] = [];
   let mines = 0;
   let chests = 0;
+  let bossIndex = -1;
   for (let y = 0; y < height; y++) {
     if (rows[y].length !== width) throw new Error('ragged layout');
     for (let x = 0; x < width; x++) {
@@ -138,6 +151,9 @@ export function createGameFromLayout(
           }),
         );
         chests++;
+      } else if (ch === 'B') {
+        bossIndex = cells.length;
+        cells.push(newCell({ state: 'revealed' }));
       } else {
         cells.push(newCell());
       }
@@ -158,6 +174,8 @@ export function createGameFromLayout(
     firstClickDone: true,
     status: 'playing',
     rewardsGranted: false,
+    boss: bossIndex >= 0 ? { index: bossIndex, lives: 2 } : null,
+    turn: 'player',
   };
 }
 
@@ -166,6 +184,7 @@ export function cloneGame(game: Game): Game {
     ...game,
     cells: game.cells.map((c) => ({ ...c })),
     inventory: { ...game.inventory },
+    boss: game.boss ? { ...game.boss } : null,
   };
 }
 
@@ -183,8 +202,18 @@ export function chestsRemaining(game: Game): number {
   ).length;
 }
 
-export function isWon(game: Game): boolean {
+export function allSafeRevealed(game: Game): boolean {
   return game.cells.every((c) => c.kind === 'mine' || c.state === 'revealed');
+}
+
+export function isWon(game: Game): boolean {
+  if (game.boss) return game.boss.lives <= 0;
+  return allSafeRevealed(game);
+}
+
+export function isLost(game: Game): boolean {
+  if (!game.boss || game.boss.lives <= 0) return false;
+  return allSafeRevealed(game);
 }
 
 /**
@@ -195,10 +224,11 @@ export function ensureFirstClickSafe(game: Game, index: number, rng: Rng): void 
   const cell = game.cells[index];
   if (cell.kind !== 'mine') return;
 
+  const bossIndex = game.boss?.index ?? -1;
   const empties: number[] = [];
   const chestIdx: number[] = [];
   for (let i = 0; i < game.cells.length; i++) {
-    if (i === index) continue;
+    if (i === index || i === bossIndex) continue;
     if (game.cells[i].kind === 'empty') empties.push(i);
     else if (game.cells[i].kind === 'chest') chestIdx.push(i);
   }
