@@ -47,12 +47,22 @@ describe('loot table', () => {
     expect(seen.size).toBeGreaterThan(1);
   });
 
+  it('can roll Hard and Campaign keys as rare inner loot', () => {
+    const rng = mulberry32(7);
+    const seen = new Set<ItemId>();
+    for (let i = 0; i < 2500; i++) seen.add(rollLoot(rng));
+    expect(seen.has('hard-key')).toBe(true);
+    expect(seen.has('campaign-key')).toBe(true);
+  });
+
   it('only gold pouches convert floor chestValue into gold', () => {
     expect(goldForLoot('gold-pouch', 18)).toBe(18);
     expect(goldForLoot('rusty-key', 18)).toBe(0);
     expect(goldForLoot('torch-charm', 18)).toBe(0);
     expect(goldForLoot('gem', 18)).toBe(0);
     expect(goldForLoot('relic-shard', 18)).toBe(0);
+    expect(goldForLoot('hard-key', 18)).toBe(0);
+    expect(goldForLoot('campaign-key', 18)).toBe(0);
   });
 
   it('stacks counts and ignores empty rows', () => {
@@ -236,7 +246,7 @@ describe('meta collection persistence', () => {
     expect(loaded.gold).toBe(0);
   });
 
-  it('reloads a persisted gold integer and never decrements it', () => {
+  it('reloads a persisted gold integer; rewards still only add coins', () => {
     const store = memoryStore({
       [COLLECTION_KEY]: JSON.stringify({
         v: 1,
@@ -267,5 +277,7 @@ describe('item catalog', () => {
     expect(tierForLoot('torch-charm')).toBe('iron');
     expect(tierForLoot('gem')).toBe('iron');
     expect(tierForLoot('relic-shard')).toBe('gilded');
+    expect(tierForLoot('hard-key')).toBe('rare');
+    expect(tierForLoot('campaign-key')).toBe('rare');
   });
 });

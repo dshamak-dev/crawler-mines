@@ -6,11 +6,13 @@ export const ITEM_IDS = [
   'torch-charm',
   'gem',
   'relic-shard',
+  'hard-key',
+  'campaign-key',
 ] as const;
 
 export type ItemId = (typeof ITEM_IDS)[number];
 
-export const CHEST_TIERS = ['wooden', 'iron', 'gilded'] as const;
+export const CHEST_TIERS = ['wooden', 'iron', 'gilded', 'rare'] as const;
 export type ChestTier = (typeof CHEST_TIERS)[number];
 
 export const TIER_COPY: Record<
@@ -32,6 +34,11 @@ export const TIER_COPY: Record<
     found: 'Found · still sealed',
     broken: 'Smashed · loot lost',
   },
+  rare: {
+    name: 'Rare chest',
+    found: 'Found · still sealed',
+    broken: 'Smashed · loot lost',
+  },
 };
 
 export function isChestTier(value: unknown): value is ChestTier {
@@ -40,6 +47,7 @@ export function isChestTier(value: unknown): value is ChestTier {
 
 /** Visible chest shell. Inner loot stays hidden until the floor is cleared. */
 export function tierForLoot(itemId: ItemId): ChestTier {
+  if (itemId === 'hard-key' || itemId === 'campaign-key') return 'rare';
   if (itemId === 'relic-shard') return 'gilded';
   if (itemId === 'gem' || itemId === 'torch-charm') return 'iron';
   return 'wooden';
@@ -84,6 +92,18 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     flavor: 'A sliver of something that used to matter.',
     grantsGold: false,
   },
+  'hard-key': {
+    id: 'hard-key',
+    name: 'Hard key',
+    flavor: 'Burns on a Hard enter. No refund.',
+    grantsGold: false,
+  },
+  'campaign-key': {
+    id: 'campaign-key',
+    name: 'Campaign key',
+    flavor: 'One free five-floor descent. No refund.',
+    grantsGold: false,
+  },
 };
 
 const LOOT_TABLE: ReadonlyArray<{ itemId: ItemId; weight: number }> = [
@@ -92,6 +112,8 @@ const LOOT_TABLE: ReadonlyArray<{ itemId: ItemId; weight: number }> = [
   { itemId: 'torch-charm', weight: 18 },
   { itemId: 'gem', weight: 16 },
   { itemId: 'relic-shard', weight: 10 },
+  { itemId: 'hard-key', weight: 3 },
+  { itemId: 'campaign-key', weight: 2 },
 ];
 
 export type Inventory = Record<ItemId, number>;
@@ -103,6 +125,8 @@ export function emptyInventory(): Inventory {
     'torch-charm': 0,
     gem: 0,
     'relic-shard': 0,
+    'hard-key': 0,
+    'campaign-key': 0,
   };
 }
 
@@ -128,9 +152,17 @@ export function addItem(inv: Inventory, itemId: ItemId, n = 1): Inventory {
   return { ...inv, [itemId]: (inv[itemId] ?? 0) + n };
 }
 
+export function removeItem(inv: Inventory, itemId: ItemId, n = 1): Inventory {
+  return { ...inv, [itemId]: Math.max(0, (inv[itemId] ?? 0) - n) };
+}
+
 /** Pouches convert to wallet coins; they are not pack salvage. */
 export function isCollectible(itemId: ItemId): boolean {
   return itemId !== 'gold-pouch';
+}
+
+export function isTicketKey(itemId: ItemId): boolean {
+  return itemId === 'hard-key' || itemId === 'campaign-key';
 }
 
 export function inventoryTotal(inv: Inventory): number {

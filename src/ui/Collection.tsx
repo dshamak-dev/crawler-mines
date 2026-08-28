@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   inventoryTotal,
+  isTicketKey,
   stackedEntries,
   type CollectionState,
   type Inventory,
@@ -73,7 +74,7 @@ export default function Collection({
       ) : (
         <ul className="loot-list">
           {rows.map(({ item, count }) => (
-            <li key={item.id} className="loot-card">
+            <li key={item.id} className={`loot-card${isTicketKey(item.id) ? ' is-ticket' : ''}`}>
               <span className="loot-ico">
                 <ItemIcon id={item.id} />
               </span>
