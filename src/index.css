@@ -230,8 +230,15 @@ button {
   justify-content: center;
   min-height: 52px;
 }
-.stone-btn.sound-slot {
+.stone-btn.sound-slot,
+.stone-btn.sound-row {
   min-height: 48px;
+}
+.sound-row.is-muted {
+  color: var(--muted);
+}
+.mute-btn {
+  flex-shrink: 0;
 }
 .tablet.start-sheet {
   width: min(340px, 100%);

@@ -1,13 +1,10 @@
 import { useCallback, useRef, useState } from 'react';
+import { playDeny, sfxFromEvents, useGameAudio } from './audio';
 import {
   CAMPAIGN_FLOORS,
   chestNotices,
-  confirmCopy,
-  confirmLabel,
   isTicketKey,
-  quoteEntry,
   stackedEntries,
-  type CollectionState,
   type Difficulty,
   type GameEvent,
 } from './engine';
@@ -21,7 +18,9 @@ import {
 import Board, { collectFx, useBoardCellSize, type BlastFx } from './ui/Board';
 import Collection from './ui/Collection';
 import LootQueue, { type LootToast } from './ui/LootToast';
-import { BagIcon, ChestIcon, FlagIcon, GoldIcon, ItemIcon, ShovelIcon, TorchIcon } from './ui/icons';
+import MuteButton from './ui/MuteButton';
+import TitleMenu from './ui/TitleMenu';
+import { BagIcon, ChestIcon, FlagIcon, GoldIcon, ItemIcon, ShovelIcon } from './ui/icons';
 import { chainDuration, prefersReducedMotion } from './ui/motion';
 
 type Screen = 'menu' | 'play' | 'collection';
@@ -58,6 +57,9 @@ export default function App() {
   const fxId = useRef(1);
   const toastId = useRef(1);
   const clearTimer = useRef<number | null>(null);
+  const { muted, toggleMuted, playSfx } = useGameAudio(screen, run?.mode ?? null, collectionFrom);
+
+  const cueUi = () => playSfx('ui');
 
   const openCollection = (from: Screen) => {
     setCollectionFrom(from);
@@ -75,7 +77,10 @@ export default function App() {
 
   const start = (mode: Difficulty) => {
     const ok = startRun(mode);
-    if (!ok) return;
+    if (!ok) {
+      playDeny();
+      return;
+    }
     clearFx();
     setScreen('play');
     try {
@@ -135,6 +140,7 @@ export default function App() {
       const events = applyDig(index);
       const cur = useGameStore.getState().run;
       if (!cur || events.length === 0) return;
+      for (const id of sfxFromEvents(events)) playSfx(id);
       queueChestToasts(events, cur.game.cells);
       const cleared = events.some((e) => e.type === 'cleared');
       applyFx(
@@ -149,14 +155,17 @@ export default function App() {
           : undefined,
       );
     },
-    [applyDig, applyFx, queueChestToasts],
+    [applyDig, applyFx, playSfx, queueChestToasts],
   );
 
   const onFlag = useCallback(
     (index: number) => {
+      const cell = useGameStore.getState().run?.game.cells[index];
+      if (!cell || cell.state === 'revealed') return;
       applyFlag(index);
+      playSfx('flag');
     },
-    [applyFlag],
+    [applyFlag, playSfx],
   );
 
   const nextFloor = () => {
@@ -185,16 +194,23 @@ export default function App() {
           <Collection
             meta={meta}
             runLoot={runLoot}
-            onBack={() => setScreen(collectionFrom === 'play' && run ? 'play' : 'menu')}
+            onBack={() => {
+              cueUi();
+              setScreen(collectionFrom === 'play' && run ? 'play' : 'menu');
+            }}
           />
         ) : screen === 'menu' || !run ? (
-          <Menu
+          <TitleMenu
             onStart={start}
             onResume={run ? resume : undefined}
             resumeCopy={run ? resumeLabel(run) : null}
             onCollection={() => openCollection('menu')}
             gold={meta.gold}
             meta={meta}
+            muted={muted}
+            onToggleMute={toggleMuted}
+            onUi={cueUi}
+            onDeny={playDeny}
           />
         ) : (
           <Play
@@ -207,16 +223,23 @@ export default function App() {
             tutorial={tutorial}
             report={report}
             lootQueue={lootQueue}
+            muted={muted}
+            onToggleMute={toggleMuted}
             onDismissToast={dismissToast}
             onDig={onDig}
             onFlag={onFlag}
+            onUi={cueUi}
             onMenu={() => {
+              cueUi();
               setScreen('menu');
               setBlasts([]);
               setSparkles([]);
               setLootQueue([]);
             }}
-            onCollection={() => openCollection('play')}
+            onCollection={() => {
+              cueUi();
+              openCollection('play');
+            }}
             onDismissTutorial={dismissTutorial}
             onNext={nextFloor}
             onRetry={retryFloor}
@@ -224,233 +247,6 @@ export default function App() {
         )}
       </div>
     </div>
-  );
-}
-
-const SOUND_KEY = 'crawler-mines-sound';
-
-function Menu({
-  onStart,
-  onResume,
-  resumeCopy,
-  onCollection,
-  gold,
-  meta,
-}: {
-  onStart: (m: Difficulty) => void;
-  onResume?: () => void;
-  resumeCopy: string | null;
-  onCollection: () => void;
-  gold: number;
-  meta: CollectionState;
-}) {
-  const [startOpen, setStartOpen] = useState(false);
-  const [pending, setPending] = useState<Difficulty | null>(null);
-  const quote = pending ? quoteEntry(pending, meta) : null;
-
-  const closeStart = () => {
-    setStartOpen(false);
-    setPending(null);
-  };
-
-  const pick = (mode: Difficulty) => {
-    const next = quoteEntry(mode, meta);
-    if (next.kind === 'free') {
-      setStartOpen(false);
-      setPending(null);
-      onStart(mode);
-      return;
-    }
-    setPending(mode);
-  };
-
-  const confirm = () => {
-    if (!pending || !quote || quote.kind === 'blocked') return;
-    const mode = pending;
-    setPending(null);
-    setStartOpen(false);
-    onStart(mode);
-  };
-
-  return (
-    <div className="shell menu-shell">
-      <header className="title-block">
-        <TorchIcon />
-        <h1>Crawler Mines</h1>
-        <p className="tagline">Bombs don&apos;t kill you. They kill the loot.</p>
-      </header>
-      <ul className="rules-chip">
-        <li>Clear every safe tile.</li>
-        <li>Blasts chain into nearby bombs.</li>
-        <li>Long-press to flag.</li>
-      </ul>
-      <nav className="menu-nav">
-        <button type="button" className="stone-btn player-row" onClick={onCollection}>
-          <span className="player-row-main">
-            <BagIcon />
-            Collection
-          </span>
-          <span className="player-wallet">
-            <GoldIcon />
-            {gold}
-          </span>
-        </button>
-        {onResume && resumeCopy && (
-          <button type="button" className="stone-btn" onClick={onResume}>
-            Resume <span>{resumeCopy}</span>
-          </button>
-        )}
-        <button type="button" className="stone-btn gold start-cta" onClick={() => setStartOpen(true)}>
-          Start
-        </button>
-        <SoundSlot />
-      </nav>
-      {startOpen && !pending && (
-        <div
-          className="overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="start-title"
-          onClick={closeStart}
-        >
-          <div className="tablet start-sheet" onClick={(e) => e.stopPropagation()}>
-            <h2 id="start-title">Start</h2>
-            <div className="menu-modes">
-              <ModeButton mode="easy" label="Easy" size="8x8" meta={meta} onPick={pick} />
-              <ModeButton mode="medium" label="Medium" size="9x12" meta={meta} onPick={pick} />
-              <ModeButton mode="hard" label="Hard" size="12x16" meta={meta} onPick={pick} />
-              <ModeButton
-                mode="campaign"
-                label="Campaign"
-                size="5 floors"
-                gold
-                meta={meta}
-                onPick={pick}
-              />
-            </div>
-            <button type="button" className="stone-btn" onClick={closeStart}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-      {quote && pending && (
-        <div
-          className="overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="entry-title"
-          onClick={() => setPending(null)}
-        >
-          <div className="tablet" onClick={(e) => e.stopPropagation()}>
-            <h2 id="entry-title">
-              {quote.kind === 'blocked'
-                ? pending === 'hard'
-                  ? "Can't enter Hard"
-                  : "Can't enter Campaign"
-                : pending === 'hard'
-                  ? 'Enter Hard?'
-                  : 'Enter Campaign?'}
-            </h2>
-            <p>{confirmCopy(quote)}</p>
-            {quote.kind === 'blocked' ? (
-              <button type="button" className="stone-btn gold" onClick={() => setPending(null)}>
-                Got it
-              </button>
-            ) : (
-              <div className="row-btns">
-                <button type="button" className="stone-btn gold" onClick={confirm}>
-                  {confirmLabel(quote)}
-                </button>
-                <button type="button" className="stone-btn" onClick={() => setPending(null)}>
-                  Cancel
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SoundSlot() {
-  const [on, setOn] = useState(() => {
-    try {
-      return localStorage.getItem(SOUND_KEY) !== '0';
-    } catch {
-      return true;
-    }
-  });
-
-  const toggle = () => {
-    const next = !on;
-    setOn(next);
-    try {
-      localStorage.setItem(SOUND_KEY, next ? '1' : '0');
-    } catch {
-      /* private mode */
-    }
-  };
-
-  return (
-    <button
-      type="button"
-      className="stone-btn sound-slot"
-      onClick={toggle}
-      aria-pressed={on}
-      aria-label={`Sound ${on ? 'on' : 'off'}`}
-    >
-      Sound
-      <span>{on ? 'On' : 'Off'}</span>
-    </button>
-  );
-}
-
-function ModeButton({
-  mode,
-  label,
-  size,
-  gold,
-  meta,
-  onPick,
-}: {
-  mode: Difficulty;
-  label: string;
-  size: string;
-  gold?: boolean;
-  meta: CollectionState;
-  onPick: (mode: Difficulty) => void;
-}) {
-  const quote = quoteEntry(mode, meta);
-  const free = quote.kind === 'free';
-  return (
-    <button
-      type="button"
-      className={`stone-btn${gold ? ' gold' : ''}${quote.kind === 'blocked' ? ' is-locked' : ''}`}
-      onClick={() => onPick(mode)}
-    >
-      {label}
-      <span className="mode-meta">
-        <span>{size}</span>
-        {free ? (
-          <span className="mode-ticket">free</span>
-        ) : (
-          <span className="mode-ticket">
-            <span className="mode-price">
-              <GoldIcon />
-              {quote.cost}
-            </span>
-            {quote.keyCount > 0 && quote.keyId ? (
-              <span className="mode-key">
-                <ItemIcon id={quote.keyId} />
-                ×{quote.keyCount}
-              </span>
-            ) : null}
-          </span>
-        )}
-      </span>
-    </button>
   );
 }
 
@@ -464,9 +260,12 @@ function Play({
   tutorial,
   report,
   lootQueue,
+  muted,
+  onToggleMute,
   onDismissToast,
   onDig,
   onFlag,
+  onUi,
   onMenu,
   onCollection,
   onDismissTutorial,
@@ -482,9 +281,12 @@ function Play({
   tutorial: boolean;
   report: FloorReport | null;
   lootQueue: LootToast[];
+  muted: boolean;
+  onToggleMute: () => void;
   onDismissToast: (id: number) => void;
   onDig: (i: number) => void;
   onFlag: (i: number) => void;
+  onUi: () => void;
   onMenu: () => void;
   onCollection: () => void;
   onDismissTutorial: () => void;
@@ -500,7 +302,7 @@ function Play({
   return (
     <div className="shell play-shell">
       <header className="hud">
-        <button className="ghost" onClick={onMenu} aria-label="Back to menu">
+        <button type="button" className="ghost" onClick={onMenu} aria-label="Back to menu">
           {'\u2039'}
         </button>
         <div className="hud-stats">
@@ -519,7 +321,8 @@ function Play({
             </span>
           </span>
         </div>
-        <button className="ghost bag-btn" onClick={onCollection} aria-label="Open collection">
+        <MuteButton muted={muted} onToggle={onToggleMute} />
+        <button type="button" className="ghost bag-btn" onClick={onCollection} aria-label="Open collection">
           <BagIcon />
         </button>
         <span className="floor-pill">{floorLabel}</span>
@@ -543,15 +346,23 @@ function Play({
       <footer className="dock">
         <div className="toggle" role="group" aria-label="Dig or flag">
           <button
+            type="button"
             className={`toggle-btn${!flagMode ? ' on' : ''}`}
-            onClick={() => setFlagMode(false)}
+            onClick={() => {
+              onUi();
+              setFlagMode(false);
+            }}
           >
             <ShovelIcon />
             Dig
           </button>
           <button
+            type="button"
             className={`toggle-btn${flagMode ? ' on flag' : ''}`}
-            onClick={() => setFlagMode(true)}
+            onClick={() => {
+              onUi();
+              setFlagMode(true);
+            }}
           >
             <FlagIcon />
             Flag
@@ -566,7 +377,14 @@ function Play({
             <h2>First descent</h2>
             <p>Bombs don&apos;t kill you. They kill the loot next to them.</p>
             <p>Clear every safe tile. Blasts chain — a bomb sets off its neighbors.</p>
-            <button className="stone-btn gold" onClick={onDismissTutorial}>
+            <button
+              type="button"
+              className="stone-btn gold"
+              onClick={() => {
+                onUi();
+                onDismissTutorial();
+              }}
+            >
               I understand
             </button>
           </div>
@@ -619,15 +437,36 @@ function Play({
             )}
             <div className="row-btns">
               {mode === 'campaign' && !report.lastFloor ? (
-                <button className="stone-btn gold" onClick={onNext}>
+                <button
+                  type="button"
+                  className="stone-btn gold"
+                  onClick={() => {
+                    onUi();
+                    onNext();
+                  }}
+                >
                   Descend
                 </button>
               ) : (
-                <button className="stone-btn gold" onClick={onNext}>
+                <button
+                  type="button"
+                  className="stone-btn gold"
+                  onClick={() => {
+                    onUi();
+                    onNext();
+                  }}
+                >
                   {mode === 'campaign' ? 'Return' : 'Menu'}
                 </button>
               )}
-              <button className="stone-btn" onClick={onRetry}>
+              <button
+                type="button"
+                className="stone-btn"
+                onClick={() => {
+                  onUi();
+                  onRetry();
+                }}
+              >
                 Replay floor
               </button>
             </div>
