@@ -1,9 +1,8 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   CAMPAIGN_FLOORS,
   DIFFICULTIES,
   addItem,
-  chestsRemaining,
   cloneGame,
   createGame,
   dig,
@@ -19,7 +18,7 @@ import {
 import Board, { collectFx, useBoardCellSize, type BlastFx, type LostFx } from './ui/Board';
 import Collection from './ui/Collection';
 import LootQueue, { type LootToast } from './ui/LootToast';
-import { BagIcon, FlagIcon, GoldIcon, ShovelIcon, TorchIcon } from './ui/icons';
+import { BagIcon, ChestIcon, FlagIcon, ShovelIcon, TorchIcon } from './ui/icons';
 import { chainDuration, prefersReducedMotion } from './ui/motion';
 
 type Screen = 'menu' | 'play' | 'collection';
@@ -29,12 +28,9 @@ interface Run {
   mode: Difficulty;
   floor: number;
   game: Game;
-  runGold: number;
 }
 
 interface FloorReport {
-  gold: number;
-  destroyed: number;
   opened: number;
   wrecked: number;
   lastFloor: boolean;
@@ -50,7 +46,6 @@ function freshRun(mode: Difficulty): Run {
     mode,
     floor: 0,
     game: createGame(configFor(mode, 0), Math.random),
-    runGold: 0,
   };
 }
 
@@ -162,15 +157,10 @@ export default function App() {
                 cur.mode !== 'campaign' ||
                 cur.floor >= CAMPAIGN_FLOORS.length - 1;
               setReport({
-                gold: cur.game.gold,
-                destroyed: cur.game.goldDestroyed,
                 opened: cur.game.chestsOpened,
                 wrecked: cur.game.chestsDestroyed,
                 lastFloor: last,
               });
-              const updated = { ...cur, runGold: cur.runGold + cur.game.gold };
-              runRef.current = updated;
-              setRun(updated);
             }
           : undefined,
       );
@@ -357,9 +347,8 @@ function Play({
   onNext: () => void;
   onRetry: () => void;
 }) {
-  const { game, mode, floor, runGold } = run;
+  const { game, mode, floor } = run;
   const { ref, px } = useBoardCellSize(game.width, game.height);
-  const remaining = useMemo(() => chestsRemaining(game), [game]);
   const floorLabel =
     mode === 'campaign' ? `Floor ${floor + 1}/${CAMPAIGN_FLOORS.length}` : mode;
 
@@ -370,24 +359,17 @@ function Play({
           {'\u2039'}
         </button>
         <div className="hud-stats">
-          <span className="stat gold-stat">
-            <span className="stat-label">Gold</span>
+          <span className="stat found-stat" title="Intact chests opened">
+            <span className="stat-label">Found</span>
             <span className="stat-row">
-              <GoldIcon className="stat-ico" />
-              {runGold + (report ? 0 : game.gold)}
-            </span>
-          </span>
-          <span className="stat" title="Chests remaining">
-            <span className="stat-label">Left</span>
-            <span className="stat-row">
-              <span className="dot chest-dot" />
-              {remaining}
+              <ChestIcon className="stat-ico" />
+              {game.chestsOpened}
             </span>
           </span>
           <span className="stat wreck" title="Chests destroyed">
             <span className="stat-label">Wrecked</span>
             <span className="stat-row">
-              <span className="dot wreck-dot" />
+              <ChestIcon wrecked className="stat-ico" />
               {game.chestsDestroyed}
             </span>
           </span>
@@ -453,20 +435,14 @@ function Play({
             <h2>{report.lastFloor && mode === 'campaign' ? 'Dungeon cleared' : 'Floor cleared'}</h2>
             <div className="tally">
               <div>
-                <em>Gold earned</em>
-                <strong className="pos">{report.gold}</strong>
+                <em>Found</em>
+                <strong className="pos">{report.opened}</strong>
               </div>
               <div>
-                <em>Gold destroyed</em>
-                <strong className="neg">{report.destroyed}</strong>
+                <em>Wrecked</em>
+                <strong className="neg">{report.wrecked}</strong>
               </div>
             </div>
-            <p className="muted">
-              {report.opened} chests looted · {report.wrecked} wrecked
-            </p>
-            {mode === 'campaign' && (
-              <p className="muted">Run gold {runGold}</p>
-            )}
             <div className="row-btns">
               {mode === 'campaign' && !report.lastFloor ? (
                 <button className="stone-btn gold" onClick={onNext}>

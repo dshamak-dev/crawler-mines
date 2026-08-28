@@ -1,21 +1,16 @@
 import type { ItemId } from '../engine';
 
-export function GoldIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
-      <ellipse cx="12" cy="16" rx="8" ry="3.2" fill="#7a5416" />
-      <ellipse cx="12" cy="14" rx="8" ry="3.2" fill="#e0b44a" />
-      <ellipse cx="12" cy="13.2" rx="5.5" ry="1.6" fill="#f3d27a" />
-      <ellipse cx="12" cy="11" rx="8" ry="3.2" fill="#c9922e" />
-      <ellipse cx="12" cy="10.2" rx="5.5" ry="1.5" fill="#e8c66a" />
-    </svg>
-  );
-}
-
-export function ChestIcon({ wrecked = false }: { wrecked?: boolean }) {
+export function ChestIcon({
+  wrecked = false,
+  className,
+}: {
+  wrecked?: boolean;
+  className?: string;
+}) {
+  const svgClass = className ?? 'glyph';
   if (wrecked) {
     return (
-      <svg viewBox="0 0 32 32" className="glyph" aria-hidden="true">
+      <svg viewBox="0 0 32 32" className={svgClass} aria-hidden="true">
         {/* same chest box as intact, wood instead of gold, lid torn open */}
         <rect x="6" y="15" width="20" height="10" rx="1.5" fill="#1a1410" />
         <rect x="5" y="14" width="22" height="12" rx="2" fill="#7a5a38" />
@@ -48,7 +43,7 @@ export function ChestIcon({ wrecked = false }: { wrecked?: boolean }) {
     );
   }
   return (
-    <svg viewBox="0 0 32 32" className="glyph" aria-hidden="true">
+    <svg viewBox="0 0 32 32" className={svgClass} aria-hidden="true">
       <rect x="5" y="14" width="22" height="12" rx="2" fill="#b8862b" />
       <path d="M5 14c0-6 4.5-9 11-9s11 3 11 9" fill="#d4a017" />
       <rect x="5" y="13" width="22" height="4" fill="#8a6419" />

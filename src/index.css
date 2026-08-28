@@ -256,10 +256,10 @@ button {
   line-height: 1.15;
   min-width: 0;
   flex: 1;
-  max-width: 5.6rem;
+  max-width: 6.4rem;
 }
 .stat-label {
-  font-size: 0.55rem;
+  font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -267,7 +267,7 @@ button {
   line-height: 1;
   white-space: nowrap;
 }
-.gold-stat .stat-label {
+.found-stat .stat-label {
   color: var(--gold);
 }
 .stat.wreck .stat-label {
@@ -279,23 +279,13 @@ button {
   gap: 3px;
 }
 .stat-ico {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
+  display: block;
+  flex-shrink: 0;
 }
-.gold-stat {
+.found-stat {
   color: var(--gold);
-}
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-}
-.chest-dot {
-  background: var(--gold);
-  box-shadow: 0 0 6px var(--gold);
-}
-.wreck-dot {
-  background: var(--ash);
 }
 .stat.wreck {
   color: var(--ash);
