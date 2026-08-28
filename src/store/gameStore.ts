@@ -2,6 +2,7 @@ import { create, type StoreApi, type UseBoundStore } from 'zustand';
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 import {
   CAMPAIGN_FLOORS,
+  addItem,
   bankFloor,
   cloneGame,
   configFor,
@@ -9,17 +10,24 @@ import {
   defaultStore,
   dig,
   emptyInventory,
+  emptyStash,
+  flag,
+  isCampaignFinale,
   loadCollection,
   loadRun,
+  mergeStash,
   newGrantKey,
   recoverBank,
+  rollBonusKey,
   RUN_KEY,
+  runStash,
   spendEntry,
-  toggleFlag,
+  stashToRewards,
   type CollectionState,
   type Difficulty,
   type GameEvent,
   type Inventory,
+  type ItemId,
   type KeyStore,
   type Rng,
   type Run,
@@ -37,7 +45,7 @@ export interface GameStoreState {
   nextFloor: (rng?: Rng) => void;
   retryFloor: (rng?: Rng) => void;
   applyDig: (index: number, rng?: Rng) => GameEvent[];
-  applyFlag: (index: number) => GameEvent[];
+  applyFlag: (index: number, rng?: Rng) => GameEvent[];
 }
 
 export type GameStore = UseBoundStore<StoreApi<GameStoreState>>;
@@ -55,13 +63,68 @@ function asStateStorage(store: KeyStore): StateStorage {
   };
 }
 
-function freshRun(mode: Difficulty, rng: Rng): Run {
+function freshRun(mode: Difficulty, rng: Rng, stash = emptyStash()): Run {
   return {
     mode,
     floor: 0,
     game: createGame(configFor(mode, 0), rng),
     grantKey: newGrantKey(),
+    campaignStash: stash,
+    bonusKey: null,
   };
+}
+
+function settleCampaign(
+  run: Run,
+  events: GameEvent[],
+  meta: CollectionState,
+  runLoot: Inventory,
+  rng: Rng,
+  keyStore: KeyStore,
+): {
+  meta: CollectionState;
+  runLoot: Inventory;
+  campaignStash: ReturnType<typeof emptyStash>;
+  bonusKey: ItemId | null;
+} {
+  const lost = events.some((e) => e.type === 'lost');
+  const cleared = events.find((e) => e.type === 'cleared');
+  if (run.mode !== 'campaign') {
+    if (cleared && cleared.type === 'cleared') {
+      const banked = bankFloor(meta, runLoot, cleared.rewards, run.grantKey, keyStore);
+      return {
+        meta: banked.meta,
+        runLoot: banked.runLoot,
+        campaignStash: emptyStash(),
+        bonusKey: null,
+      };
+    }
+    return { meta, runLoot, campaignStash: emptyStash(), bonusKey: null };
+  }
+
+  if (lost) {
+    return { meta, runLoot: emptyInventory(), campaignStash: emptyStash(), bonusKey: null };
+  }
+
+  if (!cleared || cleared.type !== 'cleared') {
+    return { meta, runLoot, campaignStash: runStash(run), bonusKey: run.bonusKey ?? null };
+  }
+
+  let stash = mergeStash(runStash(run), cleared.rewards);
+  let bonusKey: ItemId | null = run.bonusKey ?? null;
+  let nextMeta = meta;
+  let nextLoot = { ...stash.items };
+
+  if (isCampaignFinale(run.mode, run.floor)) {
+    bonusKey = rollBonusKey(rng);
+    stash = { gold: stash.gold, items: addItem(stash.items, bonusKey) };
+    nextLoot = { ...stash.items };
+    const banked = bankFloor(nextMeta, emptyInventory(), stashToRewards(stash), run.grantKey, keyStore);
+    nextMeta = banked.meta;
+    nextLoot = banked.runLoot;
+  }
+
+  return { meta: nextMeta, runLoot: nextLoot, campaignStash: stash, bonusKey };
 }
 
 export function createGameStore(keyStore: KeyStore = defaultStore()) {
@@ -102,17 +165,23 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
               floor,
               game: createGame(configFor('campaign', floor), rng),
               grantKey: newGrantKey(),
+              campaignStash: runStash(run),
+              bonusKey: null,
             },
           });
         },
         retryFloor: (rng = Math.random) => {
           const { run } = get();
           if (!run) return;
+          if (run.mode === 'campaign' && isCampaignFinale(run.mode, run.floor) && run.game.status !== 'playing') {
+            return;
+          }
           set({
             run: {
               ...run,
               game: createGame(configFor(run.mode, run.floor), rng),
               grantKey: newGrantKey(),
+              bonusKey: null,
             },
           });
         },
@@ -121,28 +190,39 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
           if (!run || run.game.status !== 'playing') return [];
           const game = cloneGame(run.game);
           const events = dig(game, index, rng);
-          let nextMeta = meta;
-          let nextLoot = runLoot;
-          const cleared = events.find((e) => e.type === 'cleared');
-          if (cleared && cleared.type === 'cleared') {
-            const banked = bankFloor(meta, runLoot, cleared.rewards, run.grantKey, keyStore);
-            nextMeta = banked.meta;
-            nextLoot = banked.runLoot;
-          }
+          const settled = settleCampaign(run, events, meta, runLoot, rng, keyStore);
           set({
-            run: { ...run, game },
-            meta: nextMeta,
-            runLoot: nextLoot,
+            run: {
+              ...run,
+              game,
+              campaignStash: settled.campaignStash,
+              bonusKey: settled.bonusKey,
+            },
+            meta: settled.meta,
+            runLoot: settled.runLoot,
           });
           return events;
         },
-        applyFlag: (index) => {
-          const { run } = get();
+        applyFlag: (index, rng = Math.random) => {
+          const { run, meta, runLoot } = get();
           if (!run || run.game.status !== 'playing') return [];
           const game = cloneGame(run.game);
-          toggleFlag(game, index);
-          set({ run: { ...run, game } });
-          return [];
+          const events = flag(game, index);
+          if (events.length === 0 && game.cells[index]?.state === run.game.cells[index]?.state) {
+            return [];
+          }
+          const settled = settleCampaign(run, events, meta, runLoot, rng, keyStore);
+          set({
+            run: {
+              ...run,
+              game,
+              campaignStash: settled.campaignStash,
+              bonusKey: settled.bonusKey,
+            },
+            meta: settled.meta,
+            runLoot: settled.runLoot,
+          });
+          return events;
         },
       }),
       {

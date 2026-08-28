@@ -5,7 +5,7 @@ import {
   type Game,
   type GameEvent,
 } from '../engine';
-import { BombIcon, ChestIcon, FlagIcon } from './icons';
+import { BombIcon, BossIcon, ChestIcon, FlagIcon } from './icons';
 import { BLAST_STAGGER_MS, prefersReducedMotion } from './motion';
 
 const LONG_MS = 400;
@@ -104,6 +104,7 @@ export default function Board({
             wave={waveOf.get(i)}
             wreckWave={wreckWave.get(i)}
             reduce={reduce}
+            bossHere={game.boss != null && game.boss.index === i && game.boss.lives > 0}
             onDig={onDig}
             onFlag={onFlag}
           />
@@ -142,6 +143,7 @@ function DungeonCell({
   wave,
   wreckWave,
   reduce,
+  bossHere,
   onDig,
   onFlag,
 }: {
@@ -151,6 +153,7 @@ function DungeonCell({
   wave?: number;
   wreckWave?: number;
   reduce: boolean;
+  bossHere: boolean;
   onDig: (i: number) => void;
   onFlag: (i: number) => void;
 }) {
@@ -210,7 +213,9 @@ function DungeonCell({
           ? wreckWave * BLAST_STAGGER_MS
           : 0;
 
-  const label = ariaFor(visual, cell.adjacentMines, cell.tier);
+  const label = bossHere
+    ? `Flag Eater${visual === 'number' ? `, ${cell.adjacentMines} adjacent bombs` : ''}`
+    : ariaFor(visual, cell.adjacentMines, cell.tier);
 
   return (
     <button
@@ -218,7 +223,7 @@ function DungeonCell({
       role="gridcell"
       className={`cell vis-${visual}${wave != null ? ' pop-bomb' : ''}${
         wreckWave != null ? ' pop-wreck' : ''
-      }`}
+      }${bossHere ? ' is-boss' : ''}`}
       style={{ '--delay': `${delay}ms` } as CSSProperties}
       aria-label={label}
       onPointerDown={onPointerDown}
@@ -235,11 +240,16 @@ function DungeonCell({
         <ChestIcon tier={cell.tier ?? 'wooden'} />
       ) : visual === 'wrecked' ? (
         <ChestIcon wrecked tier={cell.tier ?? 'wooden'} />
-      ) : visual === 'number' ? (
+      ) : visual === 'number' && !bossHere ? (
         <span className={`rune ${NUMBER_CLASS[cell.adjacentMines]}`}>
           {cell.adjacentMines}
         </span>
+      ) : visual === 'number' && bossHere ? (
+        <span className={`rune ${NUMBER_CLASS[cell.adjacentMines]} boss-under`}>
+          {cell.adjacentMines}
+        </span>
       ) : null}
+      {bossHere ? <BossIcon className="boss-glyph" /> : null}
     </button>
   );
 }

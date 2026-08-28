@@ -2,8 +2,16 @@ import type { ChestTier, Inventory, ItemId } from './loot';
 
 export type CellKind = 'empty' | 'mine' | 'chest';
 export type CellState = 'hidden' | 'flagged' | 'revealed';
-export type GameStatus = 'playing' | 'cleared';
+export type GameStatus = 'playing' | 'cleared' | 'lost';
 export type Difficulty = 'easy' | 'medium' | 'hard' | 'campaign';
+export type Turn = 'player' | 'boss';
+
+export const BOSS_MAX_LIVES = 2;
+
+export interface BossState {
+  index: number;
+  lives: number;
+}
 
 export type Rng = () => number;
 
@@ -26,6 +34,8 @@ export interface FloorConfig {
   mines: number;
   chests: number;
   chestValue: number;
+  /** Last campaign floor: Flag Eater lives. Absent on normal floors. */
+  bossLives?: number;
 }
 
 export interface Game {
@@ -44,6 +54,8 @@ export interface Game {
   status: GameStatus;
   /** Inner loot already applied to this floor. Survives reload so clear cannot pay twice. */
   rewardsGranted: boolean;
+  boss: BossState | null;
+  turn: Turn;
 }
 
 export interface ChestReward {
@@ -56,7 +68,12 @@ export type GameEvent =
   | { type: 'reveal'; indices: number[] }
   | { type: 'explode'; index: number; wrecked: number[]; wave: number }
   | { type: 'chest'; index: number; tier: ChestTier }
-  | { type: 'cleared'; rewards: ChestReward[] };
+  | { type: 'cleared'; rewards: ChestReward[] }
+  | { type: 'lost' }
+  | { type: 'boss-move'; index: number }
+  | { type: 'boss-eat-flag'; index: number }
+  | { type: 'boss-hit'; lives: number }
+  | { type: 'boss-death' };
 
 export const DIFFICULTIES: Record<'easy' | 'medium' | 'hard', FloorConfig> = {
   easy: { width: 8, height: 8, mines: 8, chests: 6, chestValue: 10 },
@@ -70,8 +87,12 @@ export const CAMPAIGN_FLOORS: FloorConfig[] = [
   { width: 8, height: 9, mines: 11, chests: 6, chestValue: 12 },
   { width: 9, height: 11, mines: 16, chests: 8, chestValue: 15 },
   { width: 9, height: 12, mines: 22, chests: 11, chestValue: 18 },
-  { width: 12, height: 16, mines: 42, chests: 16, chestValue: 25 },
+  { width: 12, height: 16, mines: 42, chests: 16, chestValue: 25, bossLives: BOSS_MAX_LIVES },
 ];
+
+export function isCampaignFinale(mode: Difficulty, floor: number): boolean {
+  return mode === 'campaign' && floor >= CAMPAIGN_FLOORS.length - 1;
+}
 
 export function configFor(mode: Difficulty, floor: number): FloorConfig {
   if (mode === 'campaign') return CAMPAIGN_FLOORS[floor];

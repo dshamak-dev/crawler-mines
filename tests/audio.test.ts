@@ -1,9 +1,12 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   AUDIO_KEY,
   LEGACY_SOUND_KEY,
   audioUrl,
   bgmUrl,
+  bossFloorActive,
   campaignFloorActive,
   desiredBgm,
   loadMuted,
@@ -31,7 +34,11 @@ describe('audio URLs', () => {
     expect(audioUrl('cozy-descent.mp3')).toBe('/crawler-mines/audio/cozy-descent.mp3');
     expect(bgmUrl('cozy')).toBe('/crawler-mines/audio/cozy-descent.mp3');
     expect(bgmUrl('campaign')).toBe('/crawler-mines/audio/campaign-depths.mp3');
+    expect(bgmUrl('boss')).toBe('/crawler-mines/audio/flag-eater-boss.mp3');
+    expect(existsSync(resolve('public/audio/flag-eater-boss.mp3'))).toBe(true);
     expect(sfxUrl('deny')).toBe('/crawler-mines/audio/sfx-deny.wav');
+    expect(sfxUrl('boss-move')).toBe('/crawler-mines/audio/sfx-boss-move.wav');
+    expect(sfxUrl('campaign-lose')).toBe('/crawler-mines/audio/sfx-campaign-lose.wav');
   });
 });
 
@@ -46,12 +53,26 @@ describe('BGM routing', () => {
     expect(desiredBgm('collection', 'campaign', 'menu')).toBe('cozy');
   });
 
-  it('uses campaign-depths only while a Campaign floor is up', () => {
+  it('uses campaign-depths on campaign floors before the Flag Eater', () => {
     expect(desiredBgm('play', 'campaign')).toBe('campaign');
-    expect(desiredBgm('collection', 'campaign', 'play')).toBe('campaign');
+    expect(desiredBgm('play', 'campaign', null, 0)).toBe('campaign');
+    expect(desiredBgm('play', 'campaign', null, 3)).toBe('campaign');
+    expect(desiredBgm('collection', 'campaign', 'play', 2)).toBe('campaign');
     expect(campaignFloorActive('play', 'campaign')).toBe(true);
     expect(campaignFloorActive('menu', 'campaign')).toBe(false);
     expect(campaignFloorActive('collection', 'campaign', 'menu')).toBe(false);
+    expect(bossFloorActive('play', 'campaign', null, 3)).toBe(false);
+  });
+
+  it('uses Flag Eater BGM only on the last campaign floor, then cozy on the menu', () => {
+    expect(desiredBgm('play', 'campaign', null, 4)).toBe('boss');
+    expect(desiredBgm('collection', 'campaign', 'play', 4)).toBe('boss');
+    expect(desiredBgm('menu', 'campaign', null, 4)).toBe('cozy');
+    expect(desiredBgm('collection', 'campaign', 'menu', 4)).toBe('cozy');
+    expect(bossFloorActive('play', 'campaign', null, 4)).toBe(true);
+    expect(bossFloorActive('collection', 'campaign', 'play', 4)).toBe(true);
+    expect(bossFloorActive('menu', 'campaign', null, 4)).toBe(false);
+    expect(bossFloorActive('play', 'hard', null, 4)).toBe(false);
   });
 });
 
@@ -79,6 +100,25 @@ describe('SFX from engine events', () => {
         { type: 'cleared', rewards: [] },
       ]),
     ).toEqual(['dig', 'clear']);
+  });
+
+  it('maps Flag Eater cues without treating a campaign loss as a clear', () => {
+    expect(sfxFromEvents([{ type: 'boss-move', index: 2 }])).toEqual(['boss-move']);
+    expect(sfxFromEvents([{ type: 'boss-eat-flag', index: 4 }])).toEqual(['boss-eat-flag']);
+    expect(
+      sfxFromEvents([
+        { type: 'explode', index: 1, wrecked: [], wave: 0 },
+        { type: 'boss-hit', lives: 1 },
+      ]),
+    ).toEqual(['blast', 'boss-hit']);
+    expect(
+      sfxFromEvents([
+        { type: 'boss-hit', lives: 0 },
+        { type: 'boss-death' },
+        { type: 'cleared', rewards: [] },
+      ]),
+    ).toEqual(['boss-hit', 'boss-death', 'clear']);
+    expect(sfxFromEvents([{ type: 'lost' }])).toEqual(['campaign-lose']);
   });
 });
 

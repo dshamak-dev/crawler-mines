@@ -281,6 +281,33 @@ export function SpeakerIcon({
   );
 }
 
+export function BossIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 32 32" className={className ?? 'glyph'} aria-hidden="true">
+      <ellipse cx="16" cy="19" rx="11.2" ry="9.2" fill="#3a1848" />
+      <ellipse cx="16" cy="17.4" rx="10.4" ry="8.4" fill="#6b2d7a" />
+      <path d="M7.2 16.4c1.8-4.6 4.6-7.2 8.8-7.2s7 2.6 8.8 7.2" fill="#8a3d98" />
+      <circle cx="12.2" cy="16.2" r="2.3" fill="#1a1014" />
+      <circle cx="19.8" cy="16.2" r="2.3" fill="#1a1014" />
+      <circle cx="12.7" cy="15.7" r="0.85" fill="#f3e6d0" />
+      <circle cx="20.3" cy="15.7" r="0.85" fill="#f3e6d0" />
+      <path
+        d="M11.2 21.2h9.6s-.4 3.4-4.8 3.4-4.8-3.4-4.8-3.4z"
+        fill="#1a1014"
+      />
+      <path
+        d="M12.2 21.2l1.4 2.2 1.4-2.2 1.4 2.2 1.4-2.2 1.4 2.2"
+        stroke="#f3e6d0"
+        strokeWidth="1.1"
+        fill="none"
+        strokeLinejoin="round"
+      />
+      <path d="M21.6 8.2l2.4-4.2 2.2 1.1-1.6 4.4z" fill="#c23b3b" />
+      <path d="M22.4 9.4h5.2v1.5h-5.2z" fill="#e0b44a" />
+    </svg>
+  );
+}
+
 export function ItemIcon({ id, className }: { id: ItemId; className?: string }) {
   const glyph =
     id === 'gold-pouch' ? (

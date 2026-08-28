@@ -9,6 +9,7 @@ export function useGameAudio(
   screen: AppScreen,
   mode: DifficultyMode | null,
   collectionFrom: AppScreen | null,
+  floor = 0,
 ) {
   const [muted, setMutedState] = useState(() => loadMuted());
 
@@ -26,8 +27,8 @@ export function useGameAudio(
   }, []);
 
   useEffect(() => {
-    getAudio().setBgm(desiredBgm(screen, mode, collectionFrom));
-  }, [screen, mode, collectionFrom]);
+    getAudio().setBgm(desiredBgm(screen, mode, collectionFrom, floor));
+  }, [screen, mode, collectionFrom, floor]);
 
   const setMuted = useCallback((next: boolean) => {
     getAudio().setMuted(next);

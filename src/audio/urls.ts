@@ -1,6 +1,8 @@
 export const BGM_FILES = {
   cozy: 'cozy-descent.mp3',
   campaign: 'campaign-depths.mp3',
+  /** Approved Flag Eater loop at public/audio/flag-eater-boss.mp3 — do not substitute a generated theme. */
+  boss: 'flag-eater-boss.mp3',
 } as const;
 
 export const SFX_FILES = {
@@ -12,6 +14,11 @@ export const SFX_FILES = {
   clear: 'sfx-clear.wav',
   ui: 'sfx-ui.wav',
   deny: 'sfx-deny.wav',
+  'boss-move': 'sfx-boss-move.wav',
+  'boss-eat-flag': 'sfx-boss-eat-flag.wav',
+  'boss-hit': 'sfx-boss-hit.wav',
+  'boss-death': 'sfx-boss-death.wav',
+  'campaign-lose': 'sfx-campaign-lose.wav',
 } as const;
 
 export type BgmId = keyof typeof BGM_FILES;

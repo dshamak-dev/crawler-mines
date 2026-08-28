@@ -1,8 +1,5 @@
-import {
-  ensureFirstClickSafe,
-  isWon,
-  neighbors,
-} from './board';
+import { allSafeRevealed, ensureFirstClickSafe, isWon, neighbors } from './board';
+import { hitBossFromBlasts, stepBoss } from './boss';
 import { addItem, type ChestTier } from './loot';
 import type { Cell, ChestReward, Game, GameEvent, Rng } from './types';
 
@@ -48,6 +45,8 @@ export function explodeChain(game: Game, startIndex: number): GameEvent[] {
     events.push({ type: 'explode', index, wrecked, wave });
   }
 
+  const blasts = events.filter((e) => e.type === 'explode').map((e) => e.index);
+  events.push(...hitBossFromBlasts(game, blasts));
   return events;
 }
 
@@ -57,6 +56,47 @@ export function toggleFlag(game: Game, index: number): boolean {
   if (!cell || cell.state === 'revealed') return false;
   cell.state = cell.state === 'flagged' ? 'hidden' : 'flagged';
   return true;
+}
+
+/**
+ * After a successful dig or flag: resolve boss kill / campaign lose, else the
+ * Flag Eater takes one move. Player + boss are one atomic action for persist.
+ */
+export function afterPlayerAction(game: Game): GameEvent[] {
+  const events: GameEvent[] = [];
+  if (game.status !== 'playing') return events;
+
+  if (game.boss) {
+    if (game.boss.lives <= 0) {
+      game.status = 'cleared';
+      game.turn = 'player';
+      events.push({ type: 'boss-death' });
+      events.push({ type: 'cleared', rewards: grantIntactLoot(game) });
+      return events;
+    }
+    if (allSafeRevealed(game)) {
+      game.status = 'lost';
+      game.turn = 'player';
+      events.push({ type: 'lost' });
+      return events;
+    }
+    game.turn = 'boss';
+    events.push(...stepBoss(game));
+    game.turn = 'player';
+    return events;
+  }
+
+  if (isWon(game)) {
+    game.status = 'cleared';
+    events.push({ type: 'cleared', rewards: grantIntactLoot(game) });
+  }
+  return events;
+}
+
+/** Flag or unflag a hidden cell, then the boss acts if this is a boss floor. */
+export function flag(game: Game, index: number): GameEvent[] {
+  if (!toggleFlag(game, index)) return [];
+  return afterPlayerAction(game);
 }
 
 function revealFlood(game: Game, start: number, events: GameEvent[]): number[] {
@@ -150,10 +190,6 @@ export function dig(game: Game, index: number, rng: Rng): GameEvent[] {
     if (indices.length > 0) events.push({ type: 'reveal', indices });
   }
 
-  if (isWon(game)) {
-    game.status = 'cleared';
-    events.push({ type: 'cleared', rewards: grantIntactLoot(game) });
-  }
-
+  events.push(...afterPlayerAction(game));
   return events;
 }
