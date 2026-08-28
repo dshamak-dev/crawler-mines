@@ -16,46 +16,34 @@ export function ChestIcon({ wrecked = false }: { wrecked?: boolean }) {
   if (wrecked) {
     return (
       <svg viewBox="0 0 32 32" className="glyph" aria-hidden="true">
-        <rect x="6" y="15" width="20" height="11" rx="2" fill="#2a2118" />
-        <path d="M8 16.5h16v8.5H8z" fill="#15110d" />
+        {/* same chest box as intact, wood instead of gold, lid torn open */}
+        <rect x="6" y="15" width="20" height="10" rx="1.5" fill="#1a1410" />
+        <rect x="5" y="14" width="22" height="12" rx="2" fill="#7a5a38" />
+        <rect x="5" y="14" width="22" height="3.6" fill="#5a4534" />
+        <path d="M7 19h18M7 23h18" stroke="#3a2a1c" strokeWidth="1.05" />
         <path
-          d="M5 15.5h22v10.5c0 1.2-1 2.2-2.2 2.2H7.2C6 28.2 5 27.2 5 26V15.5z"
-          fill="#6b5340"
-        />
-        <path d="M5 15.5h22v3.2H5z" fill="#5a4534" />
-        <path
-          d="M7 18.2h3.2l1.4 8.8H8.2L7 18.2zm5.4 0h4.4l.4 8.8h-5.2l.4-8.8zm7.2 0H25l-1.2 8.8h-3.8l-.4-8.8z"
-          fill="#8a6a40"
-          opacity="0.85"
-        />
-        <path
-          d="M12 16l2.2 5.4-1.6 6.2M19.5 16.2l-1.4 4.8 2.6 6.4M16 19v8"
+          d="M12 14.4l2.4 5.2-1.8 6.2M20 15l-1.2 5.4 2.4 5.4"
           stroke="#1c1610"
-          strokeWidth="1.15"
+          strokeWidth="1.35"
           fill="none"
           strokeLinecap="round"
         />
-        <path d="M5.2 15.2l2.2-8.4 11.2 2.4-1.6 6.4H5.2z" fill="#7a5a38" />
-        <path d="M7.6 7.4l9.6 2.1-1.2 4.8H8.4L7.6 7.4z" fill="#9a7344" />
+        {/* lid: same dome, hinged left and cracked */}
         <path
-          d="M8.2 8.2l1.6 4.2M13.4 9.4l-1 5.2"
+          d="M5 13.2c.2-5.6 4.4-8.6 10.4-8.8 4.8-.2 8.6 1.8 10.2 5.6l-4.4 1.6c-.8-1.8-3-2.8-6-2.6-3.6.2-6.2 2-6.4 4.6H5z"
+          fill="#9a7344"
+        />
+        <path
+          d="M15.2 5.2l1.2 4.8 2.4 2.2"
           stroke="#2a1e12"
-          strokeWidth="1.1"
+          strokeWidth="1.15"
           fill="none"
         />
-        <path d="M18.8 8.2l2.4-3.2 1.2 3.8z" fill="#8a6a40" />
-        <path d="M22.6 16.2l3.4-2.8.2 4.2z" fill="#5c4630" />
-        <rect
-          x="19.4"
-          y="21.2"
-          width="3.2"
-          height="4.4"
-          rx="0.6"
-          fill="#c9b59a"
-          transform="rotate(28 21 23.4)"
-        />
-        <circle cx="22.4" cy="25.4" r="1.15" fill="#6b5340" />
-        <path d="M6.2 27.4h19.4" stroke="#2a2118" strokeWidth="1.4" />
+        <path d="M23.6 11.2l3.2-3.6.6 4.6z" fill="#8a6a40" />
+        <path d="M24.2 14.2l3.4 1.2-1.2 3.2z" fill="#5c4630" />
+        {/* broken latch hanging off the front */}
+        <rect x="19.6" y="19.2" width="3.2" height="6.2" rx="0.7" fill="#c9b59a" transform="rotate(32 21.2 22.3)" />
+        <circle cx="22.2" cy="24.8" r="1.15" fill="#4a3828" />
       </svg>
     );
   }
@@ -124,13 +112,13 @@ export function TorchIcon() {
 export function BagIcon({ className }: { className?: string }) {
   return (
     <svg className={className ?? 'glyph'} viewBox="0 0 32 32" aria-hidden="true">
-      <path
-        d="M9 13h14l1.4 14.2c.1 1.2-.8 2.2-2 2.2H9.6c-1.2 0-2.1-1-2-2.2L9 13z"
-        fill="#6b5340"
-      />
-      <path d="M10 14h12l1.2 13H8.8L10 14z" fill="#8a6a40" />
-      <path d="M12 13c0-4 2.2-7 4-7s4 3 4 7" stroke="#c9b59a" strokeWidth="1.8" fill="none" />
-      <rect x="14.2" y="18" width="3.6" height="5" rx="1" fill="#e0b44a" />
+      <rect x="8" y="7" width="16" height="5.2" rx="2.4" fill="#5a4534" />
+      <rect x="9.2" y="8" width="13.6" height="3.2" rx="1.6" fill="#8a6a40" />
+      <rect x="7" y="11.5" width="18" height="16.5" rx="3.2" fill="#5a4534" />
+      <rect x="8.2" y="12.6" width="15.6" height="14.2" rx="2.4" fill="#8a6a40" />
+      <path d="M7 12.4h18l-2.4 5.6H9.4z" fill="#6b5340" />
+      <path d="M12.2 18.6v6.2M19.8 18.6v6.2" stroke="#c9b59a" strokeWidth="1.7" strokeLinecap="round" />
+      <rect x="14.4" y="14.8" width="3.2" height="2.4" rx="0.5" fill="#e0b44a" />
     </svg>
   );
 }
