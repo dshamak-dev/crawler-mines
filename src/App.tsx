@@ -315,7 +315,7 @@ function Play({
   const showReplay = report && report.outcome !== 'lost' && report.outcome !== 'victory';
   const goldCopy =
     report?.outcome === 'stashed'
-      ? 'Held until the Flag Eater falls.'
+      ? 'Held until Gluttony falls.'
       : report?.outcome === 'victory'
         ? 'Stash dumped into your wallet.'
         : 'Pouched gold, now in your wallet.';
@@ -342,8 +342,8 @@ function Play({
             </span>
           </span>
           {boss && (
-            <span className="stat boss-stat" title="Flag Eater lives">
-              <span className="stat-label">Eater</span>
+            <span className="stat boss-stat" title="Gluttony lives">
+              <span className="stat-label">Gluttony</span>
               <span className="stat-row">
                 <BossIcon className="stat-ico" />
                 {Math.max(0, boss.lives)}
@@ -432,13 +432,13 @@ function Play({
               {report.outcome === 'lost'
                 ? 'Campaign failed'
                 : report.outcome === 'victory'
-                  ? 'Flag Eater defeated'
+                  ? 'Gluttony defeated'
                   : report.lastFloor && mode === 'campaign'
                     ? 'Dungeon cleared'
                     : 'Floor cleared'}
             </h2>
             {report.outcome === 'lost' ? (
-              <p className="muted">The Flag Eater kept the stash. Every coin and relic is gone.</p>
+              <p className="muted">Gluttony kept the stash. Every coin and relic is gone.</p>
             ) : (
               <>
                 <div className="tally">
@@ -452,7 +452,7 @@ function Play({
                   </div>
                 </div>
                 {report.outcome === 'stashed' && (
-                  <p className="muted">Loot is stashed until the Flag Eater falls.</p>
+                  <p className="muted">Loot is stashed until Gluttony falls.</p>
                 )}
                 {report.bonusKey && (
                   <p className="bonus-line">

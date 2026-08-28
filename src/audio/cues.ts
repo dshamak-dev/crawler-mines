@@ -20,7 +20,7 @@ export function campaignFloorActive(
   return screen === 'collection' && collectionFrom === 'play';
 }
 
-/** Last campaign floor only — Flag Eater fight, including pack opened from it. */
+/** Last campaign floor only — Gluttony fight, including pack opened from it. */
 export function bossFloorActive(
   screen: AppScreen,
   mode: DifficultyMode | null,
@@ -67,6 +67,7 @@ export function sfxFromEvents(events: ReadonlyArray<GameEvent>): SfxId[] {
     else if (e.type === 'lost') lost = true;
     else if (e.type === 'boss-move') bossMove = true;
     else if (e.type === 'boss-eat-flag') bossEat = true;
+    else if (e.type === 'boss-smash-chest') wrecked = true;
     else if (e.type === 'boss-hit') bossHit = true;
     else if (e.type === 'boss-death') bossDeath = true;
   }

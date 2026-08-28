@@ -38,6 +38,8 @@ export {
   isTicketKey,
   removeItem,
   rollLoot,
+  lootTableFor,
+  campaignKeyDropRate,
   stackedEntries,
   tierForLoot,
 } from './loot';
@@ -83,6 +85,7 @@ export {
   firstStepToward,
   hitBossFromBlasts,
   isWalkable,
+  isWounded,
   resolvePendingBossTurn,
   stepBoss,
 } from './boss';

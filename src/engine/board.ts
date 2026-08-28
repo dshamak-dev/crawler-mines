@@ -1,5 +1,14 @@
 import { emptyInventory, goldForLoot, rollLoot, tierForLoot, type ChestTier, type ItemId } from './loot';
-import { type BossState, type Cell, type FloorConfig, type Game, type Rng, newCell } from './types';
+import {
+  BOSS_MAX_LIVES,
+  type BossState,
+  type Cell,
+  type Difficulty,
+  type FloorConfig,
+  type Game,
+  type Rng,
+  newCell,
+} from './types';
 
 export const DIRS: ReadonlyArray<readonly [number, number]> = [
   [-1, -1],
@@ -71,7 +80,7 @@ function pickUnique(
   return picked;
 }
 
-export function createGame(config: FloorConfig, rng: Rng): Game {
+export function createGame(config: FloorConfig, rng: Rng, mode: Difficulty = 'easy'): Game {
   const { width, height, mines, chests, chestValue } = config;
   const total = width * height;
   const bossSlots = config.bossLives && config.bossLives > 0 ? 1 : 0;
@@ -81,7 +90,7 @@ export function createGame(config: FloorConfig, rng: Rng): Game {
   const cells: Cell[] = Array.from({ length: total }, () => newCell());
   const chestIdx = pickUnique(chests, total, new Set(), rng);
   for (const i of chestIdx) {
-    const loot = rollLoot(rng);
+    const loot = rollLoot(rng, mode);
     cells[i].kind = 'chest';
     cells[i].loot = loot;
     cells[i].tier = tierForLoot(loot);
@@ -121,7 +130,7 @@ export function createGame(config: FloorConfig, rng: Rng): Game {
   };
 }
 
-/** Build a board from a layout for tests. `.` empty, `*` mine, `$` chest, `B` Flag Eater spawn. */
+/** Build a board from a layout for tests. `.` empty, `*` mine, `$` chest, `B` Gluttony spawn. */
 export function createGameFromLayout(
   rows: string[],
   chestValue = 10,
@@ -174,7 +183,7 @@ export function createGameFromLayout(
     firstClickDone: true,
     status: 'playing',
     rewardsGranted: false,
-    boss: bossIndex >= 0 ? { index: bossIndex, lives: 2 } : null,
+    boss: bossIndex >= 0 ? { index: bossIndex, lives: BOSS_MAX_LIVES } : null,
     turn: 'player',
   };
 }

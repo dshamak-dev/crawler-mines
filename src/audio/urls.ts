@@ -1,7 +1,7 @@
 export const BGM_FILES = {
   cozy: 'cozy-descent.mp3',
   campaign: 'campaign-depths.mp3',
-  /** Approved Flag Eater loop at public/audio/flag-eater-boss.mp3 — do not substitute a generated theme. */
+  /** Approved Gluttony loop at public/audio/flag-eater-boss.mp3 — do not substitute or re-encode. */
   boss: 'flag-eater-boss.mp3',
 } as const;
 
