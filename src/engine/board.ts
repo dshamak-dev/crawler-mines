@@ -105,6 +105,7 @@ export function createGame(config: FloorConfig, rng: Rng): Game {
     inventory: emptyInventory(),
     firstClickDone: false,
     status: 'playing',
+    rewardsGranted: false,
   };
 }
 
@@ -156,6 +157,7 @@ export function createGameFromLayout(
     inventory: emptyInventory(),
     firstClickDone: true,
     status: 'playing',
+    rewardsGranted: false,
   };
 }
 

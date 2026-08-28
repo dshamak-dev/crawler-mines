@@ -1,23 +1,18 @@
 import { useCallback, useRef, useState } from 'react';
 import {
   CAMPAIGN_FLOORS,
-  DIFFICULTIES,
-  addItem,
-  applyRewards,
   chestNotices,
-  cloneGame,
-  createGame,
-  dig,
-  emptyInventory,
-  loadCollection,
   stackedEntries,
-  toggleFlag,
-  type CollectionState,
   type Difficulty,
-  type FloorConfig,
-  type Game,
-  type Inventory,
+  type GameEvent,
 } from './engine';
+import {
+  floorReport,
+  resumeLabel,
+  useGameStore,
+  type FloorReport,
+  type Run,
+} from './store/gameStore';
 import Board, { collectFx, useBoardCellSize, type BlastFx } from './ui/Board';
 import Collection from './ui/Collection';
 import LootQueue, { type LootToast } from './ui/LootToast';
@@ -27,69 +22,72 @@ import { chainDuration, prefersReducedMotion } from './ui/motion';
 type Screen = 'menu' | 'play' | 'collection';
 const TUTORIAL_KEY = 'crawler-mines-tutorial';
 
-interface Run {
-  mode: Difficulty;
-  floor: number;
-  game: Game;
-}
-
-interface FloorReport {
-  opened: number;
-  wrecked: number;
-  lastFloor: boolean;
-  loot: Inventory;
-  gold: number;
-}
-
-function configFor(mode: Difficulty, floor: number): FloorConfig {
-  if (mode === 'campaign') return CAMPAIGN_FLOORS[floor];
-  return DIFFICULTIES[mode];
-}
-
-function freshRun(mode: Difficulty): Run {
-  return {
-    mode,
-    floor: 0,
-    game: createGame(configFor(mode, 0), Math.random),
-  };
-}
-
 export default function App() {
-  const [screen, setScreen] = useState<Screen>('menu');
-  const [run, setRun] = useState<Run | null>(null);
+  const run = useGameStore((s) => s.run);
+  const meta = useGameStore((s) => s.meta);
+  const runLoot = useGameStore((s) => s.runLoot);
+  const startRun = useGameStore((s) => s.start);
+  const nextFloorAction = useGameStore((s) => s.nextFloor);
+  const retryFloorAction = useGameStore((s) => s.retryFloor);
+  const applyDig = useGameStore((s) => s.applyDig);
+  const applyFlag = useGameStore((s) => s.applyFlag);
+
+  const [screen, setScreen] = useState<Screen>(() => (run ? 'play' : 'menu'));
   const [flagMode, setFlagMode] = useState(false);
-  const [tutorial, setTutorial] = useState(false);
-  const [report, setReport] = useState<FloorReport | null>(null);
+  const [tutorial, setTutorial] = useState(() => {
+    if (!run) return false;
+    try {
+      return localStorage.getItem(TUTORIAL_KEY) !== '1';
+    } catch {
+      return false;
+    }
+  });
+  const [report, setReport] = useState<FloorReport | null>(() =>
+    run?.game.status === 'cleared' ? floorReport(run) : null,
+  );
   const [blasts, setBlasts] = useState<BlastFx[]>([]);
   const [sparkles, setSparkles] = useState<Array<{ id: number; index: number }>>([]);
   const [shaking, setShaking] = useState(false);
-  const [meta, setMeta] = useState<CollectionState>(() => loadCollection());
-  const [runLoot, setRunLoot] = useState<Inventory>(() => emptyInventory());
   const [lootQueue, setLootQueue] = useState<LootToast[]>([]);
-  const [collectionFrom, setCollectionFrom] = useState<Screen>('menu');
+  const [collectionFrom, setCollectionFrom] = useState<Screen>(run ? 'play' : 'menu');
   const fxId = useRef(1);
   const toastId = useRef(1);
   const clearTimer = useRef<number | null>(null);
-  const runRef = useRef(run);
-  runRef.current = run;
 
   const openCollection = (from: Screen) => {
     setCollectionFrom(from);
     setScreen('collection');
   };
 
-  const start = (mode: Difficulty) => {
-    setRun(freshRun(mode));
-    setFlagMode(false);
-    setReport(null);
+  const clearFx = () => {
     setBlasts([]);
     setSparkles([]);
     setLootQueue([]);
-    setRunLoot(emptyInventory());
+    setShaking(false);
+    setReport(null);
+    setFlagMode(false);
+  };
+
+  const start = (mode: Difficulty) => {
+    startRun(mode);
+    clearFx();
+    setScreen('play');
+    try {
+      setTutorial(localStorage.getItem(TUTORIAL_KEY) !== '1');
+    } catch {
+      setTutorial(true);
+    }
+  };
+
+  const resume = () => {
+    const current = useGameStore.getState().run;
+    if (!current) return;
+    setReport(current.game.status === 'cleared' ? floorReport(current) : null);
+    setBlasts([]);
+    setSparkles([]);
+    setLootQueue([]);
     setShaking(false);
     setScreen('play');
-    const seen = localStorage.getItem(TUTORIAL_KEY) === '1';
-    setTutorial(!seen);
   };
 
   const dismissTutorial = () => {
@@ -97,7 +95,7 @@ export default function App() {
     setTutorial(false);
   };
 
-  const applyFx = useCallback((events: ReturnType<typeof dig>, after?: () => void) => {
+  const applyFx = useCallback((events: GameEvent[], after?: () => void) => {
     const packed = collectFx(events, fxId.current);
     fxId.current = packed.nextId;
     if (packed.blasts.length) setBlasts(packed.blasts);
@@ -113,7 +111,7 @@ export default function App() {
     }
   }, []);
 
-  const queueChestToasts = useCallback((events: ReturnType<typeof dig>, cells: Game['cells']) => {
+  const queueChestToasts = useCallback((events: GameEvent[], cells: NonNullable<typeof run>['game']['cells']) => {
     const notices = chestNotices(events, cells);
     if (notices.length === 0) return;
     setLootQueue((prev) => [
@@ -126,103 +124,48 @@ export default function App() {
     ]);
   }, []);
 
-  const bankRewards = useCallback((events: ReturnType<typeof dig>) => {
-    const cleared = events.find((e) => e.type === 'cleared');
-    if (!cleared || cleared.type !== 'cleared' || cleared.rewards.length === 0) return;
-    setMeta((prev) => applyRewards(prev, cleared.rewards));
-    setRunLoot((prev) => {
-      let next = prev;
-      for (const r of cleared.rewards) {
-        if (r.itemId === 'gold-pouch') continue;
-        next = addItem(next, r.itemId);
-      }
-      return next;
-    });
-  }, []);
-
-  const mutate = useCallback(
-    (fn: (g: Game) => ReturnType<typeof dig> | void) => {
-      const prev = runRef.current;
-      if (!prev || prev.game.status !== 'playing') return;
-      const game = cloneGame(prev.game);
-      const events = fn(game) ?? [];
-      const next = { ...prev, game };
-      runRef.current = next;
-      setRun(next);
-      queueChestToasts(events, game.cells);
-      bankRewards(events);
+  const onDig = useCallback(
+    (index: number) => {
+      const events = applyDig(index);
+      const cur = useGameStore.getState().run;
+      if (!cur || events.length === 0) return;
+      queueChestToasts(events, cur.game.cells);
       const cleared = events.some((e) => e.type === 'cleared');
       applyFx(
         events,
         cleared
           ? () => {
-              const cur = runRef.current;
-              if (!cur) return;
-              const last =
-                cur.mode !== 'campaign' ||
-                cur.floor >= CAMPAIGN_FLOORS.length - 1;
+              const next = useGameStore.getState().run;
+              if (!next) return;
               setLootQueue([]);
-              setReport({
-                opened: cur.game.chestsOpened,
-                wrecked: cur.game.chestsDestroyed,
-                lastFloor: last,
-                loot: { ...cur.game.inventory },
-                gold: cur.game.gold,
-              });
+              setReport(floorReport(next));
             }
           : undefined,
       );
     },
-    [applyFx, bankRewards, queueChestToasts],
-  );
-
-  const onDig = useCallback(
-    (index: number) => {
-      mutate((g) => dig(g, index, Math.random));
-    },
-    [mutate],
+    [applyDig, applyFx, queueChestToasts],
   );
 
   const onFlag = useCallback(
     (index: number) => {
-      mutate((g) => {
-        toggleFlag(g, index);
-      });
+      applyFlag(index);
     },
-    [mutate],
+    [applyFlag],
   );
 
   const nextFloor = () => {
-    if (!run) return;
-    if (run.mode !== 'campaign' || run.floor >= CAMPAIGN_FLOORS.length - 1) {
+    nextFloorAction();
+    const next = useGameStore.getState().run;
+    clearFx();
+    if (!next) {
       setScreen('menu');
-      setRun(null);
-      setReport(null);
       return;
     }
-    const floor = run.floor + 1;
-    setRun({
-      ...run,
-      floor,
-      game: createGame(configFor('campaign', floor), Math.random),
-    });
-    setReport(null);
-    setBlasts([]);
-    setSparkles([]);
-    setLootQueue([]);
-    setFlagMode(false);
   };
 
   const retryFloor = () => {
-    if (!run) return;
-    setRun({
-      ...run,
-      game: createGame(configFor(run.mode, run.floor), Math.random),
-    });
-    setReport(null);
-    setBlasts([]);
-    setSparkles([]);
-    setLootQueue([]);
+    retryFloorAction();
+    clearFx();
   };
 
   const dismissToast = useCallback((id: number) => {
@@ -241,6 +184,8 @@ export default function App() {
         ) : screen === 'menu' || !run ? (
           <Menu
             onStart={start}
+            onResume={run ? resume : undefined}
+            resumeCopy={run ? resumeLabel(run) : null}
             onCollection={() => openCollection('menu')}
             gold={meta.gold}
           />
@@ -260,8 +205,9 @@ export default function App() {
             onFlag={onFlag}
             onMenu={() => {
               setScreen('menu');
-              setRun(null);
-              setReport(null);
+              setBlasts([]);
+              setSparkles([]);
+              setLootQueue([]);
             }}
             onCollection={() => openCollection('play')}
             onDismissTutorial={dismissTutorial}
@@ -276,10 +222,14 @@ export default function App() {
 
 function Menu({
   onStart,
+  onResume,
+  resumeCopy,
   onCollection,
   gold,
 }: {
   onStart: (m: Difficulty) => void;
+  onResume?: () => void;
+  resumeCopy: string | null;
   onCollection: () => void;
   gold: number;
 }) {
@@ -306,6 +256,11 @@ function Menu({
             {gold}
           </span>
         </button>
+        {onResume && resumeCopy && (
+          <button type="button" className="stone-btn gold" onClick={onResume}>
+            Resume <span>{resumeCopy}</span>
+          </button>
+        )}
         <div className="menu-modes">
           <button className="stone-btn" onClick={() => onStart('easy')}>
             Easy <span>8x8</span>
@@ -508,4 +463,3 @@ function Play({
     </div>
   );
 }
-

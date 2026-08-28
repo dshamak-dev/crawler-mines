@@ -15,6 +15,7 @@ export {
   CAMPAIGN_FLOORS,
   DIFFICULTIES,
   cellVisual,
+  configFor,
   newCell,
 } from './types';
 export type { Inventory, ItemDef, ItemId, ChestTier } from './loot';
@@ -61,3 +62,16 @@ export {
 export { chestNotices, dig, explodeChain, grantIntactLoot, toggleFlag } from './game';
 export type { ChestNotice } from './game';
 export { mulberry32 } from './rng';
+export {
+  RUN_KEY,
+  bankFloor,
+  floorReport,
+  loadRun,
+  newGrantKey,
+  parsePersistedRun,
+  recoverBank,
+  resumeLabel,
+  rewardsFromGame,
+  sanitizeRun,
+} from './runPersist';
+export type { FloorReport, PersistedRunSlice, Run } from './runPersist';
