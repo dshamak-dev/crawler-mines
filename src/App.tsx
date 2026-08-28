@@ -365,14 +365,14 @@ function Play({
           <span className="stat found-stat" title="Intact chests found">
             <span className="stat-label">Found</span>
             <span className="stat-row">
-              <ChestIcon className="stat-ico" />
+              <ChestIcon className="stat-ico" tier="wooden" />
               {game.chestsOpened}
             </span>
           </span>
           <span className="stat wreck" title="Chests destroyed">
             <span className="stat-label">Broken</span>
             <span className="stat-row">
-              <ChestIcon wrecked className="stat-ico" />
+              <ChestIcon wrecked className="stat-ico" tier="wooden" />
               {game.chestsDestroyed}
             </span>
           </span>
