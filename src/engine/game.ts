@@ -95,7 +95,9 @@ export function grantIntactLoot(game: Game): ChestReward[] {
     const c = game.cells[i];
     if (c.kind !== 'chest' || c.wrecked || c.state !== 'revealed' || !c.loot) continue;
     game.gold += c.gold;
-    game.inventory = addItem(game.inventory, c.loot);
+    if (c.loot !== 'gold-pouch') {
+      game.inventory = addItem(game.inventory, c.loot);
+    }
     rewards.push({ index: i, itemId: c.loot, gold: c.gold });
   }
   return rewards;

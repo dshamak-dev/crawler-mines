@@ -1,6 +1,11 @@
 import { useState } from 'react';
-import { inventoryTotal, stackedEntries, type Inventory } from '../engine';
-import { BagIcon, ItemIcon } from './icons';
+import {
+  inventoryTotal,
+  stackedEntries,
+  type CollectionState,
+  type Inventory,
+} from '../engine';
+import { BagIcon, GoldIcon, ItemIcon } from './icons';
 
 const EMPTY_COPY = 'Chests stay sealed until you clear the floor. Bombs can still smash them.';
 
@@ -9,12 +14,12 @@ export default function Collection({
   runLoot,
   onBack,
 }: {
-  meta: Inventory;
+  meta: CollectionState;
   runLoot: Inventory;
   onBack: () => void;
 }) {
   const [tab, setTab] = useState<'all' | 'run'>('all');
-  const inv = tab === 'all' ? meta : runLoot;
+  const inv = tab === 'all' ? meta.items : runLoot;
   const rows = stackedEntries(inv);
   const total = inventoryTotal(inv);
   const runCount = inventoryTotal(runLoot);
@@ -31,6 +36,14 @@ export default function Collection({
         </div>
         <span className="floor-pill">{total} held</span>
       </header>
+
+      <div className="wallet-strip" aria-label={`${meta.gold} coins in wallet`}>
+        <GoldIcon />
+        <span className="wallet-copy">
+          <strong>{meta.gold}</strong>
+          <em>wallet</em>
+        </span>
+      </div>
 
       <div className="filter-row" role="tablist" aria-label="Collection filter">
         <button

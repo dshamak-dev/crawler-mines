@@ -32,8 +32,8 @@ Classic minesweeper kills you when you click a mine. Here the mine explodes wher
 - Zeros flood-fill like the classic game.
 - **Flag** with a ~400ms long-press, or flip the Dig/Flag toggle in the thumb zone. Flagged cells will not explode until you unflag and tap them (a chain from a neighbor still sets them off).
 
-The in-run HUD tracks **found** vs **broken** chests this floor. Inner loot stays sealed until you clear the floor — then surviving chests dump their items on the reward screen and into your pack. Wrecked chests give nothing. During play, toasts and tiles show the chest **tier** (wooden / iron / gilded), never the item inside.
+The in-run HUD tracks **found** vs **broken** chests this floor. Inner loot stays sealed until you clear the floor — then surviving chests dump their items on the reward screen and into your pack. Gold pouches empty into a persistent **wallet** (coins), not the salvage list. Wrecked chests give nothing. During play, toasts and tiles show the chest **tier** (wooden / iron / gilded), never the item inside.
 
-Chests drop a named item (gold pouch, rusty key, torch charm, gem, or relic shard) into your **collection**. Intact opens pop the item; wrecked chests grant nothing and show a broken chest, not generic rubble. Collection lives in the title menu and the in-run pack button, and persists across runs.
+Chests roll a named drop (gold pouch, rusty key, torch charm, gem, or relic shard). Keys, charms, gems, and shards stack in your **collection**. Pouches convert to spendable coins in the same localStorage save. Collection is the first title-menu action (player/wallet row) and also lives on the in-run pack button.
 
 Difficulties: Easy 8x8, Medium 9x12, Hard 12x16, plus a 5-floor campaign with rising mine density and more chests.

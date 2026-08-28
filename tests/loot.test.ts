@@ -5,10 +5,12 @@ import {
   ITEMS,
   ITEM_IDS,
   addItem,
+  applyRewards,
   collectLoot,
   createGame,
   createGameFromLayout,
   dig,
+  emptyCollection,
   emptyInventory,
   goldForLoot,
   inventoryTotal,
@@ -18,7 +20,6 @@ import {
   saveCollection,
   stackedEntries,
   tierForLoot,
-  type Inventory,
   type ItemId,
   type KeyStore,
 } from '../src/engine';
@@ -59,6 +60,7 @@ describe('loot table', () => {
     inv = addItem(inv, 'gem', 2);
     inv = addItem(inv, 'gem');
     inv = addItem(inv, 'rusty-key');
+    inv = addItem(inv, 'gold-pouch', 4);
     expect(inv.gem).toBe(3);
     expect(inventoryTotal(inv)).toBe(4);
     expect(stackedEntries(inv).map((row) => row.item.id)).toEqual(['rusty-key', 'gem']);
@@ -107,7 +109,7 @@ describe('chest loot identity', () => {
     }
     expect(game.status).toBe('cleared');
     expect(game.gold).toBe(25);
-    expect(game.inventory['gold-pouch']).toBe(1);
+    expect(game.inventory['gold-pouch']).toBe(0);
   });
 
   it('stacks two of the same item from separate chests on clear', () => {
@@ -173,31 +175,81 @@ describe('open vs wreck', () => {
 describe('meta collection persistence', () => {
   it('saves stacked salvage and reloads it', () => {
     const store = memoryStore();
-    let inv: Inventory = emptyInventory();
-    inv = collectLoot(inv, 'rusty-key', store);
-    inv = collectLoot(inv, 'rusty-key', store);
-    inv = collectLoot(inv, 'gem', store);
-    expect(inv['rusty-key']).toBe(2);
+    let meta = emptyCollection();
+    meta = collectLoot(meta, 'rusty-key', store);
+    meta = collectLoot(meta, 'rusty-key', store);
+    meta = collectLoot(meta, 'gem', store);
+    expect(meta.items['rusty-key']).toBe(2);
     const loaded = loadCollection(store);
-    expect(loaded['rusty-key']).toBe(2);
-    expect(loaded.gem).toBe(1);
-    expect(loaded['gold-pouch']).toBe(0);
+    expect(loaded.items['rusty-key']).toBe(2);
+    expect(loaded.items.gem).toBe(1);
+    expect(loaded.items['gold-pouch']).toBe(0);
+    expect(loaded.gold).toBe(0);
     expect(JSON.parse(store.getItem(COLLECTION_KEY) ?? '{}').v).toBe(1);
   });
 
-  it('ignores corrupt payloads and unknown ids', () => {
+  it('turns gold pouches into wallet coins and never stacks pouches', () => {
+    const store = memoryStore();
+    let meta = emptyCollection();
+    meta = applyRewards(
+      meta,
+      [
+        { itemId: 'gold-pouch', gold: 10 },
+        { itemId: 'gold-pouch', gold: 15 },
+        { itemId: 'rusty-key', gold: 0 },
+      ],
+      store,
+    );
+    expect(meta.gold).toBe(25);
+    expect(meta.items['gold-pouch']).toBe(0);
+    expect(meta.items['rusty-key']).toBe(1);
+    const loaded = loadCollection(store);
+    expect(loaded.gold).toBe(25);
+    expect(loaded.items['gold-pouch']).toBe(0);
+    expect(stackedEntries(loaded.items).map((row) => row.item.id)).toEqual(['rusty-key']);
+    const payload = JSON.parse(store.getItem(COLLECTION_KEY) ?? '{}') as {
+      gold?: number;
+      items?: Record<string, number>;
+    };
+    expect(payload.gold).toBe(25);
+    expect(payload.items?.['gold-pouch']).toBe(0);
+  });
+
+  it('ignores corrupt payloads, unknown ids, and leftover pouch stacks', () => {
     const store = memoryStore({ [COLLECTION_KEY]: '{not json' });
-    expect(loadCollection(store)).toEqual(emptyInventory());
-    saveCollection(addItem(emptyInventory(), 'torch-charm', 4), store);
+    expect(loadCollection(store)).toEqual(emptyCollection());
+    saveCollection(
+      applyRewards(emptyCollection(), [{ itemId: 'torch-charm', gold: 0 }], store),
+      store,
+    );
     const poisoned = memoryStore({
       [COLLECTION_KEY]: JSON.stringify({
         v: 1,
-        items: { 'torch-charm': 4, 'magic-sword': 99, gem: 'nope' },
+        gold: 'nope',
+        items: { 'torch-charm': 4, 'magic-sword': 99, gem: 'nope', 'gold-pouch': 12 },
       }),
     });
     const loaded = loadCollection(poisoned);
-    expect(loaded['torch-charm']).toBe(4);
-    expect(loaded.gem).toBe(0);
+    expect(loaded.items['torch-charm']).toBe(4);
+    expect(loaded.items.gem).toBe(0);
+    expect(loaded.items['gold-pouch']).toBe(0);
+    expect(loaded.gold).toBe(0);
+  });
+
+  it('reloads a persisted gold integer and never decrements it', () => {
+    const store = memoryStore({
+      [COLLECTION_KEY]: JSON.stringify({
+        v: 1,
+        gold: 40,
+        items: { gem: 1 },
+      }),
+    });
+    const loaded = loadCollection(store);
+    expect(loaded.gold).toBe(40);
+    expect(loaded.items.gem).toBe(1);
+    const next = applyRewards(loaded, [{ itemId: 'gold-pouch', gold: 18 }], store);
+    expect(next.gold).toBe(58);
+    expect(loadCollection(store).gold).toBe(58);
   });
 });
 

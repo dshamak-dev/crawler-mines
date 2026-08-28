@@ -28,6 +28,7 @@ export {
   goldForLoot,
   inventoryTotal,
   isChestTier,
+  isCollectible,
   isItemId,
   rollLoot,
   stackedEntries,
@@ -35,12 +36,14 @@ export {
 } from './loot';
 export {
   COLLECTION_KEY,
+  applyRewards,
   collectLoot,
   defaultStore,
+  emptyCollection,
   loadCollection,
   saveCollection,
 } from './collection';
-export type { KeyStore } from './collection';
+export type { CollectionState, KeyStore } from './collection';
 export {
   chestCount,
   chestsRemaining,

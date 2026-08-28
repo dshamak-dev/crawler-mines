@@ -128,14 +128,22 @@ export function addItem(inv: Inventory, itemId: ItemId, n = 1): Inventory {
   return { ...inv, [itemId]: (inv[itemId] ?? 0) + n };
 }
 
+/** Pouches convert to wallet coins; they are not pack salvage. */
+export function isCollectible(itemId: ItemId): boolean {
+  return itemId !== 'gold-pouch';
+}
+
 export function inventoryTotal(inv: Inventory): number {
-  return ITEM_IDS.reduce((sum, id) => sum + (inv[id] ?? 0), 0);
+  return ITEM_IDS.reduce(
+    (sum, id) => sum + (isCollectible(id) ? (inv[id] ?? 0) : 0),
+    0,
+  );
 }
 
 export function stackedEntries(
   inv: Inventory,
 ): Array<{ item: ItemDef; count: number }> {
-  return ITEM_IDS.map((id) => ({ item: ITEMS[id], count: inv[id] ?? 0 })).filter(
-    (row) => row.count > 0,
-  );
+  return ITEM_IDS.filter(isCollectible)
+    .map((id) => ({ item: ITEMS[id], count: inv[id] ?? 0 }))
+    .filter((row) => row.count > 0);
 }

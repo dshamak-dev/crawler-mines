@@ -3,15 +3,16 @@ import {
   CAMPAIGN_FLOORS,
   DIFFICULTIES,
   addItem,
+  applyRewards,
   chestNotices,
   cloneGame,
   createGame,
   dig,
   emptyInventory,
   loadCollection,
-  saveCollection,
   stackedEntries,
   toggleFlag,
+  type CollectionState,
   type Difficulty,
   type FloorConfig,
   type Game,
@@ -20,7 +21,7 @@ import {
 import Board, { collectFx, useBoardCellSize, type BlastFx } from './ui/Board';
 import Collection from './ui/Collection';
 import LootQueue, { type LootToast } from './ui/LootToast';
-import { BagIcon, ChestIcon, FlagIcon, ItemIcon, ShovelIcon, TorchIcon } from './ui/icons';
+import { BagIcon, ChestIcon, FlagIcon, GoldIcon, ItemIcon, ShovelIcon, TorchIcon } from './ui/icons';
 import { chainDuration, prefersReducedMotion } from './ui/motion';
 
 type Screen = 'menu' | 'play' | 'collection';
@@ -37,6 +38,7 @@ interface FloorReport {
   wrecked: number;
   lastFloor: boolean;
   loot: Inventory;
+  gold: number;
 }
 
 function configFor(mode: Difficulty, floor: number): FloorConfig {
@@ -61,7 +63,7 @@ export default function App() {
   const [blasts, setBlasts] = useState<BlastFx[]>([]);
   const [sparkles, setSparkles] = useState<Array<{ id: number; index: number }>>([]);
   const [shaking, setShaking] = useState(false);
-  const [meta, setMeta] = useState<Inventory>(() => loadCollection());
+  const [meta, setMeta] = useState<CollectionState>(() => loadCollection());
   const [runLoot, setRunLoot] = useState<Inventory>(() => emptyInventory());
   const [lootQueue, setLootQueue] = useState<LootToast[]>([]);
   const [collectionFrom, setCollectionFrom] = useState<Screen>('menu');
@@ -127,15 +129,13 @@ export default function App() {
   const bankRewards = useCallback((events: ReturnType<typeof dig>) => {
     const cleared = events.find((e) => e.type === 'cleared');
     if (!cleared || cleared.type !== 'cleared' || cleared.rewards.length === 0) return;
-    setMeta((prev) => {
-      let next = prev;
-      for (const r of cleared.rewards) next = addItem(next, r.itemId);
-      saveCollection(next);
-      return next;
-    });
+    setMeta((prev) => applyRewards(prev, cleared.rewards));
     setRunLoot((prev) => {
       let next = prev;
-      for (const r of cleared.rewards) next = addItem(next, r.itemId);
+      for (const r of cleared.rewards) {
+        if (r.itemId === 'gold-pouch') continue;
+        next = addItem(next, r.itemId);
+      }
       return next;
     });
   }, []);
@@ -167,6 +167,7 @@ export default function App() {
                 wrecked: cur.game.chestsDestroyed,
                 lastFloor: last,
                 loot: { ...cur.game.inventory },
+                gold: cur.game.gold,
               });
             }
           : undefined,
@@ -238,7 +239,11 @@ export default function App() {
             onBack={() => setScreen(collectionFrom === 'play' && run ? 'play' : 'menu')}
           />
         ) : screen === 'menu' || !run ? (
-          <Menu onStart={start} onCollection={() => openCollection('menu')} />
+          <Menu
+            onStart={start}
+            onCollection={() => openCollection('menu')}
+            gold={meta.gold}
+          />
         ) : (
           <Play
             run={run}
@@ -272,9 +277,11 @@ export default function App() {
 function Menu({
   onStart,
   onCollection,
+  gold,
 }: {
   onStart: (m: Difficulty) => void;
   onCollection: () => void;
+  gold: number;
 }) {
   return (
     <div className="shell menu-shell">
@@ -289,24 +296,30 @@ function Menu({
         <li>Long-press to flag.</li>
       </ul>
       <nav className="menu-nav">
-        <button className="stone-btn" onClick={() => onStart('easy')}>
-          Easy <span>8x8</span>
-        </button>
-        <button className="stone-btn" onClick={() => onStart('medium')}>
-          Medium <span>9x12</span>
-        </button>
-        <button className="stone-btn" onClick={() => onStart('hard')}>
-          Hard <span>12x16</span>
-        </button>
-        <button className="stone-btn gold" onClick={() => onStart('campaign')}>
-          Campaign <span>5 floors</span>
-        </button>
-        <button className="stone-btn" onClick={onCollection}>
-          Collection
-          <span className="menu-bag">
-            <BagIcon /> Pack
+        <button type="button" className="stone-btn player-row" onClick={onCollection}>
+          <span className="player-row-main">
+            <BagIcon />
+            Collection
+          </span>
+          <span className="player-wallet">
+            <GoldIcon />
+            {gold}
           </span>
         </button>
+        <div className="menu-modes">
+          <button className="stone-btn" onClick={() => onStart('easy')}>
+            Easy <span>8x8</span>
+          </button>
+          <button className="stone-btn" onClick={() => onStart('medium')}>
+            Medium <span>9x12</span>
+          </button>
+          <button className="stone-btn" onClick={() => onStart('hard')}>
+            Hard <span>12x16</span>
+          </button>
+          <button className="stone-btn gold" onClick={() => onStart('campaign')}>
+            Campaign <span>5 floors</span>
+          </button>
+        </div>
       </nav>
     </div>
   );
@@ -445,8 +458,20 @@ function Play({
                 <strong className="neg">{report.wrecked}</strong>
               </div>
             </div>
-            {salvage.length > 0 ? (
+            {report.gold > 0 || salvage.length > 0 ? (
               <ul className="loot-list report-loot">
+                {report.gold > 0 && (
+                  <li className="loot-card">
+                    <span className="loot-ico">
+                      <GoldIcon />
+                    </span>
+                    <span className="loot-copy">
+                      <strong>Coins</strong>
+                      <em>Pouched gold, now in your wallet.</em>
+                    </span>
+                    <span className="loot-count">+{report.gold}</span>
+                  </li>
+                )}
                 {salvage.map(({ item, count }) => (
                   <li key={item.id} className="loot-card">
                     <span className="loot-ico">

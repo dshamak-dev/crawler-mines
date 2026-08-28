@@ -142,6 +142,18 @@ export function TorchIcon() {
   );
 }
 
+export function GoldIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className ?? 'glyph'} viewBox="0 0 24 24" aria-hidden="true">
+      <ellipse cx="12" cy="16" rx="8" ry="3.2" fill="#7a5416" />
+      <ellipse cx="12" cy="14" rx="8" ry="3.2" fill="#e0b44a" />
+      <ellipse cx="12" cy="13.2" rx="5.5" ry="1.6" fill="#f3d27a" />
+      <ellipse cx="12" cy="11" rx="8" ry="3.2" fill="#c9922e" />
+      <ellipse cx="12" cy="10.2" rx="5.5" ry="1.5" fill="#e8c66a" />
+    </svg>
+  );
+}
+
 export function BagIcon({ className }: { className?: string }) {
   return (
     <svg className={className ?? 'glyph'} viewBox="0 0 32 32" aria-hidden="true">

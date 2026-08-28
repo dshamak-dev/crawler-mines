@@ -1,6 +1,7 @@
 import {
   addItem,
   emptyInventory,
+  isCollectible,
   isItemId,
   type Inventory,
   type ItemId,
@@ -11,6 +12,15 @@ export const COLLECTION_KEY = 'crawler-mines-collection';
 export interface KeyStore {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
+}
+
+export interface CollectionState {
+  gold: number;
+  items: Inventory;
+}
+
+export function emptyCollection(): CollectionState {
+  return { gold: 0, items: emptyInventory() };
 }
 
 function memoryFallback(): KeyStore {
@@ -32,39 +42,74 @@ export function defaultStore(): KeyStore {
   return memoryFallback();
 }
 
-export function loadCollection(store: KeyStore = defaultStore()): Inventory {
-  const inv = emptyInventory();
+function clampGold(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 0;
+  return Math.max(0, Math.floor(value));
+}
+
+export function loadCollection(store: KeyStore = defaultStore()): CollectionState {
+  const state = emptyCollection();
   const raw = store.getItem(COLLECTION_KEY);
-  if (!raw) return inv;
+  if (!raw) return state;
   try {
-    const parsed = JSON.parse(raw) as { v?: number; items?: Record<string, unknown> };
-    const items = parsed && typeof parsed === 'object' ? parsed.items : undefined;
-    if (!items || typeof items !== 'object') return inv;
+    const parsed = JSON.parse(raw) as {
+      v?: number;
+      gold?: unknown;
+      items?: Record<string, unknown>;
+    };
+    if (!parsed || typeof parsed !== 'object') return state;
+    state.gold = clampGold(parsed.gold);
+    const items = parsed.items;
+    if (!items || typeof items !== 'object') return state;
     for (const [key, value] of Object.entries(items)) {
-      if (!isItemId(key)) continue;
+      if (!isItemId(key) || !isCollectible(key)) continue;
       const n = typeof value === 'number' && Number.isFinite(value) ? Math.floor(value) : 0;
-      if (n > 0) inv[key] = n;
+      if (n > 0) state.items[key] = n;
     }
-    return inv;
+    return state;
   } catch {
-    return inv;
+    return emptyCollection();
   }
 }
 
-export function saveCollection(inv: Inventory, store: KeyStore = defaultStore()): void {
+export function saveCollection(
+  state: CollectionState,
+  store: KeyStore = defaultStore(),
+): void {
   const items: Record<ItemId, number> = emptyInventory();
   for (const id of Object.keys(items) as ItemId[]) {
-    items[id] = Math.max(0, Math.floor(inv[id] ?? 0));
+    items[id] = isCollectible(id) ? Math.max(0, Math.floor(state.items[id] ?? 0)) : 0;
   }
-  store.setItem(COLLECTION_KEY, JSON.stringify({ v: 1, items }));
+  store.setItem(
+    COLLECTION_KEY,
+    JSON.stringify({ v: 1, gold: clampGold(state.gold), items }),
+  );
+}
+
+export function applyRewards(
+  state: CollectionState,
+  rewards: ReadonlyArray<{ itemId: ItemId; gold: number }>,
+  store: KeyStore = defaultStore(),
+): CollectionState {
+  let gold = clampGold(state.gold);
+  let items = { ...state.items, 'gold-pouch': 0 };
+  for (const r of rewards) {
+    if (r.itemId === 'gold-pouch') {
+      gold += clampGold(r.gold);
+    } else {
+      items = addItem(items, r.itemId);
+    }
+  }
+  const next = { gold, items };
+  saveCollection(next, store);
+  return next;
 }
 
 export function collectLoot(
-  inv: Inventory,
+  state: CollectionState,
   itemId: ItemId,
   store: KeyStore = defaultStore(),
-): Inventory {
-  const next = addItem(inv, itemId);
-  saveCollection(next, store);
-  return next;
+  gold = 0,
+): CollectionState {
+  return applyRewards(state, [{ itemId, gold }], store);
 }

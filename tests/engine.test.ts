@@ -321,7 +321,7 @@ describe('win check and scoring', () => {
     revealAllSafe(game);
     expect(game.status).toBe('cleared');
     expect(game.gold).toBe(10);
-    expect(game.inventory['gold-pouch']).toBe(1);
+    expect(game.inventory['gold-pouch']).toBe(0);
     expect(game.chestsDestroyed).toBe(0);
   });
 
