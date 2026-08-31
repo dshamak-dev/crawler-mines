@@ -39,7 +39,7 @@ export interface Run {
   bossRevealPending?: boolean;
   /** Perfect-clear flags for campaign floors 1–4 (indices 0–3). Hydrate/resume keep it. */
   perfectFloors?: boolean[];
-  /** Socketed boss head at campaign enter; resume and floor 5 honor it. */
+  /** Resolved floor-5 boss at campaign enter (from heads); resume and retry keep it. */
   lockedBossId?: BossId | null;
 }
 

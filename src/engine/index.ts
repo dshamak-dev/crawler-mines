@@ -132,8 +132,11 @@ export {
   offeringCaption,
   offeringCaptionParts,
   offeringPickerRows,
+  remainingFinaleBosses,
   remainingOwned,
+  resolveLockedBossId,
   socketedBossId,
+  socketedHeadBosses,
   socketedList,
 } from './offerings';
 export type { OfferingPickerRow, OfferingQuote, OfferingSlots, SocketableId } from './offerings';

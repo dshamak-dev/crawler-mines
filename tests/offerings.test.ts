@@ -20,8 +20,11 @@ import {
   offeringCaption,
   offeringPickerRows,
   quoteEntry,
+  remainingFinaleBosses,
+  resolveLockedBossId,
   rollBossId,
   saveCollection,
+  socketedBossId,
   spendEntry,
   type CollectionState,
   type Inventory,
@@ -157,21 +160,36 @@ describe('#35 gold vs key slot', () => {
   });
 });
 
-describe('#35 one-head cap', () => {
-  it('keeps the first boss head and drops a second', () => {
+describe('two offering heads', () => {
+  it('keeps two different heads and does not grey the others in the picker', () => {
     const slots = normalizeOfferings(['lust-head', 'wrath-head']);
-    expect(slots).toEqual(['lust-head', null]);
+    expect(slots).toEqual(['lust-head', 'wrath-head']);
     expect(bossIdFromHead(slots[0])).toBe('lust');
-  });
+    expect(bossIdFromHead(slots[1])).toBe('wrath');
 
-  it('greys other heads in the picker once one well holds a head', () => {
     const meta = { ...emptyCollection(), items: { ...emptyInventory(), ...PACK } };
     const rows = offeringPickerRows(meta, ['lust-head', null], 1);
     const heads = rows.filter((r) => r.id.endsWith('-head'));
     expect(heads.map((r) => r.id)).toEqual(['gluttony-head', 'wrath-head']);
-    expect(heads.every((r) => r.disabled)).toBe(true);
-    expect(canSocket('wrath-head', meta, ['lust-head', null], 1)).toBe(false);
+    expect(heads.every((r) => r.disabled)).toBe(false);
+    expect(canSocket('wrath-head', meta, ['lust-head', null], 1)).toBe(true);
+    expect(canSocket('gluttony-head', meta, ['lust-head', null], 1)).toBe(true);
     expect(canSocket('campaign-key', meta, ['lust-head', null], 1)).toBe(true);
+  });
+
+  it('keeps two of the same head when the pack has two', () => {
+    const meta = {
+      ...emptyCollection(),
+      items: { ...emptyInventory(), 'lust-head': 2 },
+    };
+    expect(normalizeOfferings(['lust-head', 'lust-head'], meta)).toEqual([
+      'lust-head',
+      'lust-head',
+    ]);
+    expect(normalizeOfferings(['lust-head', 'lust-head'], {
+      ...emptyCollection(),
+      items: { ...emptyInventory(), 'lust-head': 1 },
+    })).toEqual(['lust-head', null]);
   });
 });
 
@@ -230,7 +248,7 @@ describe('#35 locked boss from a head', () => {
     expect(['gluttony', 'wrath', 'lust']).toContain(rolled.boss?.id);
   });
 
-  it('start with a head persists the lock through floor 5, resume, and retry', () => {
+  it('one head still locks floor 5, resume, and retry', () => {
     const { store } = withWallet(100, { 'lust-head': 1, 'wrath-head': 1 });
     const s1 = createGameStore(store);
     expect(s1.getState().start('campaign', mulberry32(3), ['lust-head', null])).toBe(true);
@@ -257,6 +275,104 @@ describe('#35 locked boss from a head', () => {
     expect(s2.getState().run?.lockedBossId).toBe('lust');
   });
 
+  it('Gluttony + Wrath always locks Lust and names it on the tablet', () => {
+    const slots: [ItemId, ItemId] = ['gluttony-head', 'wrath-head'];
+    expect(remainingFinaleBosses(slots)).toEqual(['lust']);
+    expect(socketedBossId(slots)).toBe('lust');
+    expect(resolveLockedBossId(slots, () => 0.99)).toBe('lust');
+    expect(resolveLockedBossId(slots, () => 0)).toBe('lust');
+    const meta = {
+      ...emptyCollection(),
+      gold: 100,
+      items: { ...emptyInventory(), 'gluttony-head': 1, 'wrath-head': 1 },
+    };
+    const quote = quoteEntry('campaign', meta, slots);
+    expect(offeringCaption(slots, quote)).toBe('Floor 5 · Lust · 100 gold');
+
+    const { store } = withWallet(100, { 'gluttony-head': 1, 'wrath-head': 1 });
+    const s1 = createGameStore(store);
+    expect(s1.getState().start('campaign', mulberry32(11), slots)).toBe(true);
+    expect(s1.getState().meta.items['gluttony-head']).toBe(0);
+    expect(s1.getState().meta.items['wrath-head']).toBe(0);
+    expect(s1.getState().run?.lockedBossId).toBe('lust');
+
+    for (let floor = 1; floor < CAMPAIGN_FLOORS.length; floor++) {
+      s1.getState().nextFloor(mulberry32(11 + floor));
+    }
+    expect(s1.getState().run?.game.boss?.id).toBe('lust');
+    expect(s1.getState().run?.lockedBossId).toBe('lust');
+
+    const s2 = createGameStore(store);
+    expect(s2.getState().run?.lockedBossId).toBe('lust');
+    s2.getState().retryFloor(mulberry32(0));
+    expect(s2.getState().run?.game.boss?.id).toBe('lust');
+  });
+
+  it('Lust + Wrath always locks Gluttony', () => {
+    const slots: [ItemId, ItemId] = ['lust-head', 'wrath-head'];
+    expect(remainingFinaleBosses(slots)).toEqual(['gluttony']);
+    expect(resolveLockedBossId(slots, () => 0.5)).toBe('gluttony');
+    const meta = {
+      ...emptyCollection(),
+      gold: 100,
+      items: { ...emptyInventory(), 'lust-head': 1, 'wrath-head': 1, 'campaign-key': 1 },
+    };
+    const quote = quoteEntry('campaign', meta, ['lust-head', 'campaign-key']);
+    expect(offeringCaption(['lust-head', 'campaign-key'], quote)).toBe(
+      'Floor 5 · Lust · Dive free',
+    );
+    expect(offeringCaption(slots, quoteEntry('campaign', meta, slots))).toBe(
+      'Floor 5 · Gluttony · 100 gold',
+    );
+
+    const { store } = withWallet(100, { 'lust-head': 1, 'wrath-head': 1 });
+    const s = createGameStore(store);
+    expect(s.getState().start('campaign', mulberry32(12), slots)).toBe(true);
+    expect(s.getState().run?.lockedBossId).toBe('gluttony');
+    for (let floor = 1; floor < CAMPAIGN_FLOORS.length; floor++) {
+      s.getState().nextFloor(mulberry32(12 + floor));
+    }
+    expect(s.getState().run?.game.boss?.id).toBe('gluttony');
+  });
+
+  it('two of the same head never pick that boss and do not name it', () => {
+    const slots: [ItemId, ItemId] = ['lust-head', 'lust-head'];
+    expect(remainingFinaleBosses(slots)).toEqual(['gluttony', 'wrath']);
+    expect(socketedBossId(slots)).toBeNull();
+    expect(resolveLockedBossId(slots, () => 0)).toBe('gluttony');
+    expect(resolveLockedBossId(slots, () => 0.99)).toBe('wrath');
+    for (let i = 0; i < 40; i++) {
+      const id = resolveLockedBossId(slots, () => i / 40);
+      expect(id).not.toBe('lust');
+      expect(['gluttony', 'wrath']).toContain(id);
+    }
+    const meta = {
+      ...emptyCollection(),
+      gold: 100,
+      items: { ...emptyInventory(), 'lust-head': 2 },
+    };
+    expect(offeringCaption(slots, quoteEntry('campaign', meta, slots))).toBe('Floor 5 · 100 gold');
+
+    const { store } = withWallet(100, { 'lust-head': 2 });
+    const s1 = createGameStore(store);
+    expect(s1.getState().start('campaign', mulberry32(13), slots)).toBe(true);
+    expect(s1.getState().meta.items['lust-head']).toBe(0);
+    const locked = s1.getState().run?.lockedBossId;
+    expect(locked === 'gluttony' || locked === 'wrath').toBe(true);
+    expect(locked).not.toBe('lust');
+
+    for (let floor = 1; floor < CAMPAIGN_FLOORS.length; floor++) {
+      s1.getState().nextFloor(mulberry32(13 + floor));
+    }
+    expect(s1.getState().run?.game.boss?.id).toBe(locked);
+    expect(s1.getState().run?.lockedBossId).toBe(locked);
+
+    const s2 = createGameStore(store);
+    expect(s2.getState().run?.lockedBossId).toBe(locked);
+    s2.getState().retryFloor(mulberry32(1));
+    expect(s2.getState().run?.game.boss?.id).toBe(locked);
+  });
+
   it('socketed torch/gem/shard burn with no extra board effect', () => {
     const { store } = withWallet(100, { 'torch-charm': 1, gem: 1, 'relic-shard': 1 });
     const s = createGameStore(store);
@@ -273,11 +389,14 @@ describe('#35 locked boss from a head', () => {
 });
 
 describe('#35 README', () => {
-  it('notes campaign offering wells and the socket rules', () => {
+  it('notes campaign offering wells and the two-head finale rules', () => {
     const readme = readFileSync(resolve('README.md'), 'utf8');
     expect(readme).toMatch(/offering wells/);
     expect(readme).toMatch(/Campaign key/);
     expect(readme).toMatch(/boss head/);
     expect(readme).toMatch(/gold cups/);
+    expect(readme).toMatch(/Two heads are allowed/);
+    expect(readme).toMatch(/Gluttony \+ Wrath → Lust/);
+    expect(readme).not.toMatch(/At most one head/);
   });
 });
