@@ -38,6 +38,9 @@ describe('audio URLs', () => {
     expect(bgmUrl('campaign')).toBe('/crawler-mines/audio/campaign-depths.mp3');
     expect(bgmUrl('boss')).toBe('/crawler-mines/audio/flag-eater-boss.mp3');
     expect(bgmUrl('wrath')).toBe('/crawler-mines/audio/wrath-boss.mp3');
+    // Presence only — do not decode mp3 bytes.
+    expect(existsSync(resolve('public/audio/cozy-descent.mp3'))).toBe(true);
+    expect(existsSync(resolve('public/audio/campaign-depths.mp3'))).toBe(true);
     expect(existsSync(resolve('public/audio/flag-eater-boss.mp3'))).toBe(true);
     expect(sfxUrl('deny')).toBe('/crawler-mines/audio/sfx-deny.wav');
     expect(sfxUrl('boss-move')).toBe('/crawler-mines/audio/sfx-boss-move.wav');
