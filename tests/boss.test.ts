@@ -81,6 +81,14 @@ function revealHiddenSafe(
   }
 }
 
+function blastUntilDead(game: ReturnType<typeof createGameFromLayout>): void {
+  while (game.boss && game.boss.lives > 0) {
+    const mine = game.cells.findIndex((c) => c.kind === 'mine' && !c.exploded);
+    if (mine < 0) throw new Error('expected mines next to the boss');
+    explodeChain(game, mine);
+  }
+}
+
 function killBoss(
   store: ReturnType<typeof createGameStore>,
   rng: () => number,
@@ -1076,7 +1084,7 @@ describe('finale door extract', () => {
   });
 
   it('boss death does not clear; extract needs the door and a dead boss', () => {
-    const game = createGameFromLayout(['B...', '....'], 10, 'gold-pouch', undefined, 'lust');
+    const game = createGameFromLayout(['*B*.', '***.', '....', '....'], 10, 'gold-pouch', undefined, 'lust');
     const door = game.doorIndex;
     expect(door).not.toBeNull();
     const corpse = game.boss!.index;
@@ -1084,9 +1092,7 @@ describe('finale door extract', () => {
     expect(dig(game, door!, mulberry32(1))).toEqual([{ type: 'deny' }]);
     expect(game.status).toBe('playing');
 
-    for (let hit = 0; hit < LUST_MAX_LIVES; hit++) {
-      dig(game, corpse, mulberry32(1));
-    }
+    blastUntilDead(game);
     expect(game.boss?.lives).toBe(0);
     expect(game.status).toBe('playing');
     expect(game.boss?.index).toBe(corpse);
@@ -1099,12 +1105,10 @@ describe('finale door extract', () => {
   });
 
   it('extracts immediately when the boss is dead and every safe cell is already open', () => {
-    const game = createGameFromLayout(['B..', '...'], 10, 'gold-pouch', undefined, 'lust');
+    const game = createGameFromLayout(['*B*.', '***.', '....', '....'], 10, 'gold-pouch', undefined, 'lust');
     const door = game.doorIndex!;
     const corpse = game.boss!.index;
-    for (let hit = 0; hit < LUST_MAX_LIVES; hit++) {
-      dig(game, corpse, mulberry32(1));
-    }
+    blastUntilDead(game);
     expect(game.boss?.lives).toBe(0);
     for (let i = 0; i < game.cells.length; i++) {
       if (game.cells[i].kind !== 'mine') game.cells[i].state = 'revealed';
@@ -1117,11 +1121,9 @@ describe('finale door extract', () => {
   });
 
   it('open-all-safe after the boss is dead does not auto-win', () => {
-    const game = createGameFromLayout(['B.*', '...'], 10, 'gold-pouch', undefined, 'lust');
+    const game = createGameFromLayout(['*B*.', '***.', '....', '....'], 10, 'gold-pouch', undefined, 'lust');
     const corpse = game.boss!.index;
-    for (let hit = 0; hit < LUST_MAX_LIVES; hit++) {
-      dig(game, corpse, mulberry32(1));
-    }
+    blastUntilDead(game);
     expect(game.boss?.lives).toBe(0);
     for (let i = 0; i < game.cells.length; i++) {
       if (game.cells[i].kind !== 'mine' && game.cells[i].state === 'hidden') {
