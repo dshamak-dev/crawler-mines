@@ -671,6 +671,76 @@ describe('Lust movement and combat', () => {
     expect(pickLustTarget(game)).not.toBe(low);
   });
 
+  function heartCount(game: ReturnType<typeof createGameFromLayout>): number {
+    return game.cells.filter((c) => c.hearted).length;
+  }
+
+  /** Mine at (0,0), Lust at (1,0), a row of numbers above a mine wall. */
+  function lustHeartBoard() {
+    const game = createGameFromLayout(
+      ['*B........', '..........', '**********'],
+      10,
+      'gold-pouch',
+      undefined,
+      'lust',
+    );
+    for (let x = 0; x < game.width; x++) {
+      game.cells[idx(game, x, 1)].state = 'revealed';
+    }
+    return game;
+  }
+
+  it('cannot plant a 6th heart while Lust has 5 lives', () => {
+    const game = lustHeartBoard();
+    expect(game.boss?.lives).toBe(LUST_MAX_LIVES);
+    for (let x = 0; x < 5; x++) {
+      game.cells[idx(game, x, 1)].hearted = true;
+    }
+    expect(heartCount(game)).toBe(5);
+    const sixth = idx(game, 5, 1);
+    game.boss!.index = sixth;
+    expect(pickLustTarget(game)).toBe(sixth);
+    const events = stepBoss(game);
+    expect(events.some((e) => e.type === 'boss-plant-heart')).toBe(false);
+    expect(game.cells[sixth].hearted).toBe(false);
+    expect(heartCount(game)).toBe(5);
+  });
+
+  it('after a hit with 5 hearts, count becomes 4', () => {
+    const game = lustHeartBoard();
+    for (let x = 3; x < 8; x++) {
+      game.cells[idx(game, x, 1)].hearted = true;
+    }
+    expect(heartCount(game)).toBe(5);
+    expect(game.boss?.lives).toBe(LUST_MAX_LIVES);
+    const blasts = explodeChain(game, 0);
+    expect(blasts.some((e) => e.type === 'boss-hit' && e.lives === LUST_MAX_LIVES - 1)).toBe(true);
+    expect(game.boss?.lives).toBe(LUST_MAX_LIVES - 1);
+    expect(heartCount(game)).toBe(4);
+    expect(game.cells[idx(game, 3, 1)].hearted).toBe(false);
+    expect(game.status).toBe('playing');
+    game.boss!.index = idx(game, 8, 1);
+    expect(stepBoss(game).some((e) => e.type === 'boss-plant-heart')).toBe(false);
+    expect(heartCount(game)).toBe(4);
+  });
+
+  it('death clears every planted heart and leaves the corpse', () => {
+    const game = lustHeartBoard();
+    for (let x = 3; x < 8; x++) {
+      game.cells[idx(game, x, 1)].hearted = true;
+    }
+    expect(heartCount(game)).toBe(5);
+    const corpse = game.boss!.index;
+    game.boss!.lives = 1;
+    const events = explodeChain(game, 0);
+    expect(events.some((e) => e.type === 'boss-death')).toBe(true);
+    expect(game.boss?.lives).toBe(0);
+    expect(heartCount(game)).toBe(0);
+    expect(game.cells.every((c) => !c.hearted)).toBe(true);
+    expect(game.status).toBe('playing');
+    expect(game.boss?.index).toBe(corpse);
+  });
+
   it('has 5 lives while Gluttony and Wrath stay at 3', () => {
     expect(bossMaxLives('lust')).toBe(5);
     expect(bossMaxLives('gluttony')).toBe(3);

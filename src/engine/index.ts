@@ -97,6 +97,7 @@ export {
 export type { ChestNotice } from './game';
 export {
   BOSS_COPY,
+  capLustHearts,
   bossMaxLives,
   bossIdFromHead,
   chebyshev,

@@ -10,12 +10,15 @@ import {
   campaignFloorActive,
   desiredBgm,
   finaleBgm,
+  GameAudio,
   getAudio,
   loadMuted,
   saveMuted,
   sfxFromEvents,
   sfxUrl,
+  stopOtherBgm,
 } from '../src/audio';
+import type { BgmId } from '../src/audio';
 import type { KeyStore } from '../src/engine';
 
 function memoryStore(seed: Record<string, string> = {}): KeyStore {
@@ -156,6 +159,88 @@ describe('SFX from engine events', () => {
       sfxFromEvents([{ type: 'boss-smash-chest', index: 2, tier: 'iron' }]),
     ).toEqual(['wreck']);
     expect(sfxFromEvents([{ type: 'deny' }])).toEqual(['deny']);
+  });
+});
+
+describe('exclusive BGM', () => {
+  function stubTrack(playing: boolean, volume = playing ? 0.2 : 0) {
+    return {
+      volume,
+      paused: !playing,
+      pause() {
+        this.paused = true;
+      },
+    };
+  }
+
+  it('hard-stops every other clip and leaves the incoming one playing', () => {
+    const tracks = {
+      cozy: stubTrack(true),
+      campaign: stubTrack(true, 0.2),
+      boss: stubTrack(false),
+      wrath: stubTrack(true),
+      lust: stubTrack(false),
+    };
+    stopOtherBgm(tracks, 'campaign');
+    expect(tracks.campaign.paused).toBe(false);
+    expect(tracks.campaign.volume).toBe(0.2);
+    expect(tracks.cozy.paused).toBe(true);
+    expect(tracks.cozy.volume).toBe(0);
+    expect(tracks.wrath.paused).toBe(true);
+    expect(tracks.wrath.volume).toBe(0);
+    expect(tracks.boss.paused).toBe(true);
+    expect(tracks.lust.paused).toBe(true);
+  });
+
+  it('GameAudio pauses leftover BGM as soon as a new id starts', async () => {
+    class FakeAudio {
+      src: string;
+      loop = false;
+      volume = 0;
+      paused = true;
+      currentTime = 0;
+      muted = false;
+      preload = '';
+      constructor(src: string) {
+        this.src = src;
+      }
+      play() {
+        this.paused = false;
+        return Promise.resolve();
+      }
+      pause() {
+        this.paused = true;
+      }
+      setAttribute() {}
+    }
+
+    const g = globalThis as typeof globalThis & { Audio?: unknown; requestAnimationFrame?: unknown };
+    const prevAudio = g.Audio;
+    const prevRaf = g.requestAnimationFrame;
+    g.Audio = FakeAudio;
+    g.requestAnimationFrame = () => 0;
+
+    try {
+      const audio = new GameAudio();
+      audio.setMuted(false);
+      await audio.unlock();
+      audio.setBgm('campaign');
+      const bgm = (audio as unknown as { bgm: Record<BgmId, FakeAudio | null> }).bgm;
+      expect(bgm.campaign?.paused).toBe(false);
+      expect(bgm.cozy?.paused).toBe(true);
+      expect(bgm.cozy?.volume).toBe(0);
+      expect(bgm.boss?.paused).toBe(true);
+      expect(bgm.wrath?.paused).toBe(true);
+      expect(bgm.lust?.paused).toBe(true);
+      audio.setBgm('lust');
+      expect(bgm.lust?.paused).toBe(false);
+      expect(bgm.campaign?.paused).toBe(true);
+      expect(bgm.campaign?.volume).toBe(0);
+      expect(bgm.cozy?.paused).toBe(true);
+    } finally {
+      g.Audio = prevAudio;
+      g.requestAnimationFrame = prevRaf;
+    }
   });
 });
 

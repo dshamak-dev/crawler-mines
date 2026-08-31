@@ -72,7 +72,7 @@ export const BOSS_COPY: Record<BossId, { name: string; blurb: string }> = {
   lust: {
     name: 'Lust',
     blurb:
-      'Walks to the highest open number that still has a hidden neighbor and plants a heart. Blast a mine next to him. Hearts stay until a blast strips them. When he falls, leave through the door.',
+      'Walks to the highest open number that still has a hidden neighbor and plants a heart (never more than his remaining lives). Blast a mine next to him. Hearts stay until a blast strips them; a hit drops extras, death clears them all. When he falls, leave through the door.',
   },
 };
 
@@ -342,11 +342,36 @@ function stepWrath(game: Game, boss: BossState): GameEvent[] {
   return [{ type: 'boss-slam', index: target }];
 }
 
+function heartedCount(game: Game): number {
+  let n = 0;
+  for (const cell of game.cells) {
+    if (cell.hearted) n += 1;
+  }
+  return n;
+}
+
 function plantHeart(game: Game, index: number): GameEvent[] {
   const cell = game.cells[index];
   if (!cell || cell.hearted) return [];
+  const lives = game.boss?.lives ?? 0;
+  if (heartedCount(game) >= lives) return [];
   cell.hearted = true;
   return [{ type: 'boss-plant-heart', index }];
+}
+
+/** Hearts never exceed Lust's remaining lives. Death (0) clears every overlay. */
+export function capLustHearts(game: Game): void {
+  const boss = game.boss;
+  if (!boss || boss.id !== 'lust') return;
+  const cap = Math.max(0, boss.lives);
+  let extra = heartedCount(game) - cap;
+  if (extra <= 0) return;
+  for (const cell of game.cells) {
+    if (!cell.hearted) continue;
+    cell.hearted = false;
+    extra -= 1;
+    if (extra <= 0) return;
+  }
 }
 
 /**
@@ -405,6 +430,7 @@ export function hitBossFromBlasts(game: Game, blastIndices: readonly number[]): 
   if (boss.lives <= 0 && !events.some((e) => e.type === 'boss-death')) {
     events.push({ type: 'boss-death' });
   }
+  if (events.length > 0) capLustHearts(game);
   return events;
 }
 
