@@ -424,6 +424,23 @@ function MedalGlyph({
   );
 }
 
+function GoldCupGlyph() {
+  return (
+    <svg viewBox="0 0 32 32" className="glyph" aria-hidden="true">
+      <path d="M10.2 6.4h11.6v2.2H10.2z" fill="#8a6419" />
+      <path
+        d="M11.2 8.6h9.6c.5 5.8-1.8 9.2-4.8 10.6v2.4h3.2v2H12.8v-2h3.2v-2.4c-3-1.4-5.3-4.8-4.8-10.6z"
+        fill="#e0b44a"
+      />
+      <path d="M13 10h6c.2 4.2-1.4 6.6-3 7.4-1.6-.8-3.2-3.2-3-7.4z" fill="#f3d27a" />
+      <path d="M11.2 9c-3 .6-4.6 3-4 6.2 1.4-.2 3-1.6 3.6-3.8z" fill="#c9922e" />
+      <path d="M20.8 9c3 .6 4.6 3 4 6.2-1.4-.2-3-1.6-3.6-3.8z" fill="#c9922e" />
+      <rect x="12.2" y="23.4" width="7.6" height="2.2" fill="#c9922e" />
+      <rect x="10.6" y="25.4" width="10.8" height="2.6" rx="0.6" fill="#8a6419" />
+    </svg>
+  );
+}
+
 function HeadGlyph({ kind }: { kind: 'gluttony' | 'wrath' | 'lust' }) {
   if (kind === 'lust') {
     return (
@@ -484,6 +501,8 @@ export function ItemIcon({ id, className }: { id: ItemId; className?: string }) 
       <MedalGlyph metal="#8a93a0" shine="#c5d0dc" rim="#3a4048" />
     ) : id === 'gold-medal' ? (
       <MedalGlyph metal="#e0b44a" shine="#f3d27a" rim="#8a6419" />
+    ) : id === 'gold-cup' ? (
+      <GoldCupGlyph />
     ) : (
       <ShardGlyph />
     );

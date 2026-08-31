@@ -36,7 +36,7 @@ export function sealedRowsFromBoard(game: Game): SealedRow[] {
 export function sealedRowsFromStash(inv: Inventory, stashGold: number): SealedRow[] {
   const map = new Map<string, SealedRow>();
   for (const id of ITEM_IDS) {
-    if (!isCollectible(id) || isMedal(id)) continue;
+    if (!isCollectible(id) || isMedal(id) || id === 'gold-cup') continue;
     const n = inv[id] ?? 0;
     if (n <= 0) continue;
     bump(map, { kind: 'chest', tier: tierForLoot(id), wrecked: false }, n);

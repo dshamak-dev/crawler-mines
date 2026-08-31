@@ -568,6 +568,11 @@ function Play({
                     Trophy <ItemIcon id={report.bossHead} /> {ITEMS[report.bossHead].name}
                   </p>
                 )}
+                {report.goldCup && (
+                  <p className="bonus-line">
+                    Trophy <ItemIcon id={report.goldCup} /> {ITEMS[report.goldCup].name}
+                  </p>
+                )}
                 {report.bonusKey && (
                   <p className="bonus-line">
                     Bonus <ItemIcon id={report.bonusKey} /> {ITEMS[report.bonusKey].name}
@@ -591,7 +596,11 @@ function Play({
                       <li
                         key={item.id}
                         className={`loot-card${isTicketKey(item.id) ? ' is-ticket' : ''}${
-                          report.bonusKey === item.id || report.bossHead === item.id ? ' is-bonus' : ''
+                          report.bonusKey === item.id ||
+                          report.bossHead === item.id ||
+                          report.goldCup === item.id
+                            ? ' is-bonus'
+                            : ''
                         }`}
                       >
                         <span className="loot-ico">

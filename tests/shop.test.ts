@@ -71,7 +71,7 @@ describe('sell catalog', () => {
     }
   });
 
-  it('does not list pouches, ticket keys, or heads as sellable', () => {
+  it('does not list pouches, ticket keys, heads, or the gold cup as sellable', () => {
     const hidden: ItemId[] = [
       'gold-pouch',
       'hard-key',
@@ -79,10 +79,13 @@ describe('sell catalog', () => {
       'gluttony-head',
       'wrath-head',
       'lust-head',
+      'gold-cup',
     ];
     for (const id of hidden) {
       expect(isSellable(id)).toBe(false);
-      expect(isTicketKey(id) || id === 'gold-pouch' || id.endsWith('-head')).toBe(true);
+      expect(
+        isTicketKey(id) || id === 'gold-pouch' || id.endsWith('-head') || id === 'gold-cup',
+      ).toBe(true);
     }
     const rows = sellableEntries({
       ...emptyCollection().items,
@@ -95,6 +98,7 @@ describe('sell catalog', () => {
       'gluttony-head': 1,
       'wrath-head': 1,
       'lust-head': 1,
+      'gold-cup': 2,
       'gold-pouch': 9,
       'bronze-medal': 1,
       'silver-medal': 2,
@@ -121,6 +125,7 @@ describe('sell catalog', () => {
     expect(isCollectible('bronze-medal')).toBe(true);
     expect(isCollectible('silver-medal')).toBe(true);
     expect(isCollectible('gold-medal')).toBe(true);
+    expect(isCollectible('gold-cup')).toBe(true);
   });
 });
 
@@ -137,10 +142,18 @@ describe('sellLoot gold math', () => {
     expect(charm!.items['torch-charm']).toBe(2);
   });
 
-  it('cannot sell keys or heads', () => {
+  it('cannot sell keys, heads, or the gold cup', () => {
     const store = memoryStore();
     const meta = packed(
-      { 'hard-key': 2, 'campaign-key': 1, 'gluttony-head': 1, 'wrath-head': 1, 'lust-head': 1, 'rusty-key': 1 },
+      {
+        'hard-key': 2,
+        'campaign-key': 1,
+        'gluttony-head': 1,
+        'wrath-head': 1,
+        'lust-head': 1,
+        'gold-cup': 2,
+        'rusty-key': 1,
+      },
       10,
     );
     expect(sellLoot(meta, 'hard-key', 1, store)).toBeNull();
@@ -148,6 +161,7 @@ describe('sellLoot gold math', () => {
     expect(sellLoot(meta, 'gluttony-head', 1, store)).toBeNull();
     expect(sellLoot(meta, 'wrath-head', 1, store)).toBeNull();
     expect(sellLoot(meta, 'lust-head', 1, store)).toBeNull();
+    expect(sellLoot(meta, 'gold-cup', 1, store)).toBeNull();
     expect(sellLoot(meta, 'gold-pouch', 1, store)).toBeNull();
     expect(loadCollection(store).gold).toBe(0);
     expect(loadCollection(store).items['hard-key']).toBe(0);

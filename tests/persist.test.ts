@@ -148,6 +148,48 @@ describe('run snapshot hydrate', () => {
     const store = memoryStore({ [RUN_KEY]: '{"state":{"run":null}}' });
     expect(loadRun(store).run).toBeNull();
   });
+
+  it('keeps campaign perfectFloors and treats missing or junk slots as false', () => {
+    const game = createGameFromLayout(['.$', '..']);
+    const store = memoryStore();
+    const s1 = createGameStore(store);
+    s1.setState({
+      run: {
+        mode: 'campaign',
+        floor: 1,
+        game: cloneGame(game),
+        grantKey: 'perfect-keep',
+        perfectFloors: [true, true, false, true],
+      },
+      runLoot: emptyInventory(),
+    });
+    const s2 = createGameStore(store);
+    expect(s2.getState().run?.perfectFloors).toEqual([true, true, false, true]);
+
+    const junk = parsePersistedRun(
+      JSON.stringify({
+        state: {
+          run: {
+            mode: 'campaign',
+            floor: 0,
+            grantKey: 'junk',
+            game,
+            perfectFloors: [true, 'yes', 1, true, true],
+          },
+        },
+      }),
+    );
+    expect(junk.run?.perfectFloors).toEqual([true, false, false, true]);
+
+    const missing = parsePersistedRun(
+      JSON.stringify({
+        state: {
+          run: { mode: 'campaign', floor: 0, grantKey: 'missing', game },
+        },
+      }),
+    );
+    expect(missing.run?.perfectFloors).toEqual([false, false, false, false]);
+  });
 });
 
 describe('hydrate then clear awards once', () => {
