@@ -675,6 +675,18 @@ describe('Lust movement and combat', () => {
     return game.cells.filter((c) => c.hearted).length;
   }
 
+  function plantHearts(
+    game: ReturnType<typeof createGameFromLayout>,
+    indices: number[],
+  ): void {
+    game.heartOrder = [];
+    for (const i of indices) {
+      game.cells[i].state = 'revealed';
+      game.cells[i].hearted = true;
+      game.heartOrder.push(i);
+    }
+  }
+
   /** Mine at (0,0), Lust at (1,0), a row of numbers above a mine wall. */
   function lustHeartBoard() {
     const game = createGameFromLayout(
@@ -690,45 +702,63 @@ describe('Lust movement and combat', () => {
     return game;
   }
 
-  it('cannot plant a 6th heart while Lust has 5 lives', () => {
+  it('at 5 lives with 5 hearts, planting a 6th recycles the oldest', () => {
     const game = lustHeartBoard();
     expect(game.boss?.lives).toBe(LUST_MAX_LIVES);
-    for (let x = 0; x < 5; x++) {
-      game.cells[idx(game, x, 1)].hearted = true;
-    }
+    const planted = [0, 1, 2, 3, 4].map((x) => idx(game, x, 1));
+    plantHearts(game, planted);
     expect(heartCount(game)).toBe(5);
     const sixth = idx(game, 5, 1);
     game.boss!.index = sixth;
     expect(pickLustTarget(game)).toBe(sixth);
     const events = stepBoss(game);
-    expect(events.some((e) => e.type === 'boss-plant-heart')).toBe(false);
-    expect(game.cells[sixth].hearted).toBe(false);
+    expect(events.some((e) => e.type === 'boss-plant-heart' && e.index === sixth)).toBe(true);
+    expect(game.cells[planted[0]].hearted).toBe(false);
+    expect(game.cells[sixth].hearted).toBe(true);
     expect(heartCount(game)).toBe(5);
+    expect(game.heartOrder[0]).toBe(planted[1]);
+    expect(game.heartOrder.at(-1)).toBe(sixth);
+    expect(game.heartOrder).toHaveLength(5);
   });
 
-  it('after a hit with 5 hearts, count becomes 4', () => {
+  it('after a hit with 5 hearts, the oldest is stripped first', () => {
     const game = lustHeartBoard();
-    for (let x = 3; x < 8; x++) {
-      game.cells[idx(game, x, 1)].hearted = true;
-    }
+    const planted = [7, 6, 5, 4, 3].map((x) => idx(game, x, 1));
+    plantHearts(game, planted);
     expect(heartCount(game)).toBe(5);
     expect(game.boss?.lives).toBe(LUST_MAX_LIVES);
     const blasts = explodeChain(game, 0);
     expect(blasts.some((e) => e.type === 'boss-hit' && e.lives === LUST_MAX_LIVES - 1)).toBe(true);
     expect(game.boss?.lives).toBe(LUST_MAX_LIVES - 1);
     expect(heartCount(game)).toBe(4);
-    expect(game.cells[idx(game, 3, 1)].hearted).toBe(false);
+    expect(game.cells[planted[0]].hearted).toBe(false);
+    expect(game.cells[planted[1]].hearted).toBe(true);
+    expect(game.heartOrder[0]).toBe(planted[1]);
     expect(game.status).toBe('playing');
+  });
+
+  it('blast-stripped hearts drop out of plant order', () => {
+    const game = lustHeartBoard();
     game.boss!.index = idx(game, 8, 1);
-    expect(stepBoss(game).some((e) => e.type === 'boss-plant-heart')).toBe(false);
-    expect(heartCount(game)).toBe(4);
+    const oldest = idx(game, 0, 1);
+    const mid = idx(game, 4, 1);
+    const newest = idx(game, 5, 1);
+    plantHearts(game, [oldest, mid, newest]);
+    const blasts = explodeChain(game, 0);
+    expect(blasts.some((e) => e.type === 'boss-hit')).toBe(false);
+    expect(game.boss?.lives).toBe(LUST_MAX_LIVES);
+    expect(game.cells[oldest].hearted).toBe(false);
+    expect(game.cells[mid].hearted).toBe(true);
+    expect(game.cells[newest].hearted).toBe(true);
+    expect(game.heartOrder).toEqual([mid, newest]);
   });
 
   it('death clears every planted heart and leaves the corpse', () => {
     const game = lustHeartBoard();
-    for (let x = 3; x < 8; x++) {
-      game.cells[idx(game, x, 1)].hearted = true;
-    }
+    plantHearts(
+      game,
+      [3, 4, 5, 6, 7].map((x) => idx(game, x, 1)),
+    );
     expect(heartCount(game)).toBe(5);
     const corpse = game.boss!.index;
     game.boss!.lives = 1;
@@ -737,6 +767,7 @@ describe('Lust movement and combat', () => {
     expect(game.boss?.lives).toBe(0);
     expect(heartCount(game)).toBe(0);
     expect(game.cells.every((c) => !c.hearted)).toBe(true);
+    expect(game.heartOrder).toEqual([]);
     expect(game.status).toBe('playing');
     expect(game.boss?.index).toBe(corpse);
   });
@@ -1007,6 +1038,37 @@ describe('boss win rewards', () => {
     expect(paid.gold).toBe(12);
   });
 
+  it('auto-extract on a complete dead-boss board grants the head without a door tap', () => {
+    const { store } = withWallet(4);
+    const s = createGameStore(store);
+    const game = createGameFromLayout(['B*$.', '....'], 10, 'gold-pouch', undefined, 'lust');
+    s.setState({
+      meta: loadCollection(store),
+      run: {
+        mode: 'campaign',
+        floor: 4,
+        game,
+        grantKey: 'lust-auto-extract',
+        campaignStash: { gold: 8, items: emptyInventory() },
+        bonusKey: null,
+        bossRevealPending: false,
+      },
+      runLoot: emptyInventory(),
+    });
+    const rng = seqRng([0.9, 0.9]);
+    game.boss!.lives = 1;
+    for (let i = 0; i < game.cells.length; i++) {
+      if (game.cells[i].kind === 'empty') game.cells[i].state = 'revealed';
+    }
+    const mine = game.cells.findIndex((c) => c.kind === 'mine');
+    const events = s.getState().applyDig(mine, rng);
+    expect(events.some((e) => e.type === 'cleared')).toBe(true);
+    expect(s.getState().run?.game.status).toBe('cleared');
+    const paid = loadCollection(store);
+    expect(paid.items['lust-head']).toBe(1);
+    expect(paid.gold).toBe(12);
+  });
+
   it('killing Wrath grants wrath-head and a rolled hard-key inside the 25%', () => {
     const { store } = withWallet(0);
     const s = createGameStore(store);
@@ -1190,19 +1252,42 @@ describe('finale door extract', () => {
     expect(game.boss?.index).toBe(corpse);
   });
 
-  it('open-all-safe after the boss is dead does not auto-win', () => {
+  it('open-all-safe after the boss is dead auto-extracts without a door tap', () => {
     const game = createGameFromLayout(['*B*.', '***.', '....', '....'], 10, 'gold-pouch', undefined, 'lust');
     const corpse = game.boss!.index;
+    const door = game.doorIndex!;
     blastUntilDead(game);
     expect(game.boss?.lives).toBe(0);
+    let last: GameEvent[] = [];
     for (let i = 0; i < game.cells.length; i++) {
       if (game.cells[i].kind !== 'mine' && game.cells[i].state === 'hidden') {
-        dig(game, i, mulberry32(1), 'campaign');
+        last = dig(game, i, mulberry32(1), 'campaign');
       }
     }
     expect(allSafeRevealed(game)).toBe(true);
-    expect(game.status).toBe('playing');
+    expect(game.status).toBe('cleared');
+    expect(last.some((e) => e.type === 'cleared')).toBe(true);
+    expect(last.some((e) => e.type === 'extract-prompt')).toBe(false);
     expect(isLost(game)).toBe(false);
+    expect(game.boss?.index).toBe(corpse);
+    expect(dig(game, door, mulberry32(1), 'campaign')).toEqual([]);
+  });
+
+  it('a killing blast that also finishes the board auto-extracts', () => {
+    const game = createGameFromLayout(['B*$.', '....'], 10, 'gold-pouch', undefined, 'lust');
+    game.boss!.lives = 1;
+    for (let i = 0; i < game.cells.length; i++) {
+      if (game.cells[i].kind === 'empty') game.cells[i].state = 'revealed';
+    }
+    const mine = game.cells.findIndex((c) => c.kind === 'mine');
+    expect(allSafeRevealed(game)).toBe(false);
+    const events = dig(game, mine, mulberry32(1), 'campaign');
+    expect(game.boss?.lives).toBe(0);
+    expect(allSafeRevealed(game)).toBe(true);
+    expect(events.some((e) => e.type === 'boss-death')).toBe(true);
+    expect(events.some((e) => e.type === 'cleared')).toBe(true);
+    expect(events.some((e) => e.type === 'extract-prompt')).toBe(false);
+    expect(game.status).toBe('cleared');
   });
 });
 

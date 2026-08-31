@@ -98,9 +98,47 @@ export function hasHiddenNeighbor(game: Game, index: number): boolean {
   return neighbors(game.width, game.height, index).some((n) => game.cells[n].state !== 'revealed');
 }
 
+/** Drop stale indices and append hearted cells missing from plant order. */
+export function syncHeartOrder(game: Game): void {
+  const prev = game.heartOrder ?? [];
+  const kept: number[] = [];
+  const seen = new Set<number>();
+  for (const i of prev) {
+    const cell = game.cells[i];
+    if (!cell || !cell.hearted || seen.has(i)) continue;
+    kept.push(i);
+    seen.add(i);
+  }
+  for (let i = 0; i < game.cells.length; i++) {
+    if (game.cells[i].hearted && !seen.has(i)) {
+      kept.push(i);
+      seen.add(i);
+    }
+  }
+  game.heartOrder = kept;
+}
+
+function heartedCount(game: Game): number {
+  syncHeartOrder(game);
+  return game.heartOrder.length;
+}
+
+/** Oldest heart is free when a plant this step will recycle it. */
+function skipsHeart(game: Game, index: number): boolean {
+  const cell = game.cells[index];
+  if (!cell?.hearted) return false;
+  const lives = game.boss?.lives ?? 0;
+  syncHeartOrder(game);
+  if (lives > 0 && game.heartOrder.length >= lives && game.heartOrder[0] === index) {
+    return false;
+  }
+  return true;
+}
+
 /**
  * Highest open digit that is not already hearted and still has a hidden neighbor.
  * Ties: nearest Chebyshev to Lust, then lowest index. Fully-open rings are skipped.
+ * At cap, the oldest heart is treated as free (it will be recycled on plant).
  */
 export function pickLustTarget(game: Game): number | null {
   const boss = game.boss;
@@ -110,7 +148,7 @@ export function pickLustTarget(game: Game): number | null {
   let bestDist = Infinity;
   for (let i = 0; i < game.cells.length; i++) {
     const cell = game.cells[i];
-    if (!isOpenNumber(game, i) || cell.hearted || !hasHiddenNeighbor(game, i)) continue;
+    if (!isOpenNumber(game, i) || skipsHeart(game, i) || !hasHiddenNeighbor(game, i)) continue;
     const digit = cell.adjacentMines;
     const dist = chebyshev(game.width, boss.index, i);
     if (
@@ -342,36 +380,39 @@ function stepWrath(game: Game, boss: BossState): GameEvent[] {
   return [{ type: 'boss-slam', index: target }];
 }
 
-function heartedCount(game: Game): number {
-  let n = 0;
-  for (const cell of game.cells) {
-    if (cell.hearted) n += 1;
-  }
-  return n;
+function removeOldestHeart(game: Game): number | null {
+  syncHeartOrder(game);
+  const oldest = game.heartOrder.shift();
+  if (oldest == null) return null;
+  if (game.cells[oldest]) game.cells[oldest].hearted = false;
+  return oldest;
 }
 
 function plantHeart(game: Game, index: number): GameEvent[] {
   const cell = game.cells[index];
-  if (!cell || cell.hearted) return [];
+  if (!cell) return [];
   const lives = game.boss?.lives ?? 0;
-  if (heartedCount(game) >= lives) return [];
+  if (lives <= 0) return [];
+  syncHeartOrder(game);
+  if (heartedCount(game) >= lives) removeOldestHeart(game);
+  if (cell.hearted) return [];
   cell.hearted = true;
+  game.heartOrder.push(index);
   return [{ type: 'boss-plant-heart', index }];
 }
 
-/** Hearts never exceed Lust's remaining lives. Death (0) clears every overlay. */
+/** Hearts never exceed Lust's remaining lives. Death (0) clears every overlay. Oldest first. */
 export function capLustHearts(game: Game): void {
   const boss = game.boss;
   if (!boss || boss.id !== 'lust') return;
   const cap = Math.max(0, boss.lives);
-  let extra = heartedCount(game) - cap;
-  if (extra <= 0) return;
-  for (const cell of game.cells) {
-    if (!cell.hearted) continue;
-    cell.hearted = false;
-    extra -= 1;
-    if (extra <= 0) return;
+  if (cap === 0) {
+    for (const cell of game.cells) cell.hearted = false;
+    game.heartOrder = [];
+    return;
   }
+  syncHeartOrder(game);
+  while (game.heartOrder.length > cap) removeOldestHeart(game);
 }
 
 /**
@@ -408,11 +449,18 @@ export function stepBoss(game: Game, _afterHit = false): GameEvent[] {
 
 /** Strip heart overlays from every cell in each blast's 8-neighborhood. */
 export function stripHeartsFromBlasts(game: Game, blastIndices: readonly number[]): void {
+  const stripped = new Set<number>();
   for (const index of blastIndices) {
     for (const n of neighbors(game.width, game.height, index)) {
-      game.cells[n].hearted = false;
+      if (game.cells[n].hearted) {
+        game.cells[n].hearted = false;
+        stripped.add(n);
+      }
     }
   }
+  if (stripped.size === 0) return;
+  syncHeartOrder(game);
+  game.heartOrder = game.heartOrder.filter((i) => !stripped.has(i));
 }
 
 /** Each exploding mine whose 8-neighborhood contains the boss deals 1 life. */

@@ -117,6 +117,7 @@ export {
   stepAwayFrom,
   stepBoss,
   stripHeartsFromBlasts,
+  syncHeartOrder,
 } from './boss';
 export { emptyStash, mergeStash, rollBonusKey, stashToRewards } from './stash';
 export type { CampaignStash } from './stash';

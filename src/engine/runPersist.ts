@@ -1,5 +1,5 @@
 import { cloneGame, isDoorCandidate, pickDoorIndex } from './board';
-import { clampBossLives, headItemId, isBossId } from './boss';
+import { capLustHearts, clampBossLives, headItemId, isBossId, syncHeartOrder } from './boss';
 import type { CollectionState, KeyStore } from './collection';
 import { applyRewards } from './collection';
 import { resolvePendingBossTurn } from './game';
@@ -185,6 +185,18 @@ function sanitizeCell(raw: unknown): Cell | null {
   };
 }
 
+function sanitizeHeartOrder(raw: unknown, cellCount: number): number[] {
+  if (!Array.isArray(raw)) return [];
+  const out: number[] = [];
+  const seen = new Set<number>();
+  for (const v of raw) {
+    if (!isInt(v) || v < 0 || v >= cellCount || seen.has(v)) continue;
+    seen.add(v);
+    out.push(v);
+  }
+  return out;
+}
+
 function sanitizeGame(raw: unknown): Game | null {
   if (!raw || typeof raw !== 'object') return null;
   const g = raw as Record<string, unknown>;
@@ -241,7 +253,10 @@ function sanitizeGame(raw: unknown): Game | null {
     turn,
     lastPlayerAction,
     doorIndex,
+    heartOrder: sanitizeHeartOrder(g.heartOrder, cells.length),
   };
+  syncHeartOrder(game);
+  capLustHearts(game);
   resolvePendingBossTurn(game);
   return game;
 }
