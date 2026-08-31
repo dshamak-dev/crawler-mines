@@ -1,5 +1,5 @@
 import { cloneGame } from './board';
-import { clampBossLives, isBossId } from './boss';
+import { clampBossLives, headItemId, isBossId } from './boss';
 import type { CollectionState, KeyStore } from './collection';
 import { applyRewards } from './collection';
 import { resolvePendingBossTurn } from './game';
@@ -80,12 +80,7 @@ export function floorReport(run: Run): FloorReport {
   const stashed = run.mode === 'campaign' && !lastFloor && run.game.status === 'cleared';
   const stash = runStash(run);
   const bossId = run.game.boss?.id;
-  const bossHead =
-    victory && bossId === 'wrath'
-      ? 'wrath-head'
-      : victory && bossId
-        ? 'gluttony-head'
-        : null;
+  const bossHead = victory && bossId ? headItemId(bossId) : null;
   return {
     opened: run.game.chestsOpened,
     wrecked: run.game.chestsDestroyed,
@@ -132,7 +127,8 @@ function sanitizeBoss(raw: unknown, cellCount: number): BossState | null {
   const b = raw as Record<string, unknown>;
   if (!isInt(b.index) || b.index < 0 || b.index >= cellCount) return null;
   const id = isBossId(b.id) ? b.id : 'gluttony';
-  return { id, index: b.index, lives: clampBossLives(b.lives) };
+  const heart = id === 'lust' ? b.heart !== false : undefined;
+  return { id, index: b.index, lives: clampBossLives(b.lives, id), heart };
 }
 
 function sanitizeCell(raw: unknown): Cell | null {

@@ -430,7 +430,9 @@ function Play({
         </div>
         <p className="hint">
           {boss
-            ? 'Hit it with a blast. Eating a flag is not a loss.'
+            ? boss.id === 'lust'
+              ? 'Tap the heart or blast a mine next to it.'
+              : 'Hit it with a blast. Eating a flag is not a loss.'
             : `Tap to ${flagMode ? 'flag' : 'dig'} · hold 400ms to flag`}
         </p>
       </footer>

@@ -6,6 +6,7 @@ const BGM_VOL: Record<BgmId, number> = {
   campaign: 0.2,
   boss: 0.24,
   wrath: 0.24,
+  lust: 0.24,
 };
 const CROSSFADE_MS = 700;
 const SFX_VOL: Record<SfxId, number> = {
@@ -55,6 +56,7 @@ export class GameAudio {
       campaign: makeTrack(bgmUrl('campaign'), true),
       boss: makeTrack(bgmUrl('boss'), true),
       wrath: makeTrack(bgmUrl('wrath'), true),
+      lust: makeTrack(bgmUrl('lust'), true),
     };
     this.sfx = {
       dig: makeTrack(sfxUrl('dig'), false),

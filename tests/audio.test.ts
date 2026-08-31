@@ -38,6 +38,7 @@ describe('audio URLs', () => {
     expect(bgmUrl('campaign')).toBe('/crawler-mines/audio/campaign-depths.mp3');
     expect(bgmUrl('boss')).toBe('/crawler-mines/audio/flag-eater-boss.mp3');
     expect(bgmUrl('wrath')).toBe('/crawler-mines/audio/wrath-boss.mp3');
+    expect(bgmUrl('lust')).toBe('/crawler-mines/audio/lust-boss.mp3');
     // Presence only — do not decode mp3 bytes.
     expect(existsSync(resolve('public/audio/cozy-descent.mp3'))).toBe(true);
     expect(existsSync(resolve('public/audio/campaign-depths.mp3'))).toBe(true);
@@ -94,6 +95,17 @@ describe('BGM routing', () => {
     expect(desiredBgm('play', 'campaign', null, 3, 'wrath')).toBe('campaign');
     expect(desiredBgm('play', 'hard', null, 0, 'wrath')).toBe('cozy');
     expect(finaleBgm('wrath')).toBe('wrath');
+  });
+
+  it('uses Lust BGM on the last campaign floor when that sin is rolled', () => {
+    expect(desiredBgm('play', 'campaign', null, 4, 'lust')).toBe('lust');
+    expect(desiredBgm('collection', 'campaign', 'play', 4, 'lust')).toBe('lust');
+    expect(desiredBgm('menu', 'campaign', null, 4, 'lust')).toBe('cozy');
+    expect(desiredBgm('play', 'campaign', null, 3, 'lust')).toBe('campaign');
+    expect(finaleBgm('lust')).toBe('lust');
+    expect(bgmUrl('lust')).toBe('/crawler-mines/audio/lust-boss.mp3');
+    expect(bgmUrl('boss')).toBe('/crawler-mines/audio/flag-eater-boss.mp3');
+    expect(bgmUrl('wrath')).toBe('/crawler-mines/audio/wrath-boss.mp3');
   });
 });
 

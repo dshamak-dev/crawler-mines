@@ -1,4 +1,4 @@
-import type { ChestTier, ItemId } from '../engine';
+import type { BossId, ChestTier, ItemId } from '../engine';
 
 const TIER_PAINT: Record<
   ChestTier,
@@ -315,8 +315,40 @@ export function BossIcon({
   id = 'gluttony',
 }: {
   className?: string;
-  id?: 'gluttony' | 'wrath';
+  id?: BossId;
 }) {
+  if (id === 'lust') {
+    return (
+      <svg viewBox="0 0 32 32" className={className ?? 'glyph'} aria-hidden="true">
+        <path
+          d="M16 27.2c-1.2 0-2.2-.5-8.2-6.2C3.4 16.4 4.2 10.2 8.6 8.2c2.6-1.2 5.2-.2 7.4 2.2 2.2-2.4 4.8-3.4 7.4-2.2 4.4 2 5.2 8.2.8 12.8-6 5.7-7 6.2-8.2 6.2z"
+          fill="#4a1024"
+        />
+        <path
+          d="M16 25.4c-1 0-1.8-.4-7.2-5.5C5.2 16.2 5.8 11.2 9.2 9.6c2.1-1 4.3-.1 6.1 2.1l.7.8.7-.8c1.8-2.2 4-3.1 6.1-2.1 3.4 1.6 4 6.6.4 10.3-5.4 5.1-6.2 5.5-7.2 5.5z"
+          fill="#c43a5c"
+        />
+        <path
+          d="M10.2 11.2c1.6-1.4 3.6-.8 5.2 1.2"
+          stroke="#f6b4c4"
+          strokeWidth="1.3"
+          fill="none"
+          strokeLinecap="round"
+        />
+        <circle cx="13.2" cy="16.4" r="1.55" fill="#1a1014" />
+        <circle cx="18.8" cy="16.4" r="1.55" fill="#1a1014" />
+        <circle cx="13.6" cy="16" r="0.55" fill="#f6d27a" />
+        <circle cx="19.2" cy="16" r="0.55" fill="#f6d27a" />
+        <path
+          d="M13.6 20.2c.8 1.2 2 1.8 2.4 1.8s1.6-.6 2.4-1.8"
+          stroke="#1a1014"
+          strokeWidth="1.15"
+          fill="none"
+          strokeLinecap="round"
+        />
+      </svg>
+    );
+  }
   if (id === 'wrath') {
     return (
       <svg viewBox="0 0 32 32" className={className ?? 'glyph'} aria-hidden="true">
@@ -392,7 +424,24 @@ function MedalGlyph({
   );
 }
 
-function HeadGlyph({ kind }: { kind: 'gluttony' | 'wrath' }) {
+function HeadGlyph({ kind }: { kind: 'gluttony' | 'wrath' | 'lust' }) {
+  if (kind === 'lust') {
+    return (
+      <svg viewBox="0 0 32 32" className="glyph" aria-hidden="true">
+        <path
+          d="M16 26.4c-1 0-1.8-.4-7-5.2C5.4 17.4 6 12.2 9.6 10.6c2.2-1 4.4 0 6.4 2.2 2-2.2 4.2-3.2 6.4-2.2 3.6 1.6 4.2 6.8.6 10.6-5.2 4.8-6 5.2-7 5.2z"
+          fill="#1a1014"
+        />
+        <path
+          d="M16 24.6c-.8 0-1.5-.3-6-4.4C7 17.2 7.5 13.2 10.2 12c1.8-.8 3.6 0 5.2 1.8l.6.7.6-.7c1.6-1.8 3.4-2.6 5.2-1.8 2.7 1.2 3.2 5.2.2 8.2-4.5 4.1-5.2 4.4-6 4.4z"
+          fill="#c43a5c"
+        />
+        <path d="M11.2 13.2c1.2-1 2.6-.6 3.8.8" stroke="#f6b4c4" strokeWidth="1.1" fill="none" />
+        <circle cx="13.6" cy="16.6" r="1.15" fill="#1a1014" />
+        <circle cx="18.4" cy="16.6" r="1.15" fill="#1a1014" />
+      </svg>
+    );
+  }
   const body = kind === 'wrath' ? '#a32a22' : '#6b2d7a';
   const shine = kind === 'wrath' ? '#c43b30' : '#8a3d98';
   return (
@@ -427,6 +476,8 @@ export function ItemIcon({ id, className }: { id: ItemId; className?: string }) 
       <HeadGlyph kind="gluttony" />
     ) : id === 'wrath-head' ? (
       <HeadGlyph kind="wrath" />
+    ) : id === 'lust-head' ? (
+      <HeadGlyph kind="lust" />
     ) : id === 'bronze-medal' ? (
       <MedalGlyph metal="#b87333" shine="#d4a574" rim="#6b4530" />
     ) : id === 'silver-medal' ? (

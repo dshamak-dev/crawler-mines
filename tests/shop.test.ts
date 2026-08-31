@@ -78,6 +78,7 @@ describe('sell catalog', () => {
       'campaign-key',
       'gluttony-head',
       'wrath-head',
+      'lust-head',
     ];
     for (const id of hidden) {
       expect(isSellable(id)).toBe(false);
@@ -93,6 +94,7 @@ describe('sell catalog', () => {
       'campaign-key': 2,
       'gluttony-head': 1,
       'wrath-head': 1,
+      'lust-head': 1,
       'gold-pouch': 9,
       'bronze-medal': 1,
       'silver-medal': 2,
@@ -114,6 +116,7 @@ describe('sell catalog', () => {
     expect(isCollectible('campaign-key')).toBe(true);
     expect(isCollectible('gluttony-head')).toBe(true);
     expect(isCollectible('wrath-head')).toBe(true);
+    expect(isCollectible('lust-head')).toBe(true);
     expect(isCollectible('gold-pouch')).toBe(false);
     expect(isCollectible('bronze-medal')).toBe(true);
     expect(isCollectible('silver-medal')).toBe(true);
@@ -137,13 +140,14 @@ describe('sellLoot gold math', () => {
   it('cannot sell keys or heads', () => {
     const store = memoryStore();
     const meta = packed(
-      { 'hard-key': 2, 'campaign-key': 1, 'gluttony-head': 1, 'wrath-head': 1, 'rusty-key': 1 },
+      { 'hard-key': 2, 'campaign-key': 1, 'gluttony-head': 1, 'wrath-head': 1, 'lust-head': 1, 'rusty-key': 1 },
       10,
     );
     expect(sellLoot(meta, 'hard-key', 1, store)).toBeNull();
     expect(sellLoot(meta, 'campaign-key', 1, store)).toBeNull();
     expect(sellLoot(meta, 'gluttony-head', 1, store)).toBeNull();
     expect(sellLoot(meta, 'wrath-head', 1, store)).toBeNull();
+    expect(sellLoot(meta, 'lust-head', 1, store)).toBeNull();
     expect(sellLoot(meta, 'gold-pouch', 1, store)).toBeNull();
     expect(loadCollection(store).gold).toBe(0);
     expect(loadCollection(store).items['hard-key']).toBe(0);

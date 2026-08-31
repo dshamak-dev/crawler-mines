@@ -461,6 +461,19 @@ button {
     inset 0 0 0 1.5px rgba(201, 180, 255, 0.45),
     inset 0 2px 4px rgba(0, 0, 0, 0.55);
 }
+.cell.is-boss.is-lust {
+  background: radial-gradient(circle at 50% 55%, rgba(196, 58, 92, 0.4), #1a1512 72%);
+  box-shadow:
+    inset 0 0 0 1.5px rgba(246, 180, 196, 0.5),
+    inset 0 2px 4px rgba(0, 0, 0, 0.55);
+}
+.cell.is-boss.is-lust .boss-glyph {
+  filter: drop-shadow(0 0 4px rgba(220, 60, 110, 0.7));
+}
+.cell.is-heart .boss-glyph {
+  width: 92%;
+  height: 92%;
+}
 .cell .boss-under {
   opacity: 0.35;
   font-size: calc(var(--cell) * 0.32);
