@@ -9,6 +9,7 @@ import {
   bossFloorActive,
   campaignFloorActive,
   desiredBgm,
+  finaleBgm,
   getAudio,
   loadMuted,
   saveMuted,
@@ -36,6 +37,7 @@ describe('audio URLs', () => {
     expect(bgmUrl('cozy')).toBe('/crawler-mines/audio/cozy-descent.mp3');
     expect(bgmUrl('campaign')).toBe('/crawler-mines/audio/campaign-depths.mp3');
     expect(bgmUrl('boss')).toBe('/crawler-mines/audio/flag-eater-boss.mp3');
+    expect(bgmUrl('wrath')).toBe('/crawler-mines/audio/wrath-boss.mp3');
     expect(existsSync(resolve('public/audio/flag-eater-boss.mp3'))).toBe(true);
     expect(sfxUrl('deny')).toBe('/crawler-mines/audio/sfx-deny.wav');
     expect(sfxUrl('boss-move')).toBe('/crawler-mines/audio/sfx-boss-move.wav');
@@ -54,7 +56,7 @@ describe('BGM routing', () => {
     expect(desiredBgm('collection', 'campaign', 'menu')).toBe('cozy');
   });
 
-  it('uses campaign-depths on campaign floors before Gluttony', () => {
+  it('uses campaign-depths on campaign floors before the finale', () => {
     expect(desiredBgm('play', 'campaign')).toBe('campaign');
     expect(desiredBgm('play', 'campaign', null, 0)).toBe('campaign');
     expect(desiredBgm('play', 'campaign', null, 3)).toBe('campaign');
@@ -65,15 +67,28 @@ describe('BGM routing', () => {
     expect(bossFloorActive('play', 'campaign', null, 3)).toBe(false);
   });
 
-  it('uses Gluttony BGM only on the last campaign floor, then cozy on the menu', () => {
+  it('uses Gluttony BGM on the last campaign floor when that sin is rolled', () => {
     expect(desiredBgm('play', 'campaign', null, 4)).toBe('boss');
-    expect(desiredBgm('collection', 'campaign', 'play', 4)).toBe('boss');
-    expect(desiredBgm('menu', 'campaign', null, 4)).toBe('cozy');
-    expect(desiredBgm('collection', 'campaign', 'menu', 4)).toBe('cozy');
+    expect(desiredBgm('play', 'campaign', null, 4, 'gluttony')).toBe('boss');
+    expect(desiredBgm('collection', 'campaign', 'play', 4, 'gluttony')).toBe('boss');
+    expect(desiredBgm('menu', 'campaign', null, 4, 'gluttony')).toBe('cozy');
+    expect(desiredBgm('collection', 'campaign', 'menu', 4, 'gluttony')).toBe('cozy');
     expect(bossFloorActive('play', 'campaign', null, 4)).toBe(true);
     expect(bossFloorActive('collection', 'campaign', 'play', 4)).toBe(true);
     expect(bossFloorActive('menu', 'campaign', null, 4)).toBe(false);
     expect(bossFloorActive('play', 'hard', null, 4)).toBe(false);
+    expect(finaleBgm('gluttony')).toBe('boss');
+    expect(finaleBgm(null)).toBe('boss');
+  });
+
+  it('uses Wrath BGM on the last campaign floor when that sin is rolled', () => {
+    expect(desiredBgm('play', 'campaign', null, 4, 'wrath')).toBe('wrath');
+    expect(desiredBgm('collection', 'campaign', 'play', 4, 'wrath')).toBe('wrath');
+    expect(desiredBgm('menu', 'campaign', null, 4, 'wrath')).toBe('cozy');
+    expect(desiredBgm('collection', 'campaign', 'menu', 4, 'wrath')).toBe('cozy');
+    expect(desiredBgm('play', 'campaign', null, 3, 'wrath')).toBe('campaign');
+    expect(desiredBgm('play', 'hard', null, 0, 'wrath')).toBe('cozy');
+    expect(finaleBgm('wrath')).toBe('wrath');
   });
 });
 
