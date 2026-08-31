@@ -20,7 +20,7 @@ export function campaignFloorActive(
   return screen === 'collection' && collectionFrom === 'play';
 }
 
-/** Last campaign floor only — Gluttony or Wrath fight, including pack opened from it. */
+/** Last campaign floor only — Gluttony / Wrath / Lust fight, including pack opened from it. */
 export function bossFloorActive(
   screen: AppScreen,
   mode: DifficultyMode | null,
@@ -34,9 +34,11 @@ export function bossFloorActive(
   );
 }
 
-/** Live campaign-run boss — never a second roll. Lust reuses Gluttony's loop. */
+/** Live campaign-run boss — never a second roll. */
 export function finaleBgm(bossId: BossId | null | undefined): BgmId {
-  return bossId === 'wrath' ? 'wrath' : 'boss';
+  if (bossId === 'wrath') return 'wrath';
+  if (bossId === 'lust') return 'lust';
+  return 'boss';
 }
 
 export function desiredBgm(

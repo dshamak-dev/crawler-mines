@@ -1,11 +1,13 @@
 export const BGM_FILES = {
-  /** Title / Easy / Medium / Hard: seamless cozy-descent loop (no fade-to-silence restart, slightly quicker middle). Do not substitute or re-encode. */
+  /** Title / Easy / Medium / Hard: violin cozy-descent loop (quiet violin only ~30–70s, soft edges). Exact approved bytes land in a follow-up — do not invent or re-encode. */
   cozy: 'cozy-descent.mp3',
   campaign: 'campaign-depths.mp3',
   /** Approved Gluttony loop at public/audio/flag-eater-boss.mp3 — do not substitute or re-encode. */
   boss: 'flag-eater-boss.mp3',
-  /** Wrath finale loop at public/audio/wrath-boss.mp3 — approved bytes land in a follow-up. */
+  /** Wrath finale loop at public/audio/wrath-boss.mp3 — do not substitute or re-encode. */
   wrath: 'wrath-boss.mp3',
+  /** Lust finale loop at public/audio/lust-boss.mp3 — approved bytes land in a follow-up. Do not invent or re-encode. */
+  lust: 'lust-boss.mp3',
 } as const;
 
 export const SFX_FILES = {

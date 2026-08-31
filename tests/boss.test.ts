@@ -261,7 +261,7 @@ describe('floor 5 rolls and persists boss id', () => {
     expect(s2.getState().run?.bossRevealPending).toBe(false);
     expect(
       desiredBgm('play', 'campaign', null, 4, s2.getState().run?.game.boss?.id ?? null),
-    ).toBe('boss');
+    ).toBe('lust');
   });
 
   it('resume skips popup and does not reroll the boss id', () => {
