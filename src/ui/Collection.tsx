@@ -2,15 +2,91 @@ import { useState } from 'react';
 import {
   inventoryTotal,
   isTicketKey,
+  sealedRowLabel,
+  sealedRunRows,
   stackedEntries,
   type CollectionState,
+  type Game,
   type Inventory,
 } from '../engine';
-import { BagIcon, GoldIcon, ItemIcon } from './icons';
+import { BagIcon, ChestIcon, GoldIcon, ItemIcon } from './icons';
 
 const EMPTY_COPY = 'Chests stay sealed until you clear the floor. Bombs can still smash them.';
 
 export default function Collection({
+  meta,
+  runLoot,
+  game,
+  stashGold = 0,
+  sealed = false,
+  onBack,
+}: {
+  meta: CollectionState;
+  runLoot: Inventory;
+  game?: Game;
+  stashGold?: number;
+  sealed?: boolean;
+  onBack: () => void;
+}) {
+  if (sealed && game) {
+    const rows = sealedRunRows(game, runLoot, stashGold);
+    const total = rows.reduce((sum, row) => sum + row.count, 0);
+
+    return (
+      <div className="shell collection-shell">
+        <header className="collection-head">
+          <button type="button" className="ghost back-thumb" onClick={onBack} aria-label="Back">
+            {'\u2039'}
+          </button>
+          <div className="collection-title">
+            <BagIcon />
+            <h1>Collection</h1>
+          </div>
+          <span className="floor-pill">{total} sealed</span>
+        </header>
+
+        {rows.length === 0 ? (
+          <div className="collection-empty">
+            <p>{EMPTY_COPY}</p>
+          </div>
+        ) : (
+          <ul className="loot-list">
+            {rows.map((row) => {
+              const { title, subtitle } = sealedRowLabel(row);
+              const key = `${row.kind}:${row.tier ?? 'gold'}:${row.wrecked ? 'wreck' : 'ok'}`;
+              return (
+                <li key={key} className="loot-card">
+                  <span className="loot-ico">
+                    {row.kind === 'gold-bag' ? (
+                      <ItemIcon id="gold-pouch" />
+                    ) : row.wrecked ? (
+                      <ChestIcon wrecked tier={row.tier ?? 'wooden'} />
+                    ) : (
+                      <ChestIcon tier={row.tier ?? 'wooden'} />
+                    )}
+                  </span>
+                  <span className="loot-copy">
+                    <strong>{title}</strong>
+                    <em>{subtitle}</em>
+                  </span>
+                  <span className="loot-count">×{row.count}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        <button type="button" className="stone-btn collection-back" onClick={onBack}>
+          Back
+        </button>
+      </div>
+    );
+  }
+
+  return <TitleCollection meta={meta} runLoot={runLoot} onBack={onBack} />;
+}
+
+function TitleCollection({
   meta,
   runLoot,
   onBack,
