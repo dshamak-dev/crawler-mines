@@ -1,7 +1,35 @@
 import { allSafeRevealed, ensureFirstClickSafe, isWon, neighbors } from './board';
 import { hitBossFromBlasts, stepBoss } from './boss';
-import { addItem, type ChestTier } from './loot';
-import type { Cell, ChestReward, Game, GameEvent, Rng } from './types';
+import { addItem, type ChestTier, type ItemId } from './loot';
+import type { Cell, ChestReward, Difficulty, Game, GameEvent, Rng } from './types';
+
+/** Easy/Medium/Hard medals. Campaign never awards one. */
+export function medalForMode(mode: Difficulty): ItemId | null {
+  if (mode === 'easy') return 'bronze-medal';
+  if (mode === 'medium') return 'silver-medal';
+  if (mode === 'hard') return 'gold-medal';
+  return null;
+}
+
+/**
+ * Perfect clear: no cell exploded, and flags match mines exactly.
+ * Zero flags is not perfect. Wrecked chests without an exploded mine do not fail this.
+ */
+export function isPerfectClear(game: Game): boolean {
+  let mines = 0;
+  let flaggedMines = 0;
+  let flaggedSafe = 0;
+  for (const cell of game.cells) {
+    if (cell.exploded) return false;
+    if (cell.kind === 'mine') {
+      mines += 1;
+      if (cell.state === 'flagged') flaggedMines += 1;
+    } else if (cell.state === 'flagged') {
+      flaggedSafe += 1;
+    }
+  }
+  return mines > 0 && flaggedMines === mines && flaggedSafe === 0;
+}
 
 /**
  * Detonate a mine and BFS-chain into every 8-adjacent mine (flagged or hidden).
@@ -71,7 +99,7 @@ function resolveBossSlam(game: Game, mineIndex: number): GameEvent[] {
   return events;
 }
 
-function finishBossTurn(game: Game, bossEvents: GameEvent[]): GameEvent[] {
+function finishBossTurn(game: Game, bossEvents: GameEvent[], mode?: Difficulty): GameEvent[] {
   const events: GameEvent[] = [];
   for (const e of bossEvents) {
     if (e.type === 'boss-slam') {
@@ -84,7 +112,7 @@ function finishBossTurn(game: Game, bossEvents: GameEvent[]): GameEvent[] {
     game.status = 'cleared';
     game.turn = 'player';
     events.push({ type: 'boss-death' });
-    events.push({ type: 'cleared', rewards: grantIntactLoot(game) });
+    events.push({ type: 'cleared', rewards: grantIntactLoot(game, mode) });
     return events;
   }
   if (allSafeRevealed(game) && game.boss && game.boss.lives > 0) {
@@ -98,20 +126,20 @@ function finishBossTurn(game: Game, bossEvents: GameEvent[]): GameEvent[] {
 }
 
 /** Reload must finish a persisted boss turn instead of skipping it. */
-export function resolvePendingBossTurn(game: Game): void {
+export function resolvePendingBossTurn(game: Game, mode?: Difficulty): void {
   if (game.status !== 'playing' || !game.boss) {
     game.turn = 'player';
     return;
   }
   if (game.turn !== 'boss') return;
-  finishBossTurn(game, stepBoss(game));
+  finishBossTurn(game, stepBoss(game), mode);
 }
 
 /**
  * After a successful dig or flag: resolve boss kill / campaign lose, else
  * the floor boss takes one move. Player + boss are one atomic action for persist.
  */
-export function afterPlayerAction(game: Game): GameEvent[] {
+export function afterPlayerAction(game: Game, mode?: Difficulty): GameEvent[] {
   const events: GameEvent[] = [];
   if (game.status !== 'playing') return events;
 
@@ -120,7 +148,7 @@ export function afterPlayerAction(game: Game): GameEvent[] {
       game.status = 'cleared';
       game.turn = 'player';
       events.push({ type: 'boss-death' });
-      events.push({ type: 'cleared', rewards: grantIntactLoot(game) });
+      events.push({ type: 'cleared', rewards: grantIntactLoot(game, mode) });
       return events;
     }
     if (allSafeRevealed(game)) {
@@ -130,22 +158,22 @@ export function afterPlayerAction(game: Game): GameEvent[] {
       return events;
     }
     game.turn = 'boss';
-    events.push(...finishBossTurn(game, stepBoss(game)));
+    events.push(...finishBossTurn(game, stepBoss(game), mode));
     return events;
   }
 
   if (isWon(game)) {
     game.status = 'cleared';
-    events.push({ type: 'cleared', rewards: grantIntactLoot(game) });
+    events.push({ type: 'cleared', rewards: grantIntactLoot(game, mode) });
   }
   return events;
 }
 
 /** Flag or unflag a hidden cell, then the boss acts if this is a boss floor. */
-export function flag(game: Game, index: number): GameEvent[] {
+export function flag(game: Game, index: number, mode?: Difficulty): GameEvent[] {
   if (!toggleFlag(game, index)) return [];
   game.lastPlayerAction = index;
-  return afterPlayerAction(game);
+  return afterPlayerAction(game, mode);
 }
 
 function revealFlood(game: Game, start: number, events: GameEvent[]): number[] {
@@ -178,7 +206,7 @@ function revealFlood(game: Game, start: number, events: GameEvent[]): number[] {
 }
 
 /** Grant inner items from intact chests. Call only once the floor is cleared. */
-export function grantIntactLoot(game: Game): ChestReward[] {
+export function grantIntactLoot(game: Game, mode?: Difficulty): ChestReward[] {
   if (game.rewardsGranted) return [];
   const rewards: ChestReward[] = [];
   for (let i = 0; i < game.cells.length; i++) {
@@ -189,6 +217,11 @@ export function grantIntactLoot(game: Game): ChestReward[] {
       game.inventory = addItem(game.inventory, c.loot);
     }
     rewards.push({ index: i, itemId: c.loot, gold: c.gold });
+  }
+  const medal = mode ? medalForMode(mode) : null;
+  if (medal && isPerfectClear(game)) {
+    game.inventory = addItem(game.inventory, medal);
+    rewards.push({ index: -1, itemId: medal, gold: 0 });
   }
   game.rewardsGranted = true;
   return rewards;
@@ -222,7 +255,7 @@ export function chestNotices(events: GameEvent[], cells: Cell[]): ChestNotice[] 
  * Dig a hidden cell. Flagged cells are ignored (unflag first).
  * First reveal of a floor is always relocated off a mine.
  */
-export function dig(game: Game, index: number, rng: Rng): GameEvent[] {
+export function dig(game: Game, index: number, rng: Rng, mode?: Difficulty): GameEvent[] {
   const events: GameEvent[] = [];
   if (game.status !== 'playing') return events;
   const cell = game.cells[index];
@@ -242,6 +275,6 @@ export function dig(game: Game, index: number, rng: Rng): GameEvent[] {
   }
 
   game.lastPlayerAction = index;
-  events.push(...afterPlayerAction(game));
+  events.push(...afterPlayerAction(game, mode));
   return events;
 }

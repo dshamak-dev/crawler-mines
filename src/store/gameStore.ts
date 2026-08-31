@@ -210,7 +210,7 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
           if (!run || run.game.status !== 'playing') return [];
           if (run.bossRevealPending) return [];
           const game = cloneGame(run.game);
-          const events = dig(game, index, rng);
+          const events = dig(game, index, rng, run.mode);
           const settled = settleCampaign(run, events, meta, runLoot, rng, keyStore);
           set({
             run: {
@@ -229,7 +229,7 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
           if (!run || run.game.status !== 'playing') return [];
           if (run.bossRevealPending) return [];
           const game = cloneGame(run.game);
-          const events = flag(game, index);
+          const events = flag(game, index, run.mode);
           if (events.length === 0 && game.cells[index]?.state === run.game.cells[index]?.state) {
             return [];
           }

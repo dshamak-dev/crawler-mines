@@ -10,6 +10,9 @@ export const ITEM_IDS = [
   'campaign-key',
   'gluttony-head',
   'wrath-head',
+  'bronze-medal',
+  'silver-medal',
+  'gold-medal',
 ] as const;
 
 export type ItemId = (typeof ITEM_IDS)[number];
@@ -49,7 +52,7 @@ export function isChestTier(value: unknown): value is ChestTier {
 
 /** Visible chest shell. Inner loot stays hidden until the floor is cleared. */
 export function tierForLoot(itemId: ItemId): ChestTier {
-  if (itemId === 'hard-key' || itemId === 'campaign-key') return 'rare';
+  if (itemId === 'hard-key' || itemId === 'campaign-key' || isMedal(itemId)) return 'rare';
   if (itemId === 'relic-shard') return 'gilded';
   if (itemId === 'gem' || itemId === 'torch-charm') return 'iron';
   return 'wooden';
@@ -118,6 +121,24 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     flavor: 'A trophy from the slam-hunter. Stacks.',
     grantsGold: false,
   },
+  'bronze-medal': {
+    id: 'bronze-medal',
+    name: 'Bronze medal',
+    flavor: 'A perfect Easy clear. Every mine marked.',
+    grantsGold: false,
+  },
+  'silver-medal': {
+    id: 'silver-medal',
+    name: 'Silver medal',
+    flavor: 'A perfect Medium clear. Every mine marked.',
+    grantsGold: false,
+  },
+  'gold-medal': {
+    id: 'gold-medal',
+    name: 'Gold medal',
+    flavor: 'A perfect Hard clear. Every mine marked.',
+    grantsGold: false,
+  },
 };
 
 const BASE_LOOT_TABLE: ReadonlyArray<{ itemId: ItemId; weight: number }> = [
@@ -147,17 +168,11 @@ export function campaignKeyDropRate(mode: Difficulty): number {
 export type Inventory = Record<ItemId, number>;
 
 export function emptyInventory(): Inventory {
-  return {
-    'gold-pouch': 0,
-    'rusty-key': 0,
-    'torch-charm': 0,
-    gem: 0,
-    'relic-shard': 0,
-    'hard-key': 0,
-    'campaign-key': 0,
-    'gluttony-head': 0,
-    'wrath-head': 0,
-  };
+  return Object.fromEntries(ITEM_IDS.map((id) => [id, 0])) as Inventory;
+}
+
+export function isMedal(itemId: ItemId): boolean {
+  return itemId === 'bronze-medal' || itemId === 'silver-medal' || itemId === 'gold-medal';
 }
 
 export function isItemId(value: unknown): value is ItemId {
@@ -212,6 +227,9 @@ const SELL_GOLD: Partial<Record<ItemId, number>> = {
   'torch-charm': 2,
   gem: 10,
   'relic-shard': 18,
+  'bronze-medal': 3,
+  'silver-medal': 14,
+  'gold-medal': 20,
 };
 
 export function sellGold(itemId: ItemId): number {

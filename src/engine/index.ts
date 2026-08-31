@@ -38,6 +38,7 @@ export {
   isChestTier,
   isCollectible,
   isItemId,
+  isMedal,
   isSellable,
   isTicketKey,
   removeItem,
@@ -84,6 +85,8 @@ export {
   explodeChain,
   flag,
   grantIntactLoot,
+  isPerfectClear,
+  medalForMode,
   resolvePendingBossTurn,
   toggleFlag,
 } from './game';

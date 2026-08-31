@@ -49,8 +49,20 @@ describe('sell catalog', () => {
     expect(sellGold('torch-charm')).toBe(2);
     expect(sellGold('gem')).toBe(10);
     expect(sellGold('relic-shard')).toBe(18);
+    expect(sellGold('bronze-medal')).toBe(3);
+    expect(sellGold('silver-medal')).toBe(14);
+    expect(sellGold('gold-medal')).toBe(20);
+    const sellable = new Set([
+      'rusty-key',
+      'torch-charm',
+      'gem',
+      'relic-shard',
+      'bronze-medal',
+      'silver-medal',
+      'gold-medal',
+    ]);
     for (const id of ITEM_IDS) {
-      if (id === 'rusty-key' || id === 'torch-charm' || id === 'gem' || id === 'relic-shard') {
+      if (sellable.has(id)) {
         expect(isSellable(id)).toBe(true);
       } else {
         expect(isSellable(id)).toBe(false);
@@ -82,12 +94,18 @@ describe('sell catalog', () => {
       'gluttony-head': 1,
       'wrath-head': 1,
       'gold-pouch': 9,
+      'bronze-medal': 1,
+      'silver-medal': 2,
+      'gold-medal': 1,
     });
     expect(rows.map((row) => row.item.id)).toEqual([
       'rusty-key',
       'torch-charm',
       'gem',
       'relic-shard',
+      'bronze-medal',
+      'silver-medal',
+      'gold-medal',
     ]);
   });
 
@@ -97,6 +115,9 @@ describe('sell catalog', () => {
     expect(isCollectible('gluttony-head')).toBe(true);
     expect(isCollectible('wrath-head')).toBe(true);
     expect(isCollectible('gold-pouch')).toBe(false);
+    expect(isCollectible('bronze-medal')).toBe(true);
+    expect(isCollectible('silver-medal')).toBe(true);
+    expect(isCollectible('gold-medal')).toBe(true);
   });
 });
 

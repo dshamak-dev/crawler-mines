@@ -1,5 +1,5 @@
 import type { Game } from './types';
-import { CHEST_TIERS, isCollectible, ITEM_IDS, tierForLoot, TIER_COPY, type ChestTier, type Inventory } from './loot';
+import { CHEST_TIERS, isCollectible, isMedal, ITEM_IDS, tierForLoot, TIER_COPY, type ChestTier, type Inventory } from './loot';
 
 export type SealedKind = 'chest' | 'gold-bag';
 
@@ -36,7 +36,7 @@ export function sealedRowsFromBoard(game: Game): SealedRow[] {
 export function sealedRowsFromStash(inv: Inventory, stashGold: number): SealedRow[] {
   const map = new Map<string, SealedRow>();
   for (const id of ITEM_IDS) {
-    if (!isCollectible(id)) continue;
+    if (!isCollectible(id) || isMedal(id)) continue;
     const n = inv[id] ?? 0;
     if (n <= 0) continue;
     bump(map, { kind: 'chest', tier: tierForLoot(id), wrecked: false }, n);
