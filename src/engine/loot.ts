@@ -206,6 +206,31 @@ export function isTicketKey(itemId: ItemId): boolean {
   return itemId === 'hard-key' || itemId === 'campaign-key';
 }
 
+/** Title-shop unit prices. Pouches, ticket keys, and heads do not sell. */
+const SELL_GOLD: Partial<Record<ItemId, number>> = {
+  'rusty-key': 4,
+  'torch-charm': 2,
+  gem: 10,
+  'relic-shard': 18,
+};
+
+export function sellGold(itemId: ItemId): number {
+  return SELL_GOLD[itemId] ?? 0;
+}
+
+export function isSellable(itemId: ItemId): boolean {
+  return sellGold(itemId) > 0;
+}
+
+/** Empty slot → 0. Otherwise clamp to 1..owned. */
+export function clampSellQty(owned: number, qty: number): number {
+  const have = Math.max(0, Math.floor(owned));
+  if (have < 1) return 0;
+  const n = Math.floor(qty);
+  if (!Number.isFinite(n)) return 1;
+  return Math.min(have, Math.max(1, n));
+}
+
 export function inventoryTotal(inv: Inventory): number {
   return ITEM_IDS.reduce(
     (sum, id) => sum + (isCollectible(id) ? (inv[id] ?? 0) : 0),
@@ -218,5 +243,13 @@ export function stackedEntries(
 ): Array<{ item: ItemDef; count: number }> {
   return ITEM_IDS.filter(isCollectible)
     .map((id) => ({ item: ITEMS[id], count: inv[id] ?? 0 }))
+    .filter((row) => row.count > 0);
+}
+
+export function sellableEntries(
+  inv: Inventory,
+): Array<{ item: ItemDef; count: number; gold: number }> {
+  return ITEM_IDS.filter(isSellable)
+    .map((id) => ({ item: ITEMS[id], count: inv[id] ?? 0, gold: sellGold(id) }))
     .filter((row) => row.count > 0);
 }

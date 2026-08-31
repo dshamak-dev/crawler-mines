@@ -38,8 +38,12 @@ export {
   isChestTier,
   isCollectible,
   isItemId,
+  isSellable,
   isTicketKey,
   removeItem,
+  sellableEntries,
+  sellGold,
+  clampSellQty,
   rollLoot,
   lootTableFor,
   campaignKeyDropRate,
@@ -54,6 +58,7 @@ export {
   emptyCollection,
   loadCollection,
   saveCollection,
+  sellLoot,
 } from './collection';
 export type { CollectionState, KeyStore } from './collection';
 export {

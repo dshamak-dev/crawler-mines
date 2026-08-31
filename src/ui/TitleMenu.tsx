@@ -7,13 +7,14 @@ import {
   type Difficulty,
 } from '../engine';
 import MuteButton from './MuteButton';
-import { BagIcon, GoldIcon, ItemIcon, TorchIcon } from './icons';
+import { BagIcon, GoldIcon, ItemIcon, ScalesIcon, TorchIcon } from './icons';
 
 export default function TitleMenu({
   onStart,
   onResume,
   resumeCopy,
   onCollection,
+  onShop,
   gold,
   meta,
   muted,
@@ -25,6 +26,7 @@ export default function TitleMenu({
   onResume?: () => void;
   resumeCopy: string | null;
   onCollection: () => void;
+  onShop: () => void;
   gold: number;
   meta: CollectionState;
   muted: boolean;
@@ -116,6 +118,19 @@ export default function TitleMenu({
           }}
         >
           Start
+        </button>
+        <button
+          type="button"
+          className="stone-btn"
+          onClick={() => {
+            onUi();
+            onShop();
+          }}
+        >
+          <span className="player-row-main">
+            <ScalesIcon />
+            Shop
+          </span>
         </button>
         <MuteButton variant="row" muted={muted} onToggle={onToggleMute} />
       </nav>

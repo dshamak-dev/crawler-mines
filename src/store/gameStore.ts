@@ -22,6 +22,7 @@ import {
   rollBonusKey,
   RUN_KEY,
   runStash,
+  sellLoot,
   spendEntry,
   stashToRewards,
   type CollectionState,
@@ -48,6 +49,7 @@ export interface GameStoreState {
   dismissBossReveal: () => void;
   applyDig: (index: number, rng?: Rng) => GameEvent[];
   applyFlag: (index: number, rng?: Rng) => GameEvent[];
+  sell: (itemId: ItemId, qty?: number) => boolean;
 }
 
 export type GameStore = UseBoundStore<StoreApi<GameStoreState>>;
@@ -243,6 +245,12 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
             runLoot: settled.runLoot,
           });
           return events;
+        },
+        sell: (itemId, qty = 1) => {
+          const next = sellLoot(get().meta, itemId, qty, keyStore);
+          if (!next) return false;
+          set({ meta: next });
+          return true;
         },
       }),
       {

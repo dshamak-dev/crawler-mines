@@ -1,8 +1,12 @@
 import {
   addItem,
+  clampSellQty,
   emptyInventory,
   isCollectible,
   isItemId,
+  isSellable,
+  removeItem,
+  sellGold,
   type Inventory,
   type ItemId,
 } from './loot';
@@ -127,4 +131,27 @@ export function collectLoot(
   gold = 0,
 ): CollectionState {
   return applyRewards(state, [{ itemId, gold }], store);
+}
+
+/**
+ * Sell `qty` of a named loot stack into the wallet. Persists immediately.
+ * Qty clamps to 1..owned. Unsellable items and empty stacks return null.
+ */
+export function sellLoot(
+  state: CollectionState,
+  itemId: ItemId,
+  qty: number,
+  store: KeyStore = defaultStore(),
+): CollectionState | null {
+  if (!isSellable(itemId)) return null;
+  const owned = Math.max(0, Math.floor(state.items[itemId] ?? 0));
+  const n = clampSellQty(owned, qty);
+  if (n < 1) return null;
+  const next: CollectionState = {
+    gold: clampGold(state.gold) + sellGold(itemId) * n,
+    items: removeItem(state.items, itemId, n),
+    lastGrantKey: state.lastGrantKey,
+  };
+  saveCollection(next, store);
+  return next;
 }

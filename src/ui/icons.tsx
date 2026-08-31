@@ -162,6 +162,22 @@ export function GoldIcon({ className }: { className?: string }) {
   );
 }
 
+export function ScalesIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className ?? 'glyph'} viewBox="0 0 32 32" aria-hidden="true">
+      <path d="M15.2 4.6h1.6v18.6" stroke="#c9b59a" strokeWidth="2.1" strokeLinecap="round" />
+      <path d="M9.2 25.2h13.6v2.4H9.2z" fill="#6b5340" />
+      <path d="M11.4 25.2h9.2v-2.2h-9.2z" fill="#8a6a40" />
+      <path d="M16 6.4L7.6 15.2h16.8z" fill="none" stroke="#e0b44a" strokeWidth="1.7" strokeLinejoin="round" />
+      <path d="M7.6 15.2c0 2.8 1.8 4.6 4.4 4.6s4.4-1.8 4.4-4.6" fill="#c9922e" />
+      <path d="M15.6 15.2c0 2.8 1.8 4.6 4.4 4.6s4.4-1.8 4.4-4.6" fill="#c9922e" />
+      <path d="M8.8 15.6h6.4" stroke="#f3d27a" strokeWidth="0.8" opacity="0.7" />
+      <path d="M16.8 15.6h6.4" stroke="#f3d27a" strokeWidth="0.8" opacity="0.7" />
+      <circle cx="16" cy="6.4" r="1.6" fill="#e0b44a" />
+    </svg>
+  );
+}
+
 export function BagIcon({ className }: { className?: string }) {
   return (
     <svg className={className ?? 'glyph'} viewBox="0 0 32 32" aria-hidden="true">
