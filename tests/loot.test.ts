@@ -63,6 +63,16 @@ describe('loot table', () => {
     expect(hardSeen.has('campaign-key')).toBe(true);
   });
 
+  it('never rolls medals from chests', () => {
+    for (const mode of ['easy', 'medium', 'hard', 'campaign'] as const) {
+      const rng = mulberry32(21);
+      for (let i = 0; i < 3000; i++) {
+        const id = rollLoot(rng, mode);
+        expect(id === 'bronze-medal' || id === 'silver-medal' || id === 'gold-medal').toBe(false);
+      }
+    }
+  });
+
   it('never rolls campaign-key on Easy or Medium', () => {
     for (const mode of ['easy', 'medium'] as const) {
       const rng = mulberry32(99);
@@ -321,5 +331,8 @@ describe('item catalog', () => {
     expect(tierForLoot('relic-shard')).toBe('gilded');
     expect(tierForLoot('hard-key')).toBe('rare');
     expect(tierForLoot('campaign-key')).toBe('rare');
+    expect(tierForLoot('bronze-medal')).toBe('rare');
+    expect(tierForLoot('silver-medal')).toBe('rare');
+    expect(tierForLoot('gold-medal')).toBe('rare');
   });
 });

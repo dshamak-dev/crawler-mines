@@ -366,6 +366,32 @@ export function BossIcon({
   );
 }
 
+function MedalGlyph({
+  metal,
+  shine,
+  rim,
+}: {
+  metal: string;
+  shine: string;
+  rim: string;
+}) {
+  return (
+    <svg viewBox="0 0 32 32" className="glyph" aria-hidden="true">
+      <path d="M11.2 5.2h9.6l-1.4 5.2h-6.8z" fill="#6b5340" />
+      <path d="M12.4 5.2h7.2l-1 3.6h-5.2z" fill="#c9b59a" />
+      <circle cx="16" cy="19.2" r="8.6" fill={rim} />
+      <circle cx="16" cy="19.2" r="7.2" fill={metal} />
+      <ellipse cx="13.6" cy="16.4" rx="2.4" ry="1.6" fill={shine} opacity="0.85" />
+      <circle cx="16" cy="19.4" r="2.6" fill={shine} opacity="0.45" />
+      <path
+        d="M16 16.6l.7 1.5 1.6.2-1.2 1.1.3 1.6L16 20.2l-1.4.8.3-1.6-1.2-1.1 1.6-.2z"
+        fill={rim}
+        opacity="0.55"
+      />
+    </svg>
+  );
+}
+
 function HeadGlyph({ kind }: { kind: 'gluttony' | 'wrath' }) {
   const body = kind === 'wrath' ? '#a32a22' : '#6b2d7a';
   const shine = kind === 'wrath' ? '#c43b30' : '#8a3d98';
@@ -401,6 +427,12 @@ export function ItemIcon({ id, className }: { id: ItemId; className?: string }) 
       <HeadGlyph kind="gluttony" />
     ) : id === 'wrath-head' ? (
       <HeadGlyph kind="wrath" />
+    ) : id === 'bronze-medal' ? (
+      <MedalGlyph metal="#b87333" shine="#d4a574" rim="#6b4530" />
+    ) : id === 'silver-medal' ? (
+      <MedalGlyph metal="#8a93a0" shine="#c5d0dc" rim="#3a4048" />
+    ) : id === 'gold-medal' ? (
+      <MedalGlyph metal="#e0b44a" shine="#f3d27a" rim="#8a6419" />
     ) : (
       <ShardGlyph />
     );
