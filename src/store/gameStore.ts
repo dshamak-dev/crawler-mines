@@ -23,12 +23,12 @@ import {
   newGrantKey,
   normalizeOfferings,
   recoverBank,
+  resolveLockedBossId,
   rollBonusKey,
   RUN_KEY,
   runStash,
   sanitizePerfectFloors,
   sellLoot,
-  socketedBossId,
   spendEntry,
   stashToRewards,
   type CollectionState,
@@ -191,7 +191,8 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
           const slots = mode === 'campaign' ? normalizeOfferings(offerings, get().meta) : undefined;
           const spent = spendEntry(get().meta, mode, keyStore, slots);
           if (!spent) return false;
-          const locked = mode === 'campaign' ? socketedBossId(slots ?? [null, null]) : null;
+          const locked =
+            mode === 'campaign' ? resolveLockedBossId(slots ?? [null, null], rng) : null;
           set({
             meta: spent,
             run: freshRun(mode, rng, emptyStash(), locked),

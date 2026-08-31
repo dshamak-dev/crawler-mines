@@ -1,7 +1,7 @@
 import { BOSS_COPY, bossIdFromHead } from './boss';
 import type { CollectionState } from './collection';
 import { ITEMS, type ItemId } from './loot';
-import type { BossId } from './types';
+import { BOSS_IDS, type BossId, type Rng } from './types';
 
 export type OfferingQuote = { kind: string; cost: number };
 
@@ -38,12 +38,49 @@ export function isBossHead(id: ItemId | null | undefined): id is (typeof HEAD_ID
   return id === 'gluttony-head' || id === 'wrath-head' || id === 'lust-head';
 }
 
-export function socketedBossId(slots: OfferingSlots): BossId | null {
+/** Boss ids implied by socketed heads, in slot order (duplicates kept). */
+export function socketedHeadBosses(slots: OfferingSlots): BossId[] {
+  const out: BossId[] = [];
   for (const id of slots) {
     const boss = bossIdFromHead(id);
-    if (boss) return boss;
+    if (boss) out.push(boss);
   }
-  return null;
+  return out;
+}
+
+/**
+ * Floor-5 pool implied by socketed heads.
+ * 0 heads → full roster (equal roll later).
+ * 1 head → that sin only (lock).
+ * 2 heads → roster minus every unique socketed sin (two Lust → Gluttony/Wrath).
+ */
+export function remainingFinaleBosses(slots: OfferingSlots): BossId[] {
+  const heads = socketedHeadBosses(slots);
+  if (heads.length === 0) return [...BOSS_IDS];
+  if (heads.length === 1) return [heads[0]];
+  const excluded = new Set(heads);
+  return BOSS_IDS.filter((id) => !excluded.has(id));
+}
+
+/** Uniquely determined remaining boss for captions; null if the pool is not size 1. */
+export function socketedBossId(slots: OfferingSlots): BossId | null {
+  const pool = remainingFinaleBosses(slots);
+  return pool.length === 1 ? pool[0] : null;
+}
+
+/**
+ * Resolve floor-5 id at campaign enter so resume/retry/finale stay consistent.
+ * Zero heads → null (roll when floor 5 starts). One head or two different
+ * heads → deterministic. Two of the same head → uniform among the other two.
+ */
+export function resolveLockedBossId(slots: OfferingSlots, rng: Rng): BossId | null {
+  const heads = socketedHeadBosses(slots);
+  if (heads.length === 0) return null;
+  const pool = remainingFinaleBosses(slots);
+  if (pool.length === 0) return null;
+  if (pool.length === 1) return pool[0];
+  const i = Math.floor(rng() * pool.length);
+  return pool[Math.min(Math.max(i, 0), pool.length - 1)];
 }
 
 export function hasSocketedCampaignKey(slots: OfferingSlots): boolean {
@@ -56,8 +93,9 @@ function ownedCount(meta: CollectionState | undefined, id: ItemId): number {
 }
 
 /**
- * Keep at most two socketable ids. Drop a second boss head. When `meta` is
- * passed, drop ids the pack cannot cover (counting duplicates across slots).
+ * Keep at most two socketable ids. Two heads (same or different) are allowed.
+ * When `meta` is passed, drop ids the pack cannot cover (counting duplicates
+ * across slots).
  */
 export function normalizeOfferings(
   raw: readonly (ItemId | null | undefined)[] | null | undefined,
@@ -66,16 +104,13 @@ export function normalizeOfferings(
   const out: OfferingSlots = [null, null];
   if (!raw) return out;
   const used: Partial<Record<ItemId, number>> = {};
-  let headUsed = false;
   for (let i = 0; i < OFFERING_SLOT_COUNT; i++) {
     const id = raw[i];
     if (!isSocketable(id)) continue;
-    if (isBossHead(id) && headUsed) continue;
     const already = used[id] ?? 0;
     if (already >= ownedCount(meta, id)) continue;
     out[i] = id;
     used[id] = already + 1;
-    if (isBossHead(id)) headUsed = true;
   }
   return out;
 }
@@ -101,14 +136,12 @@ export interface OfferingPickerRow {
   disabled: boolean;
 }
 
-/** Owned socketables for one empty well. Hide at 0 remaining. Grey other heads. */
+/** Owned socketables for one empty well. Hide at 0 remaining. Heads stay enabled. */
 export function offeringPickerRows(
   meta: CollectionState,
   slots: OfferingSlots,
   fillingSlot: 0 | 1,
 ): OfferingPickerRow[] {
-  const other = slots[fillingSlot === 0 ? 1 : 0];
-  const headLocked = isBossHead(other);
   const rows: OfferingPickerRow[] = [];
   for (const id of SOCKETABLE_IDS) {
     const count = remainingOwned(id, meta, slots, fillingSlot);
@@ -117,7 +150,7 @@ export function offeringPickerRows(
       id,
       name: ITEMS[id].name,
       count,
-      disabled: headLocked && isBossHead(id),
+      disabled: false,
     });
   }
   return rows;
