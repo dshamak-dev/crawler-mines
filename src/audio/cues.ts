@@ -34,7 +34,7 @@ export function bossFloorActive(
   );
 }
 
-/** Live campaign-run boss — never a second roll. Default is Gluttony's loop. */
+/** Live campaign-run boss — never a second roll. Lust reuses Gluttony's loop. */
 export function finaleBgm(bossId: BossId | null | undefined): BgmId {
   return bossId === 'wrath' ? 'wrath' : 'boss';
 }

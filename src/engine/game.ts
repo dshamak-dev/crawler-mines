@@ -1,5 +1,5 @@
 import { allSafeRevealed, ensureFirstClickSafe, isWon, neighbors } from './board';
-import { hitBossFromBlasts, stepBoss } from './boss';
+import { chipLustHeart, hitBossFromBlasts, isLustHeart, stepBoss } from './boss';
 import { addItem, type ChestTier, type ItemId } from './loot';
 import type { Cell, ChestReward, Difficulty, Game, GameEvent, Rng } from './types';
 
@@ -139,7 +139,11 @@ export function resolvePendingBossTurn(game: Game, mode?: Difficulty): void {
  * After a successful dig or flag: resolve boss kill / campaign lose, else
  * the floor boss takes one move. Player + boss are one atomic action for persist.
  */
-export function afterPlayerAction(game: Game, mode?: Difficulty): GameEvent[] {
+export function afterPlayerAction(
+  game: Game,
+  mode?: Difficulty,
+  prior: readonly GameEvent[] = [],
+): GameEvent[] {
   const events: GameEvent[] = [];
   if (game.status !== 'playing') return events;
 
@@ -157,8 +161,9 @@ export function afterPlayerAction(game: Game, mode?: Difficulty): GameEvent[] {
       events.push({ type: 'lost' });
       return events;
     }
+    const afterHit = prior.some((e) => e.type === 'boss-hit');
     game.turn = 'boss';
-    events.push(...finishBossTurn(game, stepBoss(game), mode));
+    events.push(...finishBossTurn(game, stepBoss(game, afterHit), mode));
     return events;
   }
 
@@ -259,7 +264,16 @@ export function dig(game: Game, index: number, rng: Rng, mode?: Difficulty): Gam
   const events: GameEvent[] = [];
   if (game.status !== 'playing') return events;
   const cell = game.cells[index];
-  if (!cell || cell.state === 'revealed' || cell.state === 'flagged') return events;
+  if (!cell) return events;
+
+  if (isLustHeart(game, index)) {
+    events.push(...chipLustHeart(game));
+    game.lastPlayerAction = index;
+    events.push(...afterPlayerAction(game, mode, events));
+    return events;
+  }
+
+  if (cell.state === 'revealed' || cell.state === 'flagged') return events;
 
   if (!game.firstClickDone) {
     ensureFirstClickSafe(game, index, rng);
@@ -275,6 +289,6 @@ export function dig(game: Game, index: number, rng: Rng, mode?: Difficulty): Gam
   }
 
   game.lastPlayerAction = index;
-  events.push(...afterPlayerAction(game, mode));
+  events.push(...afterPlayerAction(game, mode, events));
   return events;
 }

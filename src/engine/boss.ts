@@ -2,6 +2,7 @@ import { coords, neighbors } from './board';
 import {
   BOSS_IDS,
   BOSS_MAX_LIVES,
+  LUST_MAX_LIVES,
   type BossId,
   type BossState,
   type Game,
@@ -39,9 +40,14 @@ export function isBossId(value: unknown): value is BossId {
   return typeof value === 'string' && (BOSS_IDS as readonly string[]).includes(value);
 }
 
-/** Equal-weight Gluttony / Wrath roll for a fresh campaign floor-5 board. */
+export function bossMaxLives(id: BossId): number {
+  return id === 'lust' ? LUST_MAX_LIVES : BOSS_MAX_LIVES;
+}
+
+/** Equal-weight Gluttony / Wrath / Lust roll for a fresh campaign floor-5 board. */
 export function rollBossId(rng: Rng): BossId {
-  return rng() < 0.5 ? 'gluttony' : 'wrath';
+  const i = Math.floor(rng() * BOSS_IDS.length);
+  return BOSS_IDS[Math.min(Math.max(i, 0), BOSS_IDS.length - 1)];
 }
 
 export const BOSS_COPY: Record<BossId, { name: string; blurb: string }> = {
@@ -53,10 +59,63 @@ export const BOSS_COPY: Record<BossId, { name: string; blurb: string }> = {
     name: 'Wrath',
     blurb: 'Hunts your last dig or flag. Smashes adjacent chests. Slams a mine when stuck.',
   },
+  lust: {
+    name: 'Lust',
+    blurb: 'Walks to the highest open number and becomes a heart. Tap or blast the heart.',
+  },
 };
 
-export function headItemId(id: BossId): 'gluttony-head' | 'wrath-head' {
-  return id === 'wrath' ? 'wrath-head' : 'gluttony-head';
+export function headItemId(id: BossId): 'gluttony-head' | 'wrath-head' | 'lust-head' {
+  if (id === 'wrath') return 'wrath-head';
+  if (id === 'lust') return 'lust-head';
+  return 'gluttony-head';
+}
+
+/** Revealed empty number tile — not a mine, chest, or zero. */
+export function isOpenNumber(game: Game, index: number): boolean {
+  const cell = game.cells[index];
+  return Boolean(
+    cell &&
+      cell.state === 'revealed' &&
+      cell.kind === 'empty' &&
+      cell.adjacentMines >= 1,
+  );
+}
+
+/** Highest open digit; ties nearest to Lust, then lowest index. */
+export function pickLustTarget(game: Game): number | null {
+  const boss = game.boss;
+  if (!boss) return null;
+  let best: number | null = null;
+  let bestDigit = 0;
+  let bestDist = Infinity;
+  for (let i = 0; i < game.cells.length; i++) {
+    if (!isOpenNumber(game, i)) continue;
+    const digit = game.cells[i].adjacentMines;
+    const dist = chebyshev(game.width, boss.index, i);
+    if (
+      best == null ||
+      digit > bestDigit ||
+      (digit === bestDigit && dist < bestDist) ||
+      (digit === bestDigit && dist === bestDist && i < best)
+    ) {
+      best = i;
+      bestDigit = digit;
+      bestDist = dist;
+    }
+  }
+  return best;
+}
+
+export function isLustHeart(game: Game, index: number): boolean {
+  const boss = game.boss;
+  return Boolean(
+    boss &&
+      boss.id === 'lust' &&
+      boss.lives > 0 &&
+      boss.heart === true &&
+      boss.index === index,
+  );
 }
 
 function healthyChestIndices(game: Game): number[] {
@@ -275,21 +334,61 @@ function stepWrath(game: Game, boss: BossState): GameEvent[] {
 }
 
 /**
+ * One 8-adjacent step toward the highest open number. Occupies as a heart
+ * on arrival or when no number is open yet. `afterHit` skips re-occupying
+ * the tile Lust was just chipped off of.
+ */
+function stepLust(game: Game, boss: BossState, afterHit: boolean): GameEvent[] {
+  const target = pickLustTarget(game);
+  if (target == null) {
+    boss.heart = true;
+    return [];
+  }
+  if (boss.index === target) {
+    if (!afterHit) boss.heart = true;
+    return [];
+  }
+  const step = firstStepToward(game, boss.index, new Set([target]));
+  if (step == null || step === boss.index) return [];
+  boss.index = step;
+  boss.heart = step === target;
+  return [{ type: 'boss-move', index: step }];
+}
+
+/**
  * One boss action. Gluttony: flags first, then wounded chest smash.
  * Wrath: adjacent chest smash, hunt last action, else mine-slam (self-hit).
+ * Lust: one walkable step toward the highest open number; sits as a heart if none.
  * A `boss-slam` event must be resolved by the game layer via explodeChain.
  */
-export function stepBoss(game: Game): GameEvent[] {
+export function stepBoss(game: Game, afterHit = false): GameEvent[] {
   const boss = game.boss;
   if (!boss || game.status !== 'playing' || boss.lives <= 0) return [];
+  if (boss.id === 'lust') return stepLust(game, boss, afterHit);
   if (boss.id === 'wrath') return stepWrath(game, boss);
   return stepGluttony(game, boss);
+}
+
+export function chipLustHeart(game: Game): GameEvent[] {
+  const boss = game.boss;
+  if (!boss || boss.id !== 'lust' || boss.lives <= 0 || boss.heart !== true) return [];
+  boss.lives -= 1;
+  boss.heart = false;
+  return [{ type: 'boss-hit', lives: boss.lives }];
 }
 
 /** Each exploding mine whose 8-neighborhood contains the boss deals 1 life. */
 export function hitBossFromBlasts(game: Game, blastIndices: readonly number[]): GameEvent[] {
   const boss = game.boss;
   if (!boss || boss.lives <= 0) return [];
+  if (boss.id === 'lust') {
+    if (boss.heart !== true) return [];
+    const around = new Set(neighbors(game.width, game.height, boss.index));
+    for (const index of blastIndices) {
+      if (around.has(index)) return chipLustHeart(game);
+    }
+    return [];
+  }
   const events: GameEvent[] = [];
   const around = new Set(neighbors(game.width, game.height, boss.index));
   for (const index of blastIndices) {
@@ -301,7 +400,8 @@ export function hitBossFromBlasts(game: Game, blastIndices: readonly number[]): 
   return events;
 }
 
-export function clampBossLives(lives: unknown): number {
-  if (typeof lives !== 'number' || !Number.isInteger(lives)) return BOSS_MAX_LIVES;
-  return Math.max(0, Math.min(BOSS_MAX_LIVES, lives));
+export function clampBossLives(lives: unknown, id: BossId = 'gluttony'): number {
+  const max = bossMaxLives(id);
+  if (typeof lives !== 'number' || !Number.isInteger(lives)) return max;
+  return Math.max(0, Math.min(max, lives));
 }

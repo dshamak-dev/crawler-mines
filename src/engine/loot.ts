@@ -10,6 +10,7 @@ export const ITEM_IDS = [
   'campaign-key',
   'gluttony-head',
   'wrath-head',
+  'lust-head',
   'bronze-medal',
   'silver-medal',
   'gold-medal',
@@ -119,6 +120,12 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     id: 'wrath-head',
     name: 'Wrath head',
     flavor: 'A trophy from the slam-hunter. Stacks.',
+    grantsGold: false,
+  },
+  'lust-head': {
+    id: 'lust-head',
+    name: 'Lust head',
+    flavor: 'A trophy from the heart-walker. Stacks.',
     grantsGold: false,
   },
   'bronze-medal': {

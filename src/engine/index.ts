@@ -17,6 +17,7 @@ export type {
 export {
   BOSS_IDS,
   BOSS_MAX_LIVES,
+  LUST_MAX_LIVES,
   CAMPAIGN_FLOORS,
   DIFFICULTIES,
   cellVisual,
@@ -93,14 +94,20 @@ export {
 export type { ChestNotice } from './game';
 export {
   BOSS_COPY,
+  bossMaxLives,
   chebyshev,
+  chipLustHeart,
+  clampBossLives,
   flaggedCells,
   firstStepToward,
   headItemId,
   hitBossFromBlasts,
   isBossId,
+  isLustHeart,
+  isOpenNumber,
   isWalkable,
   isWounded,
+  pickLustTarget,
   rollBossId,
   smashChest,
   stepAwayFrom,

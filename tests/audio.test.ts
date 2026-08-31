@@ -95,6 +95,13 @@ describe('BGM routing', () => {
     expect(desiredBgm('play', 'hard', null, 0, 'wrath')).toBe('cozy');
     expect(finaleBgm('wrath')).toBe('wrath');
   });
+
+  it('reuses Gluttony BGM for Lust and does not invent a Lust track', () => {
+    expect(desiredBgm('play', 'campaign', null, 4, 'lust')).toBe('boss');
+    expect(desiredBgm('collection', 'campaign', 'play', 4, 'lust')).toBe('boss');
+    expect(finaleBgm('lust')).toBe('boss');
+    expect(bgmUrl('boss')).toBe('/crawler-mines/audio/flag-eater-boss.mp3');
+  });
 });
 
 describe('SFX from engine events', () => {

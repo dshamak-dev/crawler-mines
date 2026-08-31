@@ -108,6 +108,13 @@ export default function Board({
             reduce={reduce}
             bossHere={game.boss != null && game.boss.index === i && game.boss.lives > 0}
             bossId={game.boss?.id ?? 'gluttony'}
+            lustHeart={
+              game.boss != null &&
+              game.boss.id === 'lust' &&
+              game.boss.heart === true &&
+              game.boss.index === i &&
+              game.boss.lives > 0
+            }
             onDig={onDig}
             onFlag={onFlag}
           />
@@ -148,6 +155,7 @@ function DungeonCell({
   reduce,
   bossHere,
   bossId,
+  lustHeart,
   onDig,
   onFlag,
 }: {
@@ -159,6 +167,7 @@ function DungeonCell({
   reduce: boolean;
   bossHere: boolean;
   bossId: BossId;
+  lustHeart: boolean;
   onDig: (i: number) => void;
   onFlag: (i: number) => void;
 }) {
@@ -220,7 +229,9 @@ function DungeonCell({
 
   const bossName = BOSS_COPY[bossId].name;
   const label = bossHere
-    ? `${bossName}${visual === 'number' ? `, ${cell.adjacentMines} adjacent bombs` : ''}`
+    ? `${lustHeart ? `${bossName} heart` : bossName}${
+        visual === 'number' ? `, ${cell.adjacentMines} adjacent bombs` : ''
+      }`
     : ariaFor(visual, cell.adjacentMines, cell.tier);
 
   return (
@@ -229,7 +240,9 @@ function DungeonCell({
       role="gridcell"
       className={`cell vis-${visual}${wave != null ? ' pop-bomb' : ''}${
         wreckWave != null ? ' pop-wreck' : ''
-      }${bossHere ? ' is-boss' : ''}`}
+      }${bossHere ? ' is-boss' : ''}${bossId === 'lust' && bossHere ? ' is-lust' : ''}${
+        lustHeart ? ' is-heart' : ''
+      }`}
       style={{ '--delay': `${delay}ms` } as CSSProperties}
       aria-label={label}
       onPointerDown={onPointerDown}

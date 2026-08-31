@@ -7,14 +7,17 @@ export type Difficulty = 'easy' | 'medium' | 'hard' | 'campaign';
 export type Turn = 'player' | 'boss';
 
 export const BOSS_MAX_LIVES = 3;
+export const LUST_MAX_LIVES = 5;
 
-export const BOSS_IDS = ['gluttony', 'wrath'] as const;
+export const BOSS_IDS = ['gluttony', 'wrath', 'lust'] as const;
 export type BossId = (typeof BOSS_IDS)[number];
 
 export interface BossState {
   id: BossId;
   index: number;
   lives: number;
+  /** Lust occupies this cell as a heart. Other sins ignore it. */
+  heart?: boolean;
 }
 
 export type Rng = () => number;
