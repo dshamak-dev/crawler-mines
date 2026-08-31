@@ -1,4 +1,5 @@
 export const BGM_FILES = {
+  /** Title / Easy / Medium / Hard: seamless cozy-descent loop (no fade-to-silence restart, slightly quicker middle). Do not substitute or re-encode. */
   cozy: 'cozy-descent.mp3',
   campaign: 'campaign-depths.mp3',
   /** Approved Gluttony loop at public/audio/flag-eater-boss.mp3 — do not substitute or re-encode. */
