@@ -22,7 +22,7 @@ import Collection from './ui/Collection';
 import LootQueue, { type LootToast } from './ui/LootToast';
 import MuteButton from './ui/MuteButton';
 import TitleMenu from './ui/TitleMenu';
-import { BagIcon, BossIcon, ChestIcon, FlagIcon, GoldIcon, ItemIcon, ShovelIcon } from './ui/icons';
+import { BagIcon, BossIcon, ChestIcon, FlagIcon, GoldIcon, ItemIcon, MenuIcon, ShovelIcon } from './ui/icons';
 import { chainDuration, prefersReducedMotion } from './ui/motion';
 
 type Screen = 'menu' | 'play' | 'collection';
@@ -209,6 +209,9 @@ export default function App() {
           <Collection
             meta={meta}
             runLoot={runLoot}
+            sealed={collectionFrom === 'play' && Boolean(run)}
+            game={collectionFrom === 'play' && run ? run.game : undefined}
+            stashGold={run?.campaignStash?.gold ?? 0}
             onBack={() => {
               cueUi();
               setScreen(collectionFrom === 'play' && run ? 'play' : 'menu');
@@ -244,16 +247,16 @@ export default function App() {
             onDig={onDig}
             onFlag={onFlag}
             onUi={cueUi}
-            onMenu={() => {
+            onCollection={() => {
+              cueUi();
+              openCollection('play');
+            }}
+            onExitRun={() => {
               cueUi();
               setScreen('menu');
               setBlasts([]);
               setSparkles([]);
               setLootQueue([]);
-            }}
-            onCollection={() => {
-              cueUi();
-              openCollection('play');
             }}
             onDismissTutorial={dismissTutorial}
             onDismissBossReveal={() => {
@@ -285,8 +288,8 @@ function Play({
   onDig,
   onFlag,
   onUi,
-  onMenu,
   onCollection,
+  onExitRun,
   onDismissTutorial,
   onDismissBossReveal,
   onNext,
@@ -307,14 +310,15 @@ function Play({
   onDig: (i: number) => void;
   onFlag: (i: number) => void;
   onUi: () => void;
-  onMenu: () => void;
   onCollection: () => void;
+  onExitRun: () => void;
   onDismissTutorial: () => void;
   onDismissBossReveal: () => void;
   onNext: () => void;
   onRetry: () => void;
 }) {
   const { game, mode, floor } = run;
+  const [menuOpen, setMenuOpen] = useState(false);
   const { ref, px } = useBoardCellSize(game.width, game.height);
   const floorLabel =
     mode === 'campaign' ? `Floor ${floor + 1}/${CAMPAIGN_FLOORS.length}` : mode;
@@ -333,8 +337,16 @@ function Play({
   return (
     <div className="shell play-shell">
       <header className="hud">
-        <button type="button" className="ghost" onClick={onMenu} aria-label="Back to menu">
-          {'\u2039'}
+        <button
+          type="button"
+          className="ghost"
+          onClick={() => {
+            onUi();
+            setMenuOpen(true);
+          }}
+          aria-label="Game menu"
+        >
+          <MenuIcon />
         </button>
         <div className="hud-stats">
           <span className="stat found-stat" title="Intact chests found">
@@ -361,10 +373,6 @@ function Play({
             </span>
           )}
         </div>
-        <MuteButton muted={muted} onToggle={onToggleMute} />
-        <button type="button" className="ghost bag-btn" onClick={onCollection} aria-label="Open collection">
-          <BagIcon />
-        </button>
         <span className="floor-pill">{floorLabel}</span>
       </header>
 
@@ -415,7 +423,62 @@ function Play({
         </p>
       </footer>
 
-      {tutorial && !revealBoss && (
+      {menuOpen && !report && (
+        <div
+          className="overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="game-menu-title"
+          onClick={() => {
+            onUi();
+            setMenuOpen(false);
+          }}
+        >
+          <div className="tablet start-sheet" onClick={(e) => e.stopPropagation()}>
+            <h2 id="game-menu-title">Menu</h2>
+            <nav className="menu-nav game-menu-nav">
+              <button
+                type="button"
+                className="stone-btn gold"
+                onClick={() => {
+                  onUi();
+                  setMenuOpen(false);
+                }}
+              >
+                Continue
+              </button>
+              <button
+                type="button"
+                className="stone-btn player-row"
+                onClick={() => {
+                  onUi();
+                  setMenuOpen(false);
+                  onCollection();
+                }}
+              >
+                <span className="player-row-main">
+                  <BagIcon />
+                  Collection
+                </span>
+              </button>
+              <MuteButton variant="row" muted={muted} onToggle={onToggleMute} />
+              <button
+                type="button"
+                className="stone-btn"
+                onClick={() => {
+                  onUi();
+                  setMenuOpen(false);
+                  onExitRun();
+                }}
+              >
+                Exit run
+              </button>
+            </nav>
+          </div>
+        </div>
+      )}
+
+      {tutorial && !revealBoss && !menuOpen && (
         <div className="overlay" onClick={onDismissTutorial} role="dialog">
           <div className="tablet" onClick={(e) => e.stopPropagation()}>
             <h2>First descent</h2>

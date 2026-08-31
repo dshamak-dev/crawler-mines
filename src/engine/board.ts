@@ -83,7 +83,7 @@ function pickUnique(
 }
 
 export function createGame(config: FloorConfig, rng: Rng, mode: Difficulty = 'easy'): Game {
-  const { width, height, mines, chests, chestValue } = config;
+  const { width, height, mines, chests } = config;
   const total = width * height;
   const bossSlots = config.bossLives && config.bossLives > 0 ? 1 : 0;
   if (mines + chests + bossSlots >= total) {
@@ -96,23 +96,25 @@ export function createGame(config: FloorConfig, rng: Rng, mode: Difficulty = 'ea
     cells[i].kind = 'chest';
     cells[i].loot = loot;
     cells[i].tier = tierForLoot(loot);
-    cells[i].gold = goldForLoot(loot, chestValue);
+    cells[i].gold = goldForLoot(loot, rng);
   }
-  const banned = new Set(chestIdx);
-  const mineIdx = pickUnique(mines, total, banned, rng);
-  for (const i of mineIdx) {
-    cells[i].kind = 'mine';
-  }
-  computeAdjacency(width, height, cells);
   let boss: BossState | null = null;
+  let bossRing = new Set<number>();
   const lives = config.bossLives;
   if (lives && lives > 0) {
-    const occupied = new Set([...chestIdx, ...mineIdx]);
+    const occupied = new Set(chestIdx);
     const spawn = pickUnique(1, total, occupied, rng);
     const index = spawn[0];
     cells[index].state = 'revealed';
     boss = { id: rollBossId(rng), index, lives };
+    bossRing = new Set([index, ...neighbors(width, height, index)]);
   }
+  const mineBanned = new Set([...chestIdx, ...bossRing]);
+  const mineIdx = pickUnique(mines, total, mineBanned, rng);
+  for (const i of mineIdx) {
+    cells[i].kind = 'mine';
+  }
+  computeAdjacency(width, height, cells);
   return {
     width,
     height,

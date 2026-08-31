@@ -256,7 +256,13 @@ button {
   margin-top: 0;
   justify-content: space-between;
 }
-.tablet.start-sheet > .stone-btn {
+.game-menu-nav {
+  width: 100%;
+}
+.game-menu-nav .stone-btn {
+  width: 100%;
+}
+.game-menu-nav .stone-btn.gold {
   justify-content: center;
 }
 

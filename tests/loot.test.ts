@@ -12,6 +12,7 @@ import {
   dig,
   emptyCollection,
   emptyInventory,
+  rollPouchGold,
   goldForLoot,
   inventoryTotal,
   loadCollection,
@@ -89,6 +90,9 @@ describe('loot table', () => {
 
   it('only gold pouches convert floor chestValue into gold', () => {
     expect(goldForLoot('gold-pouch', 18)).toBe(18);
+    expect(rollPouchGold(() => 0)).toBe(1);
+    expect(rollPouchGold(() => 0.99)).toBe(4);
+    expect(rollPouchGold(() => 0.5)).toBe(3);
     expect(goldForLoot('rusty-key', 18)).toBe(0);
     expect(goldForLoot('torch-charm', 18)).toBe(0);
     expect(goldForLoot('gem', 18)).toBe(0);
@@ -111,14 +115,20 @@ describe('loot table', () => {
 
 describe('chest loot identity', () => {
   it('stamps every generated chest with a hidden item and a visible tier', () => {
-    const game = createGame(DIFFICULTIES.easy, mulberry32(9), 'easy');
+    const rng = mulberry32(9);
+    const game = createGame(DIFFICULTIES.easy, rng, 'easy');
     const chests = game.cells.filter((c) => c.kind === 'chest');
     expect(chests).toHaveLength(DIFFICULTIES.easy.chests);
     for (const c of chests) {
       expect(c.loot).not.toBeNull();
       expect(ITEM_IDS).toContain(c.loot);
       expect(c.tier).toBe(tierForLoot(c.loot as ItemId));
-      expect(c.gold).toBe(goldForLoot(c.loot as ItemId, DIFFICULTIES.easy.chestValue));
+      if (c.loot === 'gold-pouch') {
+        expect(c.gold).toBeGreaterThanOrEqual(1);
+        expect(c.gold).toBeLessThanOrEqual(4);
+      } else {
+        expect(c.gold).toBe(0);
+      }
     }
   });
 

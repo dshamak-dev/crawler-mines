@@ -180,6 +180,34 @@ export function smashChest(game: Game, index: number): GameEvent | null {
   return tier ? { type: 'boss-smash-chest', index, tier } : null;
 }
 
+/** One open step that increases Chebyshev distance from `awayFrom`, if possible. */
+export function stepAwayFrom(game: Game, from: number, awayFrom: number): number | null {
+  const currentDist = chebyshev(game.width, from, awayFrom);
+  let best: number | null = null;
+  let bestDist = currentDist;
+  for (const n of neighbors(game.width, game.height, from)) {
+    if (!isWalkable(game, n)) continue;
+    const d = chebyshev(game.width, n, awayFrom);
+    if (d <= currentDist) continue;
+    if (d > bestDist || (d === bestDist && best != null && n < best)) {
+      best = n;
+      bestDist = d;
+    }
+  }
+  return best;
+}
+
+function retreatFromFlag(game: Game, boss: BossState, flagIndex: number, steps: number): GameEvent[] {
+  const events: GameEvent[] = [];
+  for (let i = 0; i < steps; i++) {
+    const next = stepAwayFrom(game, boss.index, flagIndex);
+    if (next == null) break;
+    boss.index = next;
+    events.push({ type: 'boss-move', index: next });
+  }
+  return events;
+}
+
 function stepGluttony(game: Game, boss: BossState): GameEvent[] {
   const flags = flaggedCells(game);
   if (flags.length > 0) {
@@ -188,7 +216,9 @@ function stepGluttony(game: Game, boss: BossState): GameEvent[] {
       const target = pickNearest(game.width, boss.index, nextTo);
       const cell = game.cells[target];
       if (cell.state === 'flagged') cell.state = 'hidden';
-      return [{ type: 'boss-eat-flag', index: target }];
+      const events: GameEvent[] = [{ type: 'boss-eat-flag', index: target }];
+      events.push(...retreatFromFlag(game, boss, target, 2));
+      return events;
     }
 
     const goals = walkableNeighborsOfFlags(game, flags);

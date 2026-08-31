@@ -4,6 +4,7 @@ import {
   CAMPAIGN_COST,
   DIFFICULTIES,
   allSafeRevealed,
+  chebyshev,
   cloneGame,
   createGame,
   createGameFromLayout,
@@ -275,9 +276,13 @@ describe('Gluttony movement', () => {
     expect(game.cells[flagCell].state).toBe('flagged');
 
     const ate = stepBoss(game);
-    expect(ate).toEqual([{ type: 'boss-eat-flag', index: flagCell }]);
+    expect(ate[0]).toEqual({ type: 'boss-eat-flag', index: flagCell });
+    expect(ate.filter((e) => e.type === 'boss-move').length).toBeGreaterThanOrEqual(1);
+    expect(ate.filter((e) => e.type === 'boss-move').length).toBeLessThanOrEqual(2);
     expect(game.cells[flagCell].state).toBe('hidden');
-    expect(game.boss?.index).toBe(open);
+    expect(chebyshev(game.width, game.boss!.index, flagCell)).toBeGreaterThan(
+      chebyshev(game.width, open, flagCell),
+    );
     expect(game.status).toBe('playing');
   });
 

@@ -175,8 +175,18 @@ export function rollLoot(rng: Rng, mode: Difficulty = 'easy'): ItemId {
   return table[table.length - 1].itemId;
 }
 
-export function goldForLoot(itemId: ItemId, chestValue: number): number {
-  return ITEMS[itemId].grantsGold ? chestValue : 0;
+/** Each gold pouch grants a random integer 1–4 coins. */
+export function rollPouchGold(rng: Rng): number {
+  return Math.floor(rng() * 4) + 1;
+}
+
+/**
+ * Gold pouches roll 1–4 via rng. Pass a fixed number in tests/layout helpers.
+ */
+export function goldForLoot(itemId: ItemId, rngOrFixed: Rng | number): number {
+  if (!ITEMS[itemId].grantsGold) return 0;
+  if (typeof rngOrFixed === 'number') return Math.max(0, Math.floor(rngOrFixed));
+  return rollPouchGold(rngOrFixed);
 }
 
 export function addItem(inv: Inventory, itemId: ItemId, n = 1): Inventory {

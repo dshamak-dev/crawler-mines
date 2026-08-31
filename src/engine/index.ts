@@ -32,6 +32,7 @@ export {
   TIER_COPY,
   addItem,
   emptyInventory,
+  rollPouchGold,
   goldForLoot,
   inventoryTotal,
   isChestTier,
@@ -94,10 +95,13 @@ export {
   isWounded,
   rollBossId,
   smashChest,
+  stepAwayFrom,
   stepBoss,
 } from './boss';
 export { emptyStash, mergeStash, rollBonusKey, stashToRewards } from './stash';
 export type { CampaignStash } from './stash';
+export { sealedRunRows, sealedRowsFromBoard, sealedRowsFromStash, sealedRowLabel } from './sealed';
+export type { SealedKind, SealedRow } from './sealed';
 export { mulberry32 } from './rng';
 export {
   CAMPAIGN_COST,
