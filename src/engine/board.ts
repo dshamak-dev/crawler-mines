@@ -140,6 +140,7 @@ export function createGame(
     turn: 'player',
     lastPlayerAction: null,
     doorIndex,
+    heartOrder: [],
   };
 }
 
@@ -210,6 +211,7 @@ export function createGameFromLayout(
     turn: 'player',
     lastPlayerAction: null,
     doorIndex,
+    heartOrder: [],
   };
 }
 
@@ -219,6 +221,7 @@ export function cloneGame(game: Game): Game {
     cells: game.cells.map((c) => ({ ...c })),
     inventory: { ...game.inventory },
     boss: game.boss ? { ...game.boss } : null,
+    heartOrder: [...(game.heartOrder ?? [])],
   };
 }
 

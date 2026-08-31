@@ -104,7 +104,7 @@ function resolveBossSlam(game: Game, mineIndex: number): GameEvent[] {
   return events;
 }
 
-function finishBossTurn(game: Game, bossEvents: GameEvent[], _mode?: Difficulty): GameEvent[] {
+function finishBossTurn(game: Game, bossEvents: GameEvent[], mode?: Difficulty): GameEvent[] {
   const events: GameEvent[] = [];
   for (const e of bossEvents) {
     if (e.type === 'boss-slam') {
@@ -117,6 +117,7 @@ function finishBossTurn(game: Game, bossEvents: GameEvent[], _mode?: Difficulty)
     capLustHearts(game);
     game.turn = 'player';
     if (!events.some((e) => e.type === 'boss-death')) events.push({ type: 'boss-death' });
+    if (allSafeRevealed(game)) events.push(...extract(game, mode));
     return events;
   }
   if (allSafeRevealed(game) && game.boss && game.boss.lives > 0) {
@@ -160,6 +161,7 @@ export function afterPlayerAction(
     if (game.boss.lives <= 0) {
       capLustHearts(game);
       game.turn = 'player';
+      if (allSafeRevealed(game)) events.push(...extract(game, mode));
       return events;
     }
     if (allSafeRevealed(game)) {
@@ -304,7 +306,7 @@ export function dig(game: Game, index: number, rng: Rng, mode?: Difficulty): Gam
   return events;
 }
 
-/** Campaign finale: leave through the revealed door after the boss is dead. */
+/** Campaign finale: leave after the boss is dead. Door must be revealed. */
 export function extract(game: Game, mode?: Difficulty): GameEvent[] {
   if (game.status !== 'playing') return [];
   const boss = game.boss;

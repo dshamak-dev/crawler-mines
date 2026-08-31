@@ -143,11 +143,15 @@ describe('run snapshot hydrate', () => {
     expect(s2.getState().run?.game.firstClickDone).toBe(true);
   });
 
-  it('hydrates Lust hearts and the finale door index', () => {
+  it('hydrates Lust hearts, plant order, and the finale door index', () => {
     const game = createGameFromLayout(['B...', '....', '...*'], 10, 'gold-pouch', undefined, 'lust');
-    const marked = idx(game, 1, 0);
-    game.cells[marked].state = 'revealed';
-    game.cells[marked].hearted = true;
+    const newer = idx(game, 1, 0);
+    const older = idx(game, 2, 0);
+    game.cells[newer].state = 'revealed';
+    game.cells[older].state = 'revealed';
+    game.cells[newer].hearted = true;
+    game.cells[older].hearted = true;
+    game.heartOrder = [older, newer];
     expect(game.doorIndex).not.toBeNull();
     const store = memoryStore();
     const s1 = createGameStore(store);
@@ -165,7 +169,9 @@ describe('run snapshot hydrate', () => {
       runLoot: emptyInventory(),
     });
     const s2 = createGameStore(store);
-    expect(s2.getState().run?.game.cells[marked].hearted).toBe(true);
+    expect(s2.getState().run?.game.cells[newer].hearted).toBe(true);
+    expect(s2.getState().run?.game.cells[older].hearted).toBe(true);
+    expect(s2.getState().run?.game.heartOrder).toEqual([older, newer]);
     expect(s2.getState().run?.game.doorIndex).toBe(game.doorIndex);
     expect(s2.getState().run?.game.boss?.id).toBe('lust');
   });

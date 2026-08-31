@@ -67,6 +67,8 @@ export interface Game {
   lastPlayerAction: number | null;
   /** Campaign finale exit. Null on Easy/Medium/Hard and campaign floors 1–4. */
   doorIndex: number | null;
+  /** Lust heart plant order, oldest first. Empty when no hearts. */
+  heartOrder: number[];
 }
 
 export interface ChestReward {
