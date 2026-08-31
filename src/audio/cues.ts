@@ -2,7 +2,7 @@ import type { BossId, GameEvent } from '../engine';
 import { isCampaignFinale, type Difficulty } from '../engine';
 import type { BgmId, SfxId } from './urls';
 
-export type AppScreen = 'menu' | 'play' | 'collection';
+export type AppScreen = 'menu' | 'play' | 'collection' | 'shop';
 
 export type DifficultyMode = Difficulty;
 

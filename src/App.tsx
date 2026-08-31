@@ -21,11 +21,12 @@ import Board, { collectFx, useBoardCellSize, type BlastFx } from './ui/Board';
 import Collection from './ui/Collection';
 import LootQueue, { type LootToast } from './ui/LootToast';
 import MuteButton from './ui/MuteButton';
+import Shop from './ui/Shop';
 import TitleMenu from './ui/TitleMenu';
 import { BagIcon, BossIcon, ChestIcon, FlagIcon, GoldIcon, ItemIcon, MenuIcon, ShovelIcon } from './ui/icons';
 import { chainDuration, prefersReducedMotion } from './ui/motion';
 
-type Screen = 'menu' | 'play' | 'collection';
+type Screen = 'menu' | 'play' | 'collection' | 'shop';
 const TUTORIAL_KEY = 'crawler-mines-tutorial';
 
 function reportFor(run: NonNullable<ReturnType<typeof useGameStore.getState>['run']>): FloorReport | null {
@@ -38,6 +39,7 @@ export default function App() {
   const meta = useGameStore((s) => s.meta);
   const runLoot = useGameStore((s) => s.runLoot);
   const startRun = useGameStore((s) => s.start);
+  const sellFromShop = useGameStore((s) => s.sell);
   const nextFloorAction = useGameStore((s) => s.nextFloor);
   const retryFloorAction = useGameStore((s) => s.retryFloor);
   const applyDig = useGameStore((s) => s.applyDig);
@@ -218,12 +220,21 @@ export default function App() {
               setScreen(collectionFrom === 'play' && run ? 'play' : 'menu');
             }}
           />
+        ) : screen === 'shop' ? (
+          <Shop
+            meta={meta}
+            onBack={() => setScreen('menu')}
+            onSell={(itemId, qty) => sellFromShop(itemId, qty)}
+            onUi={cueUi}
+            onDeny={playDeny}
+          />
         ) : screen === 'menu' || !run ? (
           <TitleMenu
             onStart={start}
             onResume={run ? resume : undefined}
             resumeCopy={run ? resumeLabel(run) : null}
             onCollection={() => openCollection('menu')}
+            onShop={() => setScreen('shop')}
             gold={meta.gold}
             meta={meta}
             muted={muted}

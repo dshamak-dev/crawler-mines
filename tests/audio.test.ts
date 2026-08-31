@@ -57,6 +57,8 @@ describe('BGM routing', () => {
     expect(desiredBgm('play', 'hard')).toBe('cozy');
     expect(desiredBgm('collection', 'easy', 'play')).toBe('cozy');
     expect(desiredBgm('collection', 'campaign', 'menu')).toBe('cozy');
+    expect(desiredBgm('shop', null)).toBe('cozy');
+    expect(desiredBgm('shop', 'campaign')).toBe('cozy');
   });
 
   it('uses campaign-depths on campaign floors before the finale', () => {
