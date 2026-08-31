@@ -95,6 +95,7 @@ export type { ChestNotice } from './game';
 export {
   BOSS_COPY,
   bossMaxLives,
+  bossIdFromHead,
   chebyshev,
   chipLustHeart,
   clampBossLives,
@@ -118,6 +119,24 @@ export type { CampaignStash } from './stash';
 export { sealedRunRows, sealedRowsFromBoard, sealedRowsFromStash, sealedRowLabel } from './sealed';
 export type { SealedKind, SealedRow } from './sealed';
 export { mulberry32 } from './rng';
+export {
+  CAMPAIGN_OFFERING_COPY,
+  OFFERING_SLOT_COUNT,
+  SOCKETABLE_IDS,
+  canSocket,
+  emptyOfferings,
+  hasSocketedCampaignKey,
+  isBossHead,
+  isSocketable,
+  normalizeOfferings,
+  offeringCaption,
+  offeringCaptionParts,
+  offeringPickerRows,
+  remainingOwned,
+  socketedBossId,
+  socketedList,
+} from './offerings';
+export type { OfferingPickerRow, OfferingQuote, OfferingSlots, SocketableId } from './offerings';
 export {
   CAMPAIGN_COST,
   HARD_COST,

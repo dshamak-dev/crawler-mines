@@ -81,7 +81,12 @@ function pickUnique(
   return picked;
 }
 
-export function createGame(config: FloorConfig, rng: Rng, mode: Difficulty = 'easy'): Game {
+export function createGame(
+  config: FloorConfig,
+  rng: Rng,
+  mode: Difficulty = 'easy',
+  lockedBossId: BossId | null = null,
+): Game {
   const { width, height, mines, chests } = config;
   const total = width * height;
   const bossSlots = config.bossLives && config.bossLives > 0 ? 1 : 0;
@@ -105,7 +110,7 @@ export function createGame(config: FloorConfig, rng: Rng, mode: Difficulty = 'ea
     const spawn = pickUnique(1, total, occupied, rng);
     const index = spawn[0];
     cells[index].state = 'revealed';
-    const id = rollBossId(rng);
+    const id = rollBossId(rng, lockedBossId);
     boss = { id, index, lives: bossMaxLives(id), heart: id === 'lust' };
     bossRing = new Set([index, ...neighbors(width, height, index)]);
   }

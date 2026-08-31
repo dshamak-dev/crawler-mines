@@ -76,7 +76,7 @@ describe('entry quotes', () => {
     expect(confirmLabel(quoteEntry('campaign', meta))).toBe('Spend 100 gold');
   });
 
-  it('prefers a matching key over gold', () => {
+  it('prefers a matching Hard key over gold; Campaign keys stay unsocketed', () => {
     const hard = {
       ...emptyCollection(),
       gold: 90,
@@ -94,12 +94,12 @@ describe('entry quotes', () => {
       gold: 90,
     });
     expect(quoteEntry('campaign', campaign)).toMatchObject({
-      kind: 'key',
-      keyId: 'campaign-key',
-      keyCount: 2,
+      kind: 'gold',
+      cost: CAMPAIGN_COST,
+      keyId: null,
     });
     expect(confirmLabel(quoteEntry('hard', hard))).toBe('Use Hard key');
-    expect(confirmLabel(quoteEntry('campaign', campaign))).toBe('Use Campaign key');
+    expect(confirmLabel(quoteEntry('campaign', campaign))).toBe('Spend 100 gold');
     expect(quoteEntry('hard', campaign).kind).toBe('gold');
   });
 
@@ -143,12 +143,12 @@ describe('spendEntry', () => {
     expect(loadCollection(store).gold).toBe(30);
   });
 
-  it('consumes one matching key and does not charge gold', () => {
+  it('consumes one Hard key and does not charge gold', () => {
     const { store, meta } = withWallet(80, { 'hard-key': 2, 'campaign-key': 1 });
     const hard = spendEntry(meta, 'hard', store);
     expect(hard?.gold).toBe(80);
     expect(hard?.items['hard-key']).toBe(1);
-    const camp = spendEntry(loadCollection(store), 'campaign', store);
+    const camp = spendEntry(loadCollection(store), 'campaign', store, ['campaign-key', null]);
     expect(camp?.gold).toBe(80);
     expect(camp?.items['campaign-key']).toBe(0);
     expect(loadCollection(store).items['hard-key']).toBe(1);
@@ -212,7 +212,7 @@ describe('paid start via the game store', () => {
     s.getState().abandon();
     expect(s.getState().meta.gold).toBe(0);
     expect(loadCollection(store).gold).toBe(0);
-    expect(s.getState().start('campaign', mulberry32(9))).toBe(true);
+    expect(s.getState().start('campaign', mulberry32(9), ['campaign-key', null])).toBe(true);
     expect(s.getState().meta.items['campaign-key']).toBe(0);
     s.getState().abandon();
     expect(loadCollection(store).items['campaign-key']).toBe(0);

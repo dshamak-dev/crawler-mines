@@ -17,6 +17,7 @@ import { emptyStash, stashToRewards, type CampaignStash } from './stash';
 import {
   CAMPAIGN_FLOORS,
   isCampaignFinale,
+  type BossId,
   type BossState,
   type Cell,
   type Difficulty,
@@ -38,6 +39,8 @@ export interface Run {
   bossRevealPending?: boolean;
   /** Perfect-clear flags for campaign floors 1–4 (indices 0–3). Hydrate/resume keep it. */
   perfectFloors?: boolean[];
+  /** Socketed boss head at campaign enter; resume and floor 5 honor it. */
+  lockedBossId?: BossId | null;
 }
 
 export type FloorOutcome = 'cleared' | 'stashed' | 'victory' | 'lost';
@@ -256,6 +259,7 @@ export function sanitizeRun(raw: unknown): Run | null {
     // Resume never re-shows the floor-5 intro.
     bossRevealPending: false,
     perfectFloors: sanitizePerfectFloors(r.perfectFloors),
+    lockedBossId: isBossId(r.lockedBossId) ? r.lockedBossId : null,
   };
 }
 
