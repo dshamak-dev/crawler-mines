@@ -1,5 +1,5 @@
 import { allSafeRevealed, ensureFirstClickSafe, isWon, neighbors } from './board';
-import { hitBossFromBlasts, stepBoss } from './boss';
+import { hitBossFromBlasts, stepBoss, tapLustHeart } from './boss';
 import { addItem, type ChestTier, type ItemId } from './loot';
 import type { Cell, ChestReward, Difficulty, Game, GameEvent, Rng } from './types';
 
@@ -259,7 +259,15 @@ export function dig(game: Game, index: number, rng: Rng, mode?: Difficulty): Gam
   const events: GameEvent[] = [];
   if (game.status !== 'playing') return events;
   const cell = game.cells[index];
-  if (!cell || cell.state === 'revealed' || cell.state === 'flagged') return events;
+  if (!cell || cell.state === 'flagged') return events;
+  if (cell.state === 'revealed') {
+    const tap = tapLustHeart(game, index);
+    if (tap.length === 0) return events;
+    game.lastPlayerAction = index;
+    events.push(...tap);
+    events.push(...afterPlayerAction(game, mode));
+    return events;
+  }
 
   if (!game.firstClickDone) {
     ensureFirstClickSafe(game, index, rng);

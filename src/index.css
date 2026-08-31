@@ -461,6 +461,15 @@ button {
     inset 0 0 0 1.5px rgba(201, 180, 255, 0.45),
     inset 0 2px 4px rgba(0, 0, 0, 0.55);
 }
+.cell.is-boss.is-lust {
+  background: radial-gradient(circle at 50% 55%, rgba(196, 59, 106, 0.42), #1a1512 72%);
+  box-shadow:
+    inset 0 0 0 1.5px rgba(244, 184, 200, 0.5),
+    inset 0 2px 4px rgba(0, 0, 0, 0.55);
+}
+.cell.is-boss.is-lust .boss-glyph {
+  filter: drop-shadow(0 0 4px rgba(196, 59, 106, 0.7));
+}
 .cell .boss-under {
   opacity: 0.35;
   font-size: calc(var(--cell) * 0.32);

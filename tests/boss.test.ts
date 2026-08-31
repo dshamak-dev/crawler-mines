@@ -3,8 +3,10 @@ import {
   BOSS_MAX_LIVES,
   CAMPAIGN_COST,
   DIFFICULTIES,
+  LUST_MAX_LIVES,
   allSafeRevealed,
   chebyshev,
+  clampBossLives,
   cloneGame,
   createGame,
   createGameFromLayout,
@@ -16,7 +18,9 @@ import {
   isLost,
   isWalkable,
   loadCollection,
+  maxBossLives,
   mulberry32,
+  pickLustTarget,
   rollBonusKey,
   rollBossId,
   saveCollection,
@@ -168,9 +172,13 @@ describe('campaign floors before last do not pay wallet', () => {
 });
 
 describe('floor 5 rolls and persists boss id', () => {
-  it('rolls Gluttony or Wrath with equal weight and persists across resume', () => {
-    expect(rollBossId(() => 0.49)).toBe('gluttony');
-    expect(rollBossId(() => 0.5)).toBe('wrath');
+  it('rolls Gluttony, Wrath, or Lust with equal weight and persists across resume', () => {
+    expect(rollBossId(() => 0)).toBe('gluttony');
+    expect(rollBossId(() => 1 / 3 - 1e-9)).toBe('gluttony');
+    expect(rollBossId(() => 1 / 3)).toBe('wrath');
+    expect(rollBossId(() => 2 / 3 - 1e-9)).toBe('wrath');
+    expect(rollBossId(() => 2 / 3)).toBe('lust');
+    expect(rollBossId(() => 0.99)).toBe('lust');
 
     const { store } = withWallet(100);
     const s1 = createGameStore(store);
@@ -224,7 +232,7 @@ describe('floor 5 rolls and persists boss id', () => {
     expect(s.getState().run?.floor).toBe(4);
     expect(s.getState().run?.game.boss).not.toBeNull();
     expect(s.getState().run?.bossRevealPending).toBe(true);
-    expect(['gluttony', 'wrath']).toContain(s.getState().run?.game.boss?.id);
+    expect(['gluttony', 'wrath', 'lust']).toContain(s.getState().run?.game.boss?.id);
   });
 
   it('resume skips popup and does not reroll the boss id', () => {
@@ -410,9 +418,10 @@ describe('Wrath movement and combat', () => {
 });
 
 describe('Gluttony combat', () => {
-  it('starts with 3 lives on the boss floor', () => {
+  it('starts with per-sin lives on the boss floor', () => {
     const game = createGame(configFor('campaign', 4), mulberry32(9));
-    expect(game.boss?.lives).toBe(3);
+    expect(game.boss).not.toBeNull();
+    expect(game.boss?.lives).toBe(maxBossLives(game.boss!.id));
   });
 
   it('takes 1 life per adjacent-mine blast and dies on three hits', () => {
@@ -611,13 +620,244 @@ describe('last campaign floor spawns a boss', () => {
   it('reveals the boss cell at start and does not sit on a mine or chest', () => {
     const game = createGame(configFor('campaign', 4), mulberry32(9));
     expect(game.boss).not.toBeNull();
-    expect(game.boss?.lives).toBe(BOSS_MAX_LIVES);
-    expect(['gluttony', 'wrath']).toContain(game.boss?.id);
+    expect(game.boss?.lives).toBe(maxBossLives(game.boss!.id));
+    expect(['gluttony', 'wrath', 'lust']).toContain(game.boss?.id);
     const cell = game.cells[game.boss!.index];
     expect(cell.state).toBe('revealed');
     expect(cell.kind).toBe('empty');
     expect(cell.kind).not.toBe('mine');
     expect(cell.kind).not.toBe('chest');
+  });
+});
+
+describe('Lust movement and combat', () => {
+  function lustBoard(rows: string[]) {
+    return createGameFromLayout(rows, 10, 'gold-pouch', undefined, 'lust');
+  }
+
+  function openPath(game: ReturnType<typeof lustBoard>, cells: number[]): void {
+    for (const i of cells) game.cells[i].state = 'revealed';
+  }
+
+  it('walks one adjacent step and does not teleport onto a distant number', () => {
+    const game = lustBoard(['B....', '....*']);
+    const target = idx(game, 3, 0);
+    expect(game.cells[target].adjacentMines).toBe(1);
+    expect(chebyshev(game.width, game.boss!.index, target)).toBeGreaterThan(1);
+    expect(game.boss?.asHeart).toBe(true);
+    openPath(game, [idx(game, 1, 0), idx(game, 2, 0), target]);
+
+    const events = stepBoss(game);
+    expect(events).toEqual([{ type: 'boss-move', index: idx(game, 1, 0) }]);
+    expect(game.boss?.index).toBe(idx(game, 1, 0));
+    expect(game.boss?.index).not.toBe(target);
+    expect(game.boss?.asHeart).toBe(false);
+    expect(chebyshev(game.width, game.boss!.index, target)).toBeGreaterThan(1);
+  });
+
+  it('retargets to a newly opened higher number and leaves the old heart', () => {
+    const game = lustBoard(['B........', '.........', '.......*.', '.**......']);
+    const one = idx(game, 7, 1);
+    const two = idx(game, 1, 2);
+    expect(game.cells[one].adjacentMines).toBe(1);
+    expect(game.cells[two].adjacentMines).toBe(2);
+    openPath(game, [idx(game, 1, 0), idx(game, 2, 0), idx(game, 3, 0), idx(game, 4, 0), idx(game, 5, 0), idx(game, 6, 0), idx(game, 7, 0), one]);
+
+    for (let n = 0; n < 12 && game.boss!.index !== one; n++) {
+      stepBoss(game);
+    }
+    expect(game.boss?.index).toBe(one);
+    expect(game.boss?.asHeart).toBe(true);
+
+    openPath(game, [two, idx(game, 1, 1), idx(game, 2, 1), idx(game, 3, 1), idx(game, 4, 1), idx(game, 5, 1), idx(game, 6, 1)]);
+    const moved = stepBoss(game);
+    expect(moved.some((e) => e.type === 'boss-move')).toBe(true);
+    expect(game.boss?.asHeart).toBe(false);
+    expect(game.boss?.index).not.toBe(one);
+    expect(game.boss?.index).not.toBe(two);
+    expect(pickLustTarget(game, game.boss!.index)).toBe(two);
+    expect(chebyshev(game.width, game.boss!.index, two)).toBeGreaterThan(1);
+  });
+
+  it('sits as a heart on spawn until a number opens, then walks', () => {
+    const game = lustBoard(['B...', '....', '...*']);
+    expect(game.cells[0].adjacentMines).toBe(0);
+    expect(game.boss?.asHeart).toBe(true);
+    expect(game.boss?.index).toBe(0);
+    expect(stepBoss(game)).toEqual([]);
+    expect(game.boss?.index).toBe(0);
+    expect(game.boss?.asHeart).toBe(true);
+
+    const num = idx(game, 3, 1);
+    expect(game.cells[num].adjacentMines).toBe(1);
+    openPath(game, [idx(game, 1, 0), idx(game, 2, 0), idx(game, 3, 0), num]);
+    const events = stepBoss(game);
+    expect(events).toEqual([{ type: 'boss-move', index: idx(game, 1, 0) }]);
+    expect(game.boss?.asHeart).toBe(false);
+    expect(game.boss?.index).not.toBe(0);
+    expect(game.boss?.index).not.toBe(num);
+  });
+
+  it('loses 1 life when the heart is tapped and leaves that cell', () => {
+    const game = lustBoard(['B....', '....*']);
+    const target = idx(game, 3, 0);
+    openPath(game, [idx(game, 1, 0), idx(game, 2, 0), target]);
+    for (let n = 0; n < 8 && game.boss!.index !== target; n++) {
+      stepBoss(game);
+    }
+    expect(game.boss?.asHeart).toBe(true);
+    expect(game.boss?.index).toBe(target);
+    expect(game.boss?.lives).toBe(LUST_MAX_LIVES);
+
+    const events = dig(game, target, mulberry32(1));
+    expect(events.some((e) => e.type === 'boss-hit')).toBe(true);
+    expect(game.boss?.lives).toBe(LUST_MAX_LIVES - 1);
+    expect(game.boss?.index).not.toBe(target);
+    expect(game.cells[target].state).toBe('revealed');
+    expect(game.cells[target].adjacentMines).toBe(1);
+    expect(game.status).toBe('playing');
+  });
+
+  it('chips 1 life when a mine explodes in the heart 8-ring', () => {
+    const game = lustBoard(['*B.', '...']);
+    expect(game.boss?.asHeart).toBe(true);
+    expect(game.boss?.index).toBe(1);
+    expect(game.cells[1].adjacentMines).toBe(1);
+    const events = dig(game, 0, mulberry32(1));
+    expect(events.some((e) => e.type === 'boss-hit')).toBe(true);
+    expect(game.boss?.lives).toBe(LUST_MAX_LIVES - 1);
+  });
+
+  it('does not chip from a wrecked chest unless a mine exploded next to the heart', () => {
+    const game = lustBoard(['B$.', '..*']);
+    expect(game.boss?.asHeart).toBe(true);
+    expect(game.boss?.index).toBe(0);
+    const events = dig(game, idx(game, 2, 1), mulberry32(1));
+    expect(game.cells[idx(game, 1, 0)].wrecked).toBe(true);
+    expect(events.filter((e) => e.type === 'boss-hit')).toEqual([]);
+    expect(game.boss?.lives).toBe(LUST_MAX_LIVES);
+  });
+
+  it('does not chip by walking beside a live mine', () => {
+    const game = lustBoard(['B.*', '...']);
+    const num = idx(game, 1, 0);
+    expect(game.cells[num].adjacentMines).toBe(1);
+    dig(game, num, mulberry32(1));
+    expect(game.boss?.index).toBe(num);
+    expect(game.boss?.asHeart).toBe(true);
+    expect(game.cells[idx(game, 2, 0)].exploded).toBe(false);
+    expect(game.boss?.lives).toBe(LUST_MAX_LIVES);
+  });
+
+  it('has 5 lives; Gluttony and Wrath stay at 3; clamp does not cap Lust at 3', () => {
+    expect(lustBoard(['B.', '..']).boss?.lives).toBe(5);
+    expect(createGameFromLayout(['B.', '..'], 10, 'gold-pouch', undefined, 'gluttony').boss?.lives).toBe(3);
+    expect(createGameFromLayout(['B.', '..'], 10, 'gold-pouch', undefined, 'wrath').boss?.lives).toBe(3);
+    expect(clampBossLives(5, 'lust')).toBe(5);
+    expect(clampBossLives(5, 'gluttony')).toBe(3);
+    expect(clampBossLives(5, 'wrath')).toBe(3);
+    expect(clampBossLives(99, 'lust')).toBe(LUST_MAX_LIVES);
+  });
+
+  it('never eats flags, smashes chests, or mine-slams', () => {
+    const game = lustBoard(['B$.', '.*.']);
+    const flagCell = idx(game, 2, 1);
+    toggleFlag(game, flagCell);
+    const events = stepBoss(game);
+    expect(events.some((e) => e.type === 'boss-eat-flag')).toBe(false);
+    expect(events.some((e) => e.type === 'boss-smash-chest')).toBe(false);
+    expect(events.some((e) => e.type === 'boss-slam')).toBe(false);
+    expect(game.cells[idx(game, 1, 0)].wrecked).toBe(false);
+    expect(game.cells[flagCell].state).toBe('flagged');
+  });
+
+  it('dies after five heart taps and grants a stacking lust-head', () => {
+    const { store } = withWallet(4, { 'lust-head': 1 });
+    const s = createGameStore(store);
+    const game = lustBoard(['B.', '..']);
+    s.setState({
+      meta: loadCollection(store),
+      run: {
+        mode: 'campaign',
+        floor: 4,
+        game,
+        grantKey: 'lust-win',
+        campaignStash: { gold: 8, items: emptyInventory() },
+        bonusKey: null,
+        bossRevealPending: false,
+      },
+      runLoot: emptyInventory(),
+    });
+    const rng = seqRng([0.9, 0.9]);
+    let death = false;
+    for (let i = 0; i < 5; i++) {
+      const ev = s.getState().applyDig(0, rng);
+      if (ev.some((e) => e.type === 'boss-death')) death = true;
+    }
+    expect(death).toBe(true);
+    expect(s.getState().run?.game.status).toBe('cleared');
+    expect(s.getState().run?.game.boss?.lives).toBe(0);
+    const paid = loadCollection(store);
+    expect(paid.items['lust-head']).toBe(2);
+    expect(paid.items['gluttony-head']).toBe(0);
+    expect(paid.items['wrath-head']).toBe(0);
+    expect(paid.gold).toBe(12);
+  });
+
+  it('fails the campaign if Lust still lives when every safe tile is open', () => {
+    const { store } = withWallet(80);
+    const s = createGameStore(store);
+    const game = lustBoard(['B.', '*.']);
+    s.setState({
+      meta: loadCollection(store),
+      run: {
+        mode: 'campaign',
+        floor: 4,
+        game,
+        grantKey: 'lust-lose',
+        campaignStash: {
+          gold: 40,
+          items: { ...emptyInventory(), gem: 2, 'rusty-key': 1 },
+        },
+        bonusKey: null,
+        bossRevealPending: false,
+      },
+      runLoot: { ...emptyInventory(), gem: 2, 'rusty-key': 1 },
+    });
+    const rng = mulberry32(1);
+    s.getState().applyDig(idx(game, 1, 0), rng);
+    s.getState().applyDig(idx(game, 1, 1), rng);
+    expect(s.getState().run?.game.status).toBe('lost');
+    expect(s.getState().run?.game.boss?.lives).toBe(LUST_MAX_LIVES);
+    expect(allSafeRevealed(s.getState().run!.game)).toBe(true);
+    expect(isLost(s.getState().run!.game)).toBe(true);
+    expect(s.getState().run?.campaignStash?.gold).toBe(0);
+    expect(s.getState().meta.gold).toBe(80);
+    expect(loadCollection(store).items['lust-head']).toBe(0);
+  });
+
+  it('reloads Lust with 5 lives and the same seat', () => {
+    const { store } = withWallet(100);
+    const s1 = createGameStore(store);
+    const game = lustBoard(['B..', '...']);
+    s1.setState({
+      meta: loadCollection(store),
+      run: {
+        mode: 'campaign',
+        floor: 4,
+        game: cloneGame(game),
+        grantKey: 'lust-live',
+        campaignStash: emptyStash(),
+        bonusKey: null,
+        bossRevealPending: false,
+      },
+      runLoot: emptyInventory(),
+    });
+    const s2 = createGameStore(store);
+    expect(s2.getState().run?.game.boss?.id).toBe('lust');
+    expect(s2.getState().run?.game.boss?.lives).toBe(5);
+    expect(s2.getState().run?.game.boss?.asHeart).toBe(true);
+    expect(s2.getState().run?.game.boss?.index).toBe(0);
   });
 });
 

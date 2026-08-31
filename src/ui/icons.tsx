@@ -310,13 +310,40 @@ export function SpeakerIcon({
   );
 }
 
+function LustHeartGlyph({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 32 32" className={className ?? 'glyph'} aria-hidden="true">
+      <path
+        d="M16 27.4C14.6 26.2 4.8 19.4 4.8 12.4 4.8 8 7.8 5.4 11.6 5.4c2.4 0 3.8 1.3 4.4 2.6.6-1.3 2-2.6 4.4-2.6 3.8 0 6.8 2.6 6.8 7 0 7-9.8 13.8-11.2 15z"
+        fill="#4a1024"
+      />
+      <path
+        d="M16 25.6c-1.2-1-8.8-6.6-8.8-12.4 0-3.4 2.4-5.6 5.4-5.6 2 0 3.2 1.2 3.4 2.5.2-1.3 1.4-2.5 3.4-2.5 3 0 5.4 2.2 5.4 5.6 0 5.8-7.6 11.4-8.8 12.4z"
+        fill="#c43b6a"
+      />
+      <path
+        d="M11.2 10.2c1.3-1.5 3.1-1.2 3.5.3"
+        stroke="#f4b8c8"
+        strokeWidth="1.4"
+        fill="none"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function BossIcon({
   className,
   id = 'gluttony',
+  heart = false,
 }: {
   className?: string;
-  id?: 'gluttony' | 'wrath';
+  id?: 'gluttony' | 'wrath' | 'lust';
+  heart?: boolean;
 }) {
+  if (id === 'lust' || heart) {
+    return <LustHeartGlyph className={className} />;
+  }
   if (id === 'wrath') {
     return (
       <svg viewBox="0 0 32 32" className={className ?? 'glyph'} aria-hidden="true">
@@ -392,7 +419,27 @@ function MedalGlyph({
   );
 }
 
-function HeadGlyph({ kind }: { kind: 'gluttony' | 'wrath' }) {
+function HeadGlyph({ kind }: { kind: 'gluttony' | 'wrath' | 'lust' }) {
+  if (kind === 'lust') {
+    return (
+      <svg viewBox="0 0 32 32" className="glyph" aria-hidden="true">
+        <ellipse cx="16" cy="18" rx="9.4" ry="8.2" fill="#1a1014" />
+        <path
+          d="M16 24.8c-1-0.9-7.4-5.4-7.4-10.2 0-2.8 2-4.6 4.6-4.6 1.6 0 2.6 1 2.8 2 .2-1 1.2-2 2.8-2 2.6 0 4.6 1.8 4.6 4.6 0 4.8-6.4 9.3-7.4 10.2z"
+          fill="#c43b6a"
+        />
+        <path
+          d="M12.2 12.4c1-1.2 2.4-1 2.7.2"
+          stroke="#f4b8c8"
+          strokeWidth="1.1"
+          fill="none"
+          strokeLinecap="round"
+        />
+        <path d="M11.2 8.4l1.6-3.2 1.4 1.2-1.2 2.8z" fill="#e0b44a" />
+        <path d="M20.8 8.4l-1.6-3.2-1.4 1.2 1.2 2.8z" fill="#e0b44a" />
+      </svg>
+    );
+  }
   const body = kind === 'wrath' ? '#a32a22' : '#6b2d7a';
   const shine = kind === 'wrath' ? '#c43b30' : '#8a3d98';
   return (
@@ -427,6 +474,8 @@ export function ItemIcon({ id, className }: { id: ItemId; className?: string }) 
       <HeadGlyph kind="gluttony" />
     ) : id === 'wrath-head' ? (
       <HeadGlyph kind="wrath" />
+    ) : id === 'lust-head' ? (
+      <HeadGlyph kind="lust" />
     ) : id === 'bronze-medal' ? (
       <MedalGlyph metal="#b87333" shine="#d4a574" rim="#6b4530" />
     ) : id === 'silver-medal' ? (

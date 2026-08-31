@@ -95,6 +95,13 @@ describe('BGM routing', () => {
     expect(desiredBgm('play', 'hard', null, 0, 'wrath')).toBe('cozy');
     expect(finaleBgm('wrath')).toBe('wrath');
   });
+
+  it('reuses Gluttony BGM for Lust and does not invent a Lust loop', () => {
+    expect(desiredBgm('play', 'campaign', null, 4, 'lust')).toBe('boss');
+    expect(desiredBgm('collection', 'campaign', 'play', 4, 'lust')).toBe('boss');
+    expect(finaleBgm('lust')).toBe('boss');
+    expect(finaleBgm('gluttony')).toBe('boss');
+  });
 });
 
 describe('SFX from engine events', () => {

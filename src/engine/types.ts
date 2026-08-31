@@ -7,14 +7,21 @@ export type Difficulty = 'easy' | 'medium' | 'hard' | 'campaign';
 export type Turn = 'player' | 'boss';
 
 export const BOSS_MAX_LIVES = 3;
+export const LUST_MAX_LIVES = 5;
 
-export const BOSS_IDS = ['gluttony', 'wrath'] as const;
+export const BOSS_IDS = ['gluttony', 'wrath', 'lust'] as const;
 export type BossId = (typeof BOSS_IDS)[number];
+
+export function maxBossLives(id: BossId): number {
+  return id === 'lust' ? LUST_MAX_LIVES : BOSS_MAX_LIVES;
+}
 
 export interface BossState {
   id: BossId;
   index: number;
   lives: number;
+  /** Lust sits as a heart on spawn or on its number. False while walking. */
+  asHeart: boolean;
 }
 
 export type Rng = () => number;

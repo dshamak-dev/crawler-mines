@@ -17,11 +17,13 @@ export type {
 export {
   BOSS_IDS,
   BOSS_MAX_LIVES,
+  LUST_MAX_LIVES,
   CAMPAIGN_FLOORS,
   DIFFICULTIES,
   cellVisual,
   configFor,
   isCampaignFinale,
+  maxBossLives,
   newCell,
 } from './types';
 export type { Inventory, ItemDef, ItemId, ChestTier } from './loot';
@@ -94,17 +96,21 @@ export type { ChestNotice } from './game';
 export {
   BOSS_COPY,
   chebyshev,
+  clampBossLives,
   flaggedCells,
   firstStepToward,
   headItemId,
   hitBossFromBlasts,
   isBossId,
+  isLustHeart,
   isWalkable,
   isWounded,
+  pickLustTarget,
   rollBossId,
   smashChest,
   stepAwayFrom,
   stepBoss,
+  tapLustHeart,
 } from './boss';
 export { emptyStash, mergeStash, rollBonusKey, stashToRewards } from './stash';
 export type { CampaignStash } from './stash';

@@ -1,7 +1,6 @@
 import { emptyInventory, goldForLoot, rollLoot, tierForLoot, type ChestTier, type ItemId } from './loot';
 import { rollBossId } from './boss';
 import {
-  BOSS_MAX_LIVES,
   type BossId,
   type BossState,
   type Cell,
@@ -9,6 +8,7 @@ import {
   type FloorConfig,
   type Game,
   type Rng,
+  maxBossLives,
   newCell,
 } from './types';
 
@@ -106,7 +106,8 @@ export function createGame(config: FloorConfig, rng: Rng, mode: Difficulty = 'ea
     const spawn = pickUnique(1, total, occupied, rng);
     const index = spawn[0];
     cells[index].state = 'revealed';
-    boss = { id: rollBossId(rng), index, lives };
+    const id = rollBossId(rng);
+    boss = { id, index, lives: maxBossLives(id), asHeart: id === 'lust' };
     bossRing = new Set([index, ...neighbors(width, height, index)]);
   }
   const mineBanned = new Set([...chestIdx, ...bossRing]);
@@ -189,7 +190,10 @@ export function createGameFromLayout(
     firstClickDone: true,
     status: 'playing',
     rewardsGranted: false,
-    boss: bossIndex >= 0 ? { id: bossId, index: bossIndex, lives: BOSS_MAX_LIVES } : null,
+    boss:
+      bossIndex >= 0
+        ? { id: bossId, index: bossIndex, lives: maxBossLives(bossId), asHeart: bossId === 'lust' }
+        : null,
     turn: 'player',
     lastPlayerAction: null,
   };

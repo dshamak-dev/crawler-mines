@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties, type Poin
 import {
   BOSS_COPY,
   cellVisual,
+  isLustHeart,
   type BossId,
   type Cell,
   type Game,
@@ -108,6 +109,7 @@ export default function Board({
             reduce={reduce}
             bossHere={game.boss != null && game.boss.index === i && game.boss.lives > 0}
             bossId={game.boss?.id ?? 'gluttony'}
+            lustHeart={isLustHeart(game.boss) && game.boss?.index === i}
             onDig={onDig}
             onFlag={onFlag}
           />
@@ -148,6 +150,7 @@ function DungeonCell({
   reduce,
   bossHere,
   bossId,
+  lustHeart,
   onDig,
   onFlag,
 }: {
@@ -159,6 +162,7 @@ function DungeonCell({
   reduce: boolean;
   bossHere: boolean;
   bossId: BossId;
+  lustHeart: boolean;
   onDig: (i: number) => void;
   onFlag: (i: number) => void;
 }) {
@@ -219,9 +223,11 @@ function DungeonCell({
           : 0;
 
   const bossName = BOSS_COPY[bossId].name;
-  const label = bossHere
-    ? `${bossName}${visual === 'number' ? `, ${cell.adjacentMines} adjacent bombs` : ''}`
-    : ariaFor(visual, cell.adjacentMines, cell.tier);
+  const label = lustHeart
+    ? `${bossName} heart`
+    : bossHere
+      ? `${bossName}${visual === 'number' ? `, ${cell.adjacentMines} adjacent bombs` : ''}`
+      : ariaFor(visual, cell.adjacentMines, cell.tier);
 
   return (
     <button
@@ -229,7 +235,9 @@ function DungeonCell({
       role="gridcell"
       className={`cell vis-${visual}${wave != null ? ' pop-bomb' : ''}${
         wreckWave != null ? ' pop-wreck' : ''
-      }${bossHere ? ' is-boss' : ''}`}
+      }${bossHere ? ' is-boss' : ''}${bossId === 'lust' && bossHere ? ' is-lust' : ''}${
+        lustHeart ? ' is-lust-heart' : ''
+      }`}
       style={{ '--delay': `${delay}ms` } as CSSProperties}
       aria-label={label}
       onPointerDown={onPointerDown}
@@ -250,12 +258,12 @@ function DungeonCell({
         <span className={`rune ${NUMBER_CLASS[cell.adjacentMines]}`}>
           {cell.adjacentMines}
         </span>
-      ) : visual === 'number' && bossHere ? (
+      ) : visual === 'number' && bossHere && !lustHeart ? (
         <span className={`rune ${NUMBER_CLASS[cell.adjacentMines]} boss-under`}>
           {cell.adjacentMines}
         </span>
       ) : null}
-      {bossHere ? <BossIcon id={bossId} className="boss-glyph" /> : null}
+      {bossHere ? <BossIcon id={bossId} className="boss-glyph" heart={lustHeart} /> : null}
     </button>
   );
 }
