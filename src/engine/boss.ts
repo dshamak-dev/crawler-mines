@@ -61,15 +61,18 @@ export function bossIdFromHead(id: unknown): BossId | null {
 export const BOSS_COPY: Record<BossId, { name: string; blurb: string }> = {
   gluttony: {
     name: 'Gluttony',
-    blurb: 'Eats the closest flag. After a hit, smashes sealed chests when no flags remain.',
+    blurb:
+      'Eats the closest flag. After a hit, smashes sealed chests when no flags remain. When it falls, leave through the door.',
   },
   wrath: {
     name: 'Wrath',
-    blurb: 'Hunts your last dig or flag. Smashes adjacent chests. Slams a mine when stuck.',
+    blurb:
+      'Hunts your last dig or flag. Smashes adjacent chests. Slams a mine when stuck. When it falls, leave through the door.',
   },
   lust: {
     name: 'Lust',
-    blurb: 'Walks to the highest open number and becomes a heart. Tap or blast the heart.',
+    blurb:
+      'Walks to the highest open number that still has a hidden neighbor and plants a heart. Tap him or blast a mine next to him. Hearts stay until a blast strips them. When he falls, leave through the door.',
   },
 };
 
@@ -90,7 +93,15 @@ export function isOpenNumber(game: Game, index: number): boolean {
   );
 }
 
-/** Highest open digit; ties nearest to Lust, then lowest index. */
+/** Closed (hidden or flagged) cell in the 8-ring — remaining unknown mines or stones. */
+export function hasHiddenNeighbor(game: Game, index: number): boolean {
+  return neighbors(game.width, game.height, index).some((n) => game.cells[n].state !== 'revealed');
+}
+
+/**
+ * Highest open digit that is not already hearted and still has a hidden neighbor.
+ * Ties: nearest Chebyshev to Lust, then lowest index. Fully-open rings are skipped.
+ */
 export function pickLustTarget(game: Game): number | null {
   const boss = game.boss;
   if (!boss) return null;
@@ -98,8 +109,9 @@ export function pickLustTarget(game: Game): number | null {
   let bestDigit = 0;
   let bestDist = Infinity;
   for (let i = 0; i < game.cells.length; i++) {
-    if (!isOpenNumber(game, i)) continue;
-    const digit = game.cells[i].adjacentMines;
+    const cell = game.cells[i];
+    if (!isOpenNumber(game, i) || cell.hearted || !hasHiddenNeighbor(game, i)) continue;
+    const digit = cell.adjacentMines;
     const dist = chebyshev(game.width, boss.index, i);
     if (
       best == null ||
@@ -113,17 +125,6 @@ export function pickLustTarget(game: Game): number | null {
     }
   }
   return best;
-}
-
-export function isLustHeart(game: Game, index: number): boolean {
-  const boss = game.boss;
-  return Boolean(
-    boss &&
-      boss.id === 'lust' &&
-      boss.lives > 0 &&
-      boss.heart === true &&
-      boss.index === index,
-  );
 }
 
 function healthyChestIndices(game: Game): number[] {
@@ -341,62 +342,68 @@ function stepWrath(game: Game, boss: BossState): GameEvent[] {
   return [{ type: 'boss-slam', index: target }];
 }
 
+function plantHeart(game: Game, index: number): GameEvent[] {
+  const cell = game.cells[index];
+  if (!cell || cell.hearted) return [];
+  cell.hearted = true;
+  return [{ type: 'boss-plant-heart', index }];
+}
+
 /**
- * One 8-adjacent step toward the highest open number. Occupies as a heart
- * on arrival or when no number is open yet. `afterHit` skips re-occupying
- * the tile Lust was just chipped off of.
+ * One 8-adjacent step toward the chosen open number. On arrival, plants a
+ * heart overlay on that cell and can retarget next turn. Sits / waits when
+ * no number has a remaining hidden neighbor. Never becomes a heart.
  */
-function stepLust(game: Game, boss: BossState, afterHit: boolean): GameEvent[] {
+function stepLust(game: Game, boss: BossState): GameEvent[] {
   const target = pickLustTarget(game);
-  if (target == null) {
-    boss.heart = true;
-    return [];
-  }
-  if (boss.index === target) {
-    if (!afterHit) boss.heart = true;
-    return [];
-  }
+  if (target == null) return [];
+  if (boss.index === target) return plantHeart(game, target);
   const step = firstStepToward(game, boss.index, new Set([target]));
   if (step == null || step === boss.index) return [];
   boss.index = step;
-  boss.heart = step === target;
-  return [{ type: 'boss-move', index: step }];
+  const events: GameEvent[] = [{ type: 'boss-move', index: step }];
+  if (step === target) events.push(...plantHeart(game, target));
+  return events;
 }
 
 /**
  * One boss action. Gluttony: flags first, then wounded chest smash.
  * Wrath: adjacent chest smash, hunt last action, else mine-slam (self-hit).
- * Lust: one walkable step toward the highest open number; sits as a heart if none.
+ * Lust: one walkable step toward the highest open number with a hidden neighbor;
+ * plants a heart on arrival. No flag-eat, chest smash, or mine-slam.
  * A `boss-slam` event must be resolved by the game layer via explodeChain.
  */
-export function stepBoss(game: Game, afterHit = false): GameEvent[] {
+export function stepBoss(game: Game, _afterHit = false): GameEvent[] {
   const boss = game.boss;
   if (!boss || game.status !== 'playing' || boss.lives <= 0) return [];
-  if (boss.id === 'lust') return stepLust(game, boss, afterHit);
+  if (boss.id === 'lust') return stepLust(game, boss);
   if (boss.id === 'wrath') return stepWrath(game, boss);
   return stepGluttony(game, boss);
 }
 
-export function chipLustHeart(game: Game): GameEvent[] {
+/** Strip heart overlays from every cell in each blast's 8-neighborhood. */
+export function stripHeartsFromBlasts(game: Game, blastIndices: readonly number[]): void {
+  for (const index of blastIndices) {
+    for (const n of neighbors(game.width, game.height, index)) {
+      game.cells[n].hearted = false;
+    }
+  }
+}
+
+/** Tap Lust's current cell — hit the walker, not a heart overlay. */
+export function chipBoss(game: Game): GameEvent[] {
   const boss = game.boss;
-  if (!boss || boss.id !== 'lust' || boss.lives <= 0 || boss.heart !== true) return [];
+  if (!boss || boss.lives <= 0) return [];
   boss.lives -= 1;
-  boss.heart = false;
-  return [{ type: 'boss-hit', lives: boss.lives }];
+  const events: GameEvent[] = [{ type: 'boss-hit', lives: boss.lives }];
+  if (boss.lives <= 0) events.push({ type: 'boss-death' });
+  return events;
 }
 
 /** Each exploding mine whose 8-neighborhood contains the boss deals 1 life. */
 export function hitBossFromBlasts(game: Game, blastIndices: readonly number[]): GameEvent[] {
   const boss = game.boss;
   if (!boss || boss.lives <= 0) return [];
-  if (boss.id === 'lust') {
-    if (boss.heart !== true) return [];
-    const around = new Set(neighbors(game.width, game.height, boss.index));
-    for (const index of blastIndices) {
-      if (around.has(index)) return chipLustHeart(game);
-    }
-    return [];
-  }
   const events: GameEvent[] = [];
   const around = new Set(neighbors(game.width, game.height, boss.index));
   for (const index of blastIndices) {
@@ -404,6 +411,9 @@ export function hitBossFromBlasts(game: Game, blastIndices: readonly number[]): 
     if (!around.has(index)) continue;
     boss.lives -= 1;
     events.push({ type: 'boss-hit', lives: boss.lives });
+  }
+  if (boss.lives <= 0 && !events.some((e) => e.type === 'boss-death')) {
+    events.push({ type: 'boss-death' });
   }
   return events;
 }

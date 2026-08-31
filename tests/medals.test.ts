@@ -360,11 +360,30 @@ describe('campaign gold cup', () => {
     for (let hit = 0; hit < BOSS_MAX_LIVES + 2; hit++) {
       const g = store.getState().run?.game;
       if (!g || g.status !== 'playing') break;
+      if (g.boss && g.boss.lives <= 0) break;
       const mine = g.cells.findIndex((c) => c.kind === 'mine' && !c.exploded);
       if (mine < 0) break;
       allEvents.push(...store.getState().applyDig(mine, rng));
     }
     return allEvents;
+  }
+
+  function extractThroughDoor(
+    store: ReturnType<typeof createGameStore>,
+    rng: () => number,
+  ): GameEvent[] {
+    const game = store.getState().run?.game;
+    if (!game) return [];
+    const door = game.doorIndex;
+    if (door == null) throw new Error('expected a finale door');
+    if (game.cells[door].state !== 'revealed') {
+      store.getState().applyDig(door, rng);
+    }
+    const events = store.getState().applyDig(door, rng);
+    if (events.some((e) => e.type === 'extract-prompt')) {
+      return store.getState().applyExtract(rng);
+    }
+    return events;
   }
 
   function revealAllOnStore(s: ReturnType<typeof createGameStore>, rng: () => number): void {
@@ -513,8 +532,11 @@ describe('campaign gold cup', () => {
       },
       runLoot: { ...stashItems },
     });
-    const events = killBoss(s, seqRng([0.9, 0.9, 0.9, 0.9]));
+    const rng = seqRng([0.9, 0.9, 0.9, 0.9]);
+    const events = killBoss(s, rng);
     expect(events.some((e) => e.type === 'boss-death')).toBe(true);
+    expect(s.getState().run?.game.status).toBe('playing');
+    extractThroughDoor(s, rng);
     expect(s.getState().run?.game.status).toBe('cleared');
     expect(s.getState().run?.campaignStash?.items['gold-cup']).toBe(1);
     expect(s.getState().run?.campaignStash?.items['gluttony-head']).toBe(1);
@@ -548,7 +570,10 @@ describe('campaign gold cup', () => {
       },
       runLoot: emptyInventory(),
     });
-    killBoss(s, seqRng([0.9, 0.9]));
+    const missRng = seqRng([0.9, 0.9]);
+    killBoss(s, missRng);
+    expect(s.getState().run?.game.status).toBe('playing');
+    extractThroughDoor(s, missRng);
     expect(s.getState().run?.game.status).toBe('cleared');
     expect(floorReport(s.getState().run!).goldCup).toBeNull();
     expect(loadCollection(store).items['gold-cup']).toBe(0);
@@ -573,7 +598,10 @@ describe('campaign gold cup', () => {
       },
       runLoot: emptyInventory(),
     });
-    killBoss(s, seqRng([0.9, 0.9]));
+    const imperfectRng = seqRng([0.9, 0.9]);
+    killBoss(s, imperfectRng);
+    expect(s.getState().run?.game.status).toBe('playing');
+    extractThroughDoor(s, imperfectRng);
     expect(s.getState().run?.game.status).toBe('cleared');
     expect(isPerfectClear(s.getState().run!.game)).toBe(false);
     expect(loadCollection(store).items['gold-cup']).toBe(1);

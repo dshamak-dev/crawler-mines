@@ -155,6 +155,7 @@ describe('SFX from engine events', () => {
     expect(
       sfxFromEvents([{ type: 'boss-smash-chest', index: 2, tier: 'iron' }]),
     ).toEqual(['wreck']);
+    expect(sfxFromEvents([{ type: 'deny' }])).toEqual(['deny']);
   });
 });
 

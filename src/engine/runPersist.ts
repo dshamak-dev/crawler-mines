@@ -1,4 +1,4 @@
-import { cloneGame } from './board';
+import { cloneGame, isDoorCandidate, pickDoorIndex } from './board';
 import { clampBossLives, headItemId, isBossId } from './boss';
 import type { CollectionState, KeyStore } from './collection';
 import { applyRewards } from './collection';
@@ -156,8 +156,7 @@ function sanitizeBoss(raw: unknown, cellCount: number): BossState | null {
   const b = raw as Record<string, unknown>;
   if (!isInt(b.index) || b.index < 0 || b.index >= cellCount) return null;
   const id = isBossId(b.id) ? b.id : 'gluttony';
-  const heart = id === 'lust' ? b.heart !== false : undefined;
-  return { id, index: b.index, lives: clampBossLives(b.lives, id), heart };
+  return { id, index: b.index, lives: clampBossLives(b.lives, id) };
 }
 
 function sanitizeCell(raw: unknown): Cell | null {
@@ -182,6 +181,7 @@ function sanitizeCell(raw: unknown): Cell | null {
     gold: Math.floor(c.gold),
     tier,
     loot,
+    hearted: c.hearted === true,
   };
 }
 
@@ -214,6 +214,15 @@ function sanitizeGame(raw: unknown): Game | null {
     isInt(g.lastPlayerAction) && g.lastPlayerAction >= 0 && g.lastPlayerAction < cells.length
       ? g.lastPlayerAction
       : null;
+  let doorIndex =
+    isInt(g.doorIndex) && g.doorIndex >= 0 && g.doorIndex < cells.length ? g.doorIndex : null;
+  if (boss) {
+    if (doorIndex == null || !isDoorCandidate(cells, doorIndex, boss.index)) {
+      doorIndex = pickDoorIndex(g.width as number, g.height as number, cells, boss.index);
+    }
+  } else {
+    doorIndex = null;
+  }
   const game: Game = {
     width: g.width,
     height: g.height,
@@ -231,6 +240,7 @@ function sanitizeGame(raw: unknown): Game | null {
     boss,
     turn,
     lastPlayerAction,
+    doorIndex,
   };
   resolvePendingBossTurn(game);
   return game;

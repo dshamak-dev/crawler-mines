@@ -13,6 +13,7 @@ import {
   emptyInventory,
   emptyPerfectFloors,
   emptyStash,
+  extract,
   flag,
   headItemId,
   isCampaignFinale,
@@ -57,6 +58,7 @@ export interface GameStoreState {
   dismissBossReveal: () => void;
   applyDig: (index: number, rng?: Rng) => GameEvent[];
   applyFlag: (index: number, rng?: Rng) => GameEvent[];
+  applyExtract: (rng?: Rng) => GameEvent[];
   sell: (itemId: ItemId, qty?: number) => boolean;
 }
 
@@ -285,6 +287,26 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
           if (events.length === 0 && game.cells[index]?.state === run.game.cells[index]?.state) {
             return [];
           }
+          const settled = settleCampaign(run, game, events, meta, runLoot, rng, keyStore);
+          set({
+            run: {
+              ...run,
+              game,
+              campaignStash: settled.campaignStash,
+              bonusKey: settled.bonusKey,
+              perfectFloors: settled.perfectFloors,
+            },
+            meta: settled.meta,
+            runLoot: settled.runLoot,
+          });
+          return events;
+        },
+        applyExtract: (rng = Math.random) => {
+          const { run, meta, runLoot } = get();
+          if (!run || run.game.status !== 'playing') return [];
+          if (run.bossRevealPending) return [];
+          const game = cloneGame(run.game);
+          const events = extract(game, run.mode);
           const settled = settleCampaign(run, game, events, meta, runLoot, rng, keyStore);
           set({
             run: {

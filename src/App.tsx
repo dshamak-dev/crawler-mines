@@ -45,6 +45,7 @@ export default function App() {
   const retryFloorAction = useGameStore((s) => s.retryFloor);
   const applyDig = useGameStore((s) => s.applyDig);
   const applyFlag = useGameStore((s) => s.applyFlag);
+  const applyExtract = useGameStore((s) => s.applyExtract);
   const dismissBossReveal = useGameStore((s) => s.dismissBossReveal);
 
   const [screen, setScreen] = useState<Screen>(() => (run ? 'play' : 'menu'));
@@ -62,6 +63,7 @@ export default function App() {
   const [sparkles, setSparkles] = useState<Array<{ id: number; index: number }>>([]);
   const [shaking, setShaking] = useState(false);
   const [lootQueue, setLootQueue] = useState<LootToast[]>([]);
+  const [extractPrompt, setExtractPrompt] = useState(false);
   const [collectionFrom, setCollectionFrom] = useState<Screen>(run ? 'play' : 'menu');
   const fxId = useRef(1);
   const toastId = useRef(1);
@@ -88,6 +90,7 @@ export default function App() {
     setShaking(false);
     setReport(null);
     setFlagMode(false);
+    setExtractPrompt(false);
   };
 
   const start = (mode: Difficulty, offerings?: OfferingSlots) => {
@@ -170,12 +173,22 @@ export default function App() {
       const events = applyDig(index);
       const cur = useGameStore.getState().run;
       if (!cur || events.length === 0) return;
+      if (events.some((e) => e.type === 'extract-prompt')) setExtractPrompt(true);
       for (const id of sfxFromEvents(events)) playSfx(id);
       queueChestToasts(events, cur.game.cells);
       finishIfEnded(events);
     },
     [applyDig, finishIfEnded, playSfx, queueChestToasts],
   );
+
+  const onExtract = useCallback(() => {
+    setExtractPrompt(false);
+    const events = applyExtract();
+    const cur = useGameStore.getState().run;
+    if (!cur || events.length === 0) return;
+    for (const id of sfxFromEvents(events)) playSfx(id);
+    finishIfEnded(events);
+  }, [applyExtract, finishIfEnded, playSfx]);
 
   const onFlag = useCallback(
     (index: number) => {
@@ -259,6 +272,15 @@ export default function App() {
             onDismissToast={dismissToast}
             onDig={onDig}
             onFlag={onFlag}
+            extractPrompt={extractPrompt}
+            onExtract={() => {
+              cueUi();
+              onExtract();
+            }}
+            onKeepDigging={() => {
+              cueUi();
+              setExtractPrompt(false);
+            }}
             onUi={cueUi}
             onCollection={() => {
               cueUi();
@@ -300,6 +322,9 @@ function Play({
   onDismissToast,
   onDig,
   onFlag,
+  extractPrompt,
+  onExtract,
+  onKeepDigging,
   onUi,
   onCollection,
   onExitRun,
@@ -322,6 +347,9 @@ function Play({
   onDismissToast: (id: number) => void;
   onDig: (i: number) => void;
   onFlag: (i: number) => void;
+  extractPrompt: boolean;
+  onExtract: () => void;
+  onKeepDigging: () => void;
   onUi: () => void;
   onCollection: () => void;
   onExitRun: () => void;
@@ -431,9 +459,11 @@ function Play({
         </div>
         <p className="hint">
           {boss
-            ? boss.id === 'lust'
-              ? 'Tap the heart or blast a mine next to it.'
-              : 'Hit it with a blast. Eating a flag is not a loss.'
+            ? boss.lives <= 0
+              ? 'The boss is dead. Find the door and extract.'
+              : boss.id === 'lust'
+                ? 'Tap Lust or blast a mine next to him. Hearts hide numbers until a blast.'
+                : 'Hit it with a blast. Eating a flag is not a loss.'
             : `Tap to ${flagMode ? 'flag' : 'dig'} · hold 400ms to flag`}
         </p>
       </footer>
@@ -531,6 +561,23 @@ function Play({
             >
               Face it
             </button>
+          </div>
+        </div>
+      )}
+
+      {extractPrompt && !report && !menuOpen && (
+        <div className="overlay" role="dialog" aria-modal="true" aria-labelledby="extract-title">
+          <div className="tablet" onClick={(e) => e.stopPropagation()}>
+            <h2 id="extract-title">Leave now?</h2>
+            <p>Treasure still lies buried. Exit with what you have, or keep digging.</p>
+            <div className="row-btns">
+              <button type="button" className="stone-btn gold" onClick={onKeepDigging}>
+                Keep digging
+              </button>
+              <button type="button" className="stone-btn" onClick={onExtract}>
+                Exit
+              </button>
+            </div>
           </div>
         </div>
       )}

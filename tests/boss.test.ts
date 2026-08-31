@@ -13,14 +13,15 @@ import {
   createGameFromLayout,
   configFor,
   dig,
+  extract,
   emptyInventory,
   emptyStash,
   flag,
   isLost,
-  isLustHeart,
   isWalkable,
   loadCollection,
   mulberry32,
+  neighbors,
   pickLustTarget,
   rollBonusKey,
   rollBossId,
@@ -87,11 +88,39 @@ function killBoss(
   for (let hit = 0; hit < BOSS_MAX_LIVES + 2; hit++) {
     const g = store.getState().run?.game;
     if (!g || g.status !== 'playing') break;
+    if (g.boss && g.boss.lives <= 0) break;
     const mine = g.cells.findIndex((c) => c.kind === 'mine' && !c.exploded);
     if (mine < 0) break;
     allEvents.push(...store.getState().applyDig(mine, rng));
   }
   return allEvents;
+}
+
+function extractThroughDoor(
+  store: ReturnType<typeof createGameStore>,
+  rng: () => number,
+): GameEvent[] {
+  const game = store.getState().run?.game;
+  if (!game) return [];
+  const door = game.doorIndex;
+  if (door == null) throw new Error('expected a finale door');
+  if (game.cells[door].state !== 'revealed') {
+    store.getState().applyDig(door, rng);
+  }
+  const events = store.getState().applyDig(door, rng);
+  if (events.some((e) => e.type === 'extract-prompt')) {
+    return store.getState().applyExtract(rng);
+  }
+  return events;
+}
+
+function extractGame(game: ReturnType<typeof createGameFromLayout>, rng: () => number): GameEvent[] {
+  const door = game.doorIndex;
+  if (door == null) throw new Error('expected a finale door');
+  if (game.cells[door].state !== 'revealed') dig(game, door, rng, 'campaign');
+  const events = dig(game, door, rng, 'campaign');
+  if (events.some((e) => e.type === 'extract-prompt')) return extract(game, 'campaign');
+  return events;
 }
 
 /** Fixed sequence: first values for digs (unused when firstClickDone), then settle rolls. */
@@ -257,7 +286,7 @@ describe('floor 5 rolls and persists boss id', () => {
     const s2 = createGameStore(store);
     expect(s2.getState().run?.game.boss?.id).toBe('lust');
     expect(s2.getState().run?.game.boss?.lives).toBe(LUST_MAX_LIVES);
-    expect(s2.getState().run?.game.boss?.heart).toBe(true);
+    expect(s2.getState().run?.game.cells.every((c) => !c.hearted)).toBe(true);
     expect(s2.getState().run?.bossRevealPending).toBe(false);
     expect(
       desiredBgm('play', 'campaign', null, 4, s2.getState().run?.game.boss?.id ?? null),
@@ -427,11 +456,10 @@ describe('Lust movement and combat', () => {
     expect(game.boss?.index).not.toBe(target);
     expect(chebyshev(game.width, 0, game.boss!.index)).toBe(1);
     expect(chebyshev(game.width, game.boss!.index, target)).toBe(before - 1);
-    expect(game.boss?.heart).toBe(false);
-    expect(isLustHeart(game, target)).toBe(false);
+    expect(game.cells.every((c) => !c.hearted)).toBe(true);
   });
 
-  it('retargets to a newly opened higher number and leaves the old heart', () => {
+  it('plants a heart that hides the number, then retargets and leaves the overlay', () => {
     const game = createGameFromLayout(
       ['B....', '.....', '*..**', '.....'],
       10,
@@ -446,33 +474,31 @@ describe('Lust movement and combat', () => {
     game.cells[low].state = 'revealed';
     game.cells[idx(game, 1, 0)].state = 'revealed';
     expect(pickLustTarget(game)).toBe(low);
-    stepBoss(game);
+    const planted = stepBoss(game);
     expect(game.boss?.index).toBe(low);
-    expect(game.boss?.heart).toBe(true);
-    expect(isLustHeart(game, low)).toBe(true);
+    expect(game.cells[low].hearted).toBe(true);
+    expect(planted.some((e) => e.type === 'boss-plant-heart' && e.index === low)).toBe(true);
 
     game.cells[high].state = 'revealed';
     game.cells[idx(game, 2, 1)].state = 'revealed';
-    game.cells[idx(game, 3, 1)].state = 'revealed';
     expect(game.cells[high].adjacentMines).toBeGreaterThan(game.cells[low].adjacentMines);
     expect(pickLustTarget(game)).toBe(high);
     const left = stepBoss(game);
     expect(left).toEqual([{ type: 'boss-move', index: expect.any(Number) }]);
     expect(game.boss?.index).not.toBe(high);
-    expect(isLustHeart(game, low)).toBe(false);
-    expect(isLustHeart(game, high)).toBe(false);
+    expect(game.cells[low].hearted).toBe(true);
+    expect(game.cells[high].hearted).toBe(false);
     expect(game.cells[low].adjacentMines).toBe(1);
     expect(chebyshev(game.width, game.boss!.index, high)).toBeGreaterThan(0);
   });
 
-  it('sits as a heart on spawn until a number opens, then walks', () => {
+  it('sits on spawn with no heart until a number opens, then walks', () => {
     const game = createGameFromLayout(['B....', '.....', '....*'], 10, 'gold-pouch', undefined, 'lust');
-    expect(game.boss?.heart).toBe(true);
-    expect(isLustHeart(game, 0)).toBe(true);
+    expect(game.cells[0].hearted).toBe(false);
     expect(pickLustTarget(game)).toBeNull();
     expect(stepBoss(game)).toEqual([]);
     expect(game.boss?.index).toBe(0);
-    expect(game.boss?.heart).toBe(true);
+    expect(game.cells.every((c) => !c.hearted)).toBe(true);
 
     const far = idx(game, 3, 1);
     expect(game.cells[far].adjacentMines).toBe(1);
@@ -485,20 +511,43 @@ describe('Lust movement and combat', () => {
     const moved = stepBoss(game);
     expect(moved[0]?.type).toBe('boss-move');
     expect(game.boss?.index).not.toBe(far);
-    expect(game.boss?.heart).toBe(false);
+    expect(game.cells[0].hearted).toBe(false);
   });
 
-  it('tapping the heart chips one life', () => {
-    const game = createGameFromLayout(['B..', '...', '...'], 10, 'gold-pouch', undefined, 'lust');
-    expect(game.boss?.lives).toBe(LUST_MAX_LIVES);
-    expect(isLustHeart(game, 0)).toBe(true);
-    const events = dig(game, 0, mulberry32(1));
-    expect(events.some((e) => e.type === 'boss-hit' && e.lives === LUST_MAX_LIVES - 1)).toBe(true);
+  it('tapping a heart does not remove it and denies unless Lust is on that cell', () => {
+    const game = createGameFromLayout(
+      ['B....', '.....', '*..**', '.....'],
+      10,
+      'gold-pouch',
+      undefined,
+      'lust',
+    );
+    const low = idx(game, 1, 1);
+    game.cells[low].state = 'revealed';
+    game.cells[idx(game, 1, 0)].state = 'revealed';
+    stepBoss(game);
+    expect(game.cells[low].hearted).toBe(true);
+    expect(game.boss?.index).toBe(low);
+
+    const chip = dig(game, low, mulberry32(1));
+    expect(chip.some((e) => e.type === 'boss-hit' && e.lives === LUST_MAX_LIVES - 1)).toBe(true);
     expect(game.boss?.lives).toBe(LUST_MAX_LIVES - 1);
+    expect(game.cells[low].hearted).toBe(true);
     expect(game.status).toBe('playing');
+
+    const high = idx(game, 3, 1);
+    game.cells[high].state = 'revealed';
+    game.cells[idx(game, 2, 1)].state = 'revealed';
+    stepBoss(game);
+    expect(game.boss?.index).not.toBe(low);
+    expect(game.cells[low].hearted).toBe(true);
+    const denied = dig(game, low, mulberry32(1));
+    expect(denied).toEqual([{ type: 'deny' }]);
+    expect(game.cells[low].hearted).toBe(true);
+    expect(game.boss?.lives).toBe(LUST_MAX_LIVES - 1);
   });
 
-  it('a blast in the heart 8-ring chips one life and walking beside a live mine does not', () => {
+  it('a blast in Lust’s 8-ring chips him and walking beside a live mine does not', () => {
     const beside = createGameFromLayout(['B.**', '....'], 10, 'gold-pouch', undefined, 'lust');
     const mine = idx(beside, 2, 0);
     const stepCell = idx(beside, 1, 0);
@@ -513,15 +562,83 @@ describe('Lust movement and combat', () => {
     expect(chebyshev(beside.width, beside.boss!.index, mine)).toBe(1);
     expect(beside.boss?.lives).toBe(LUST_MAX_LIVES);
     expect(beside.cells[mine].exploded).toBe(false);
-    expect(isLustHeart(beside, stepCell)).toBe(false);
 
     const game = createGameFromLayout(['*B.', '...'], 10, 'gold-pouch', undefined, 'lust');
-    expect(isLustHeart(game, 1)).toBe(true);
+    expect(game.boss?.index).toBe(1);
     expect(game.boss?.lives).toBe(LUST_MAX_LIVES);
     dig(game, 0, mulberry32(1));
     expect(game.boss?.lives).toBe(LUST_MAX_LIVES - 1);
     expect(game.cells[0].exploded).toBe(true);
-    expect(isLustHeart(game, 1)).toBe(false);
+  });
+
+  it('a blast in a heart’s 8-neighborhood strips the overlay so the number shows again', () => {
+    const game = createGameFromLayout(
+      ['B....', '.....', '*..**', '.....'],
+      10,
+      'gold-pouch',
+      undefined,
+      'lust',
+    );
+    const low = idx(game, 1, 1);
+    const high = idx(game, 3, 1);
+    const mine = idx(game, 0, 2);
+    game.cells[low].state = 'revealed';
+    game.cells[idx(game, 1, 0)].state = 'revealed';
+    stepBoss(game);
+    expect(game.cells[low].hearted).toBe(true);
+    game.cells[high].state = 'revealed';
+    game.cells[idx(game, 2, 1)].state = 'revealed';
+    stepBoss(game);
+    expect(game.boss?.index).not.toBe(low);
+    expect(game.cells[low].hearted).toBe(true);
+    const beforeLives = game.boss!.lives;
+    dig(game, mine, mulberry32(1));
+    expect(game.cells[mine].exploded).toBe(true);
+    expect(game.cells[low].hearted).toBe(false);
+    expect(game.boss?.lives).toBe(beforeLives);
+  });
+
+  it('prefers a 4 with hidden neighbors over a 5 whose entire ring is revealed', () => {
+    const game = createGameFromLayout(
+      ['B***.', '*....', '**..*', '..***'],
+      10,
+      'gold-pouch',
+      undefined,
+      'lust',
+    );
+    const five = idx(game, 1, 1);
+    expect(game.cells[five].adjacentMines).toBe(5);
+    game.cells[five].state = 'revealed';
+    for (const n of neighbors(game.width, game.height, five)) {
+      game.cells[n].state = 'revealed';
+    }
+    const four = idx(game, 3, 2);
+    expect(game.cells[four].adjacentMines).toBe(4);
+    game.cells[four].state = 'revealed';
+    const target = pickLustTarget(game);
+    expect(target).not.toBeNull();
+    expect(target).not.toBe(five);
+    expect(game.cells[target!].adjacentMines).toBe(4);
+  });
+
+  it('skips already-hearted cells when picking a new target', () => {
+    const game = createGameFromLayout(
+      ['B....', '.....', '*..**', '.....'],
+      10,
+      'gold-pouch',
+      undefined,
+      'lust',
+    );
+    const low = idx(game, 1, 1);
+    const high = idx(game, 3, 1);
+    game.cells[low].state = 'revealed';
+    game.cells[idx(game, 1, 0)].state = 'revealed';
+    stepBoss(game);
+    expect(game.cells[low].hearted).toBe(true);
+    game.cells[high].state = 'revealed';
+    game.cells[idx(game, 2, 1)].state = 'revealed';
+    expect(pickLustTarget(game)).toBe(high);
+    expect(pickLustTarget(game)).not.toBe(low);
   });
 
   it('has 5 lives while Gluttony and Wrath stay at 3', () => {
@@ -613,10 +730,14 @@ describe('Gluttony combat', () => {
     dig(oneHit, 0, mulberry32(1));
     expect(oneHit.boss?.lives).toBe(BOSS_MAX_LIVES - 1);
 
-    const finisher = createGameFromLayout(['*B', '..']);
+    const finisher = createGameFromLayout(['*B.', '...']);
     finisher.boss!.lives = 1;
     dig(finisher, 0, mulberry32(1));
     expect(finisher.boss?.lives).toBe(0);
+    expect(finisher.status).toBe('playing');
+    expect(finisher.boss?.index).toBe(1);
+    const extracted = extractGame(finisher, mulberry32(1));
+    expect(extracted.some((e) => e.type === 'cleared')).toBe(true);
     expect(finisher.status).toBe('cleared');
   });
 
@@ -726,8 +847,13 @@ describe('boss win rewards', () => {
       runLoot: { ...stashItems },
     });
     // After digs (no rng use when firstClickDone), settleCampaign rolls bonus: miss the 25%.
-    const events = killBoss(s, seqRng([0.9, 0.9, 0.9, 0.9]));
+    const rng = seqRng([0.9, 0.9, 0.9, 0.9]);
+    const events = killBoss(s, rng);
     expect(events.some((e) => e.type === 'boss-death')).toBe(true);
+    expect(s.getState().run?.game.status).toBe('playing');
+    expect(loadCollection(store).items['gluttony-head']).toBe(1);
+    const extracted = extractThroughDoor(s, rng);
+    expect(extracted.some((e) => e.type === 'cleared')).toBe(true);
     expect(s.getState().run?.game.status).toBe('cleared');
     expect(s.getState().run?.bonusKey).toBeNull();
     const paid = loadCollection(store);
@@ -766,6 +892,9 @@ describe('boss win rewards', () => {
       }
     }
     expect(death).toBe(true);
+    expect(s.getState().run?.game.status).toBe('playing');
+    expect(loadCollection(store).items['lust-head']).toBe(0);
+    extractThroughDoor(s, rng);
     expect(s.getState().run?.game.status).toBe('cleared');
     const paid = loadCollection(store);
     expect(paid.items['lust-head']).toBe(1);
@@ -791,8 +920,11 @@ describe('boss win rewards', () => {
       },
       runLoot: emptyInventory(),
     });
-    const events = killBoss(s, seqRng([0.1, 0.2]));
+    const rng = seqRng([0.1, 0.2]);
+    const events = killBoss(s, rng);
     expect(events.some((e) => e.type === 'boss-death')).toBe(true);
+    expect(s.getState().run?.game.status).toBe('playing');
+    extractThroughDoor(s, rng);
     expect(s.getState().run?.bonusKey).toBe('hard-key');
     const paid = loadCollection(store);
     expect(paid.items['wrath-head']).toBe(1);
@@ -890,6 +1022,89 @@ describe('last campaign floor spawns a boss', () => {
       }
     }
     expect(found).toBe(true);
+  });
+});
+
+describe('finale door extract', () => {
+  it('never places the door on a mine, number, chest, or the boss spawn', () => {
+    for (let seed = 0; seed < 40; seed++) {
+      const game = createGame(configFor('campaign', 4), mulberry32(seed));
+      expect(game.doorIndex).not.toBeNull();
+      const door = game.cells[game.doorIndex!];
+      expect(door.kind).toBe('empty');
+      expect(door.adjacentMines).toBe(0);
+      expect(game.doorIndex).not.toBe(game.boss?.index);
+    }
+    const easy = createGame(configFor('easy', 0), mulberry32(1), 'easy');
+    expect(easy.doorIndex).toBeNull();
+    const floor0 = createGame(configFor('campaign', 0), mulberry32(1), 'campaign');
+    expect(floor0.boss).toBeNull();
+    expect(floor0.doorIndex).toBeNull();
+  });
+
+  it('prefers an empty zero off the spawn ring', () => {
+    const game = createGameFromLayout(['B...', '....', '....', '...*']);
+    expect(game.doorIndex).not.toBeNull();
+    expect(game.cells[game.doorIndex!].adjacentMines).toBe(0);
+    expect(chebyshev(game.width, game.boss!.index, game.doorIndex!)).toBeGreaterThan(1);
+  });
+
+  it('boss death does not clear; extract needs the door and a dead boss', () => {
+    const game = createGameFromLayout(['B...', '....'], 10, 'gold-pouch', undefined, 'lust');
+    const door = game.doorIndex;
+    expect(door).not.toBeNull();
+    const corpse = game.boss!.index;
+    game.cells[door!].state = 'revealed';
+    expect(dig(game, door!, mulberry32(1))).toEqual([{ type: 'deny' }]);
+    expect(game.status).toBe('playing');
+
+    for (let hit = 0; hit < LUST_MAX_LIVES; hit++) {
+      dig(game, corpse, mulberry32(1));
+    }
+    expect(game.boss?.lives).toBe(0);
+    expect(game.status).toBe('playing');
+    expect(game.boss?.index).toBe(corpse);
+    expect(game.cells.some((c) => c.kind !== 'mine' && c.state === 'hidden')).toBe(true);
+    expect(dig(game, door!, mulberry32(1))).toEqual([{ type: 'extract-prompt' }]);
+    expect(game.status).toBe('playing');
+    const extracted = extract(game, 'campaign');
+    expect(extracted.some((e) => e.type === 'cleared')).toBe(true);
+    expect(game.status).toBe('cleared');
+  });
+
+  it('extracts immediately when the boss is dead and every safe cell is already open', () => {
+    const game = createGameFromLayout(['B..', '...'], 10, 'gold-pouch', undefined, 'lust');
+    const door = game.doorIndex!;
+    const corpse = game.boss!.index;
+    for (let hit = 0; hit < LUST_MAX_LIVES; hit++) {
+      dig(game, corpse, mulberry32(1));
+    }
+    expect(game.boss?.lives).toBe(0);
+    for (let i = 0; i < game.cells.length; i++) {
+      if (game.cells[i].kind !== 'mine') game.cells[i].state = 'revealed';
+    }
+    const events = dig(game, door, mulberry32(1), 'campaign');
+    expect(events.some((e) => e.type === 'extract-prompt')).toBe(false);
+    expect(events.some((e) => e.type === 'cleared')).toBe(true);
+    expect(game.status).toBe('cleared');
+    expect(game.boss?.index).toBe(corpse);
+  });
+
+  it('open-all-safe after the boss is dead does not auto-win', () => {
+    const game = createGameFromLayout(['B.*', '...'], 10, 'gold-pouch', undefined, 'lust');
+    const corpse = game.boss!.index;
+    for (let hit = 0; hit < LUST_MAX_LIVES; hit++) {
+      dig(game, corpse, mulberry32(1));
+    }
+    expect(game.boss?.lives).toBe(0);
+    for (let i = 0; i < game.cells.length; i++) {
+      if (game.cells[i].kind !== 'mine' && game.cells[i].state === 'hidden') {
+        dig(game, i, mulberry32(1), 'campaign');
+      }
+    }
+    expect(allSafeRevealed(game)).toBe(true);
+    expect(game.status).toBe('playing');
+    expect(isLost(game)).toBe(false);
   });
 });
 

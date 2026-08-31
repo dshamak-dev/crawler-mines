@@ -7,7 +7,7 @@ import {
   type Game,
   type GameEvent,
 } from '../engine';
-import { BombIcon, BossIcon, ChestIcon, FlagIcon } from './icons';
+import { BombIcon, BossIcon, ChestIcon, DoorIcon, FlagIcon, HeartIcon } from './icons';
 import { BLAST_STAGGER_MS, prefersReducedMotion } from './motion';
 
 const LONG_MS = 400;
@@ -106,15 +106,11 @@ export default function Board({
             wave={waveOf.get(i)}
             wreckWave={wreckWave.get(i)}
             reduce={reduce}
-            bossHere={game.boss != null && game.boss.index === i && game.boss.lives > 0}
+            bossHere={game.boss != null && game.boss.index === i && game.status === 'playing'}
             bossId={game.boss?.id ?? 'gluttony'}
-            lustHeart={
-              game.boss != null &&
-              game.boss.id === 'lust' &&
-              game.boss.heart === true &&
-              game.boss.index === i &&
-              game.boss.lives > 0
-            }
+            bossDead={game.boss != null && game.boss.lives <= 0}
+            hearted={cell.hearted === true}
+            door={game.doorIndex === i && cell.state === 'revealed'}
             onDig={onDig}
             onFlag={onFlag}
           />
@@ -155,7 +151,9 @@ function DungeonCell({
   reduce,
   bossHere,
   bossId,
-  lustHeart,
+  bossDead,
+  hearted,
+  door,
   onDig,
   onFlag,
 }: {
@@ -167,7 +165,9 @@ function DungeonCell({
   reduce: boolean;
   bossHere: boolean;
   bossId: BossId;
-  lustHeart: boolean;
+  bossDead: boolean;
+  hearted: boolean;
+  door: boolean;
   onDig: (i: number) => void;
   onFlag: (i: number) => void;
 }) {
@@ -229,10 +229,14 @@ function DungeonCell({
 
   const bossName = BOSS_COPY[bossId].name;
   const label = bossHere
-    ? `${lustHeart ? `${bossName} heart` : bossName}${
-        visual === 'number' ? `, ${cell.adjacentMines} adjacent bombs` : ''
+    ? `${bossDead ? `Fallen ${bossName}` : bossName}${hearted ? ', heart covering the number' : ''}${
+        visual === 'number' && !hearted ? `, ${cell.adjacentMines} adjacent bombs` : ''
       }`
-    : ariaFor(visual, cell.adjacentMines, cell.tier);
+    : hearted
+      ? `Heart covering ${cell.adjacentMines} adjacent bombs`
+      : door
+        ? 'Exit door'
+        : ariaFor(visual, cell.adjacentMines, cell.tier);
 
   return (
     <button
@@ -241,8 +245,8 @@ function DungeonCell({
       className={`cell vis-${visual}${wave != null ? ' pop-bomb' : ''}${
         wreckWave != null ? ' pop-wreck' : ''
       }${bossHere ? ' is-boss' : ''}${bossId === 'lust' && bossHere ? ' is-lust' : ''}${
-        lustHeart ? ' is-heart' : ''
-      }`}
+        bossDead && bossHere ? ' is-dead' : ''
+      }${hearted ? ' is-heart' : ''}${door ? ' is-door' : ''}`}
       style={{ '--delay': `${delay}ms` } as CSSProperties}
       aria-label={label}
       onPointerDown={onPointerDown}
@@ -253,12 +257,16 @@ function DungeonCell({
     >
       {visual === 'flagged' || visual === 'bomb-flagged' ? (
         <FlagIcon ember={visual === 'bomb-flagged'} />
+      ) : hearted ? (
+        <HeartIcon className="heart-glyph" />
       ) : visual === 'exploded' ? (
         <BombIcon cracked />
       ) : visual === 'chest' ? (
         <ChestIcon tier={cell.tier ?? 'wooden'} />
       ) : visual === 'wrecked' ? (
         <ChestIcon wrecked tier={cell.tier ?? 'wooden'} />
+      ) : door ? (
+        <DoorIcon className="door-glyph" />
       ) : visual === 'number' && !bossHere ? (
         <span className={`rune ${NUMBER_CLASS[cell.adjacentMines]}`}>
           {cell.adjacentMines}
