@@ -36,6 +36,8 @@ export interface Run {
   bonusKey?: ItemId | null;
   /** Fresh floor-5 entry shows the boss reveal once; resume skips it. */
   bossRevealPending?: boolean;
+  /** Perfect-clear flags for campaign floors 1–4 (indices 0–3). Hydrate/resume keep it. */
+  perfectFloors?: boolean[];
 }
 
 export type FloorOutcome = 'cleared' | 'stashed' | 'victory' | 'lost';
@@ -49,6 +51,7 @@ export interface FloorReport {
   outcome: FloorOutcome;
   bonusKey: ItemId | null;
   bossHead: ItemId | null;
+  goldCup: ItemId | null;
 }
 
 export interface PersistedRunSlice {
@@ -73,6 +76,27 @@ export function runStash(run: Run): CampaignStash {
   return run.campaignStash ?? emptyStash();
 }
 
+/** Campaign floors 1–4. Floor 5 / the boss does not need to be perfect. */
+export function emptyPerfectFloors(): boolean[] {
+  return Array.from({ length: CAMPAIGN_FLOORS.length - 1 }, () => false);
+}
+
+export function sanitizePerfectFloors(raw: unknown): boolean[] {
+  const out = emptyPerfectFloors();
+  if (!Array.isArray(raw)) return out;
+  for (let i = 0; i < out.length; i++) out[i] = raw[i] === true;
+  return out;
+}
+
+export function allDescentPerfect(floors: readonly boolean[] | undefined): boolean {
+  const expected = CAMPAIGN_FLOORS.length - 1;
+  if (!floors || floors.length < expected) return false;
+  for (let i = 0; i < expected; i++) {
+    if (floors[i] !== true) return false;
+  }
+  return true;
+}
+
 export function floorReport(run: Run): FloorReport {
   const lastFloor = run.mode !== 'campaign' || isCampaignFinale(run.mode, run.floor);
   const lost = run.game.status === 'lost';
@@ -81,6 +105,7 @@ export function floorReport(run: Run): FloorReport {
   const stash = runStash(run);
   const bossId = run.game.boss?.id;
   const bossHead = victory && bossId ? headItemId(bossId) : null;
+  const goldCup = victory && allDescentPerfect(run.perfectFloors) ? 'gold-cup' : null;
   return {
     opened: run.game.chestsOpened,
     wrecked: run.game.chestsDestroyed,
@@ -90,6 +115,7 @@ export function floorReport(run: Run): FloorReport {
     outcome: lost ? 'lost' : victory ? 'victory' : stashed ? 'stashed' : 'cleared',
     bonusKey: victory ? (run.bonusKey ?? null) : null,
     bossHead,
+    goldCup,
   };
 }
 
@@ -229,6 +255,7 @@ export function sanitizeRun(raw: unknown): Run | null {
     bonusKey,
     // Resume never re-shows the floor-5 intro.
     bossRevealPending: false,
+    perfectFloors: sanitizePerfectFloors(r.perfectFloors),
   };
 }
 

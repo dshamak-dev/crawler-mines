@@ -3,6 +3,7 @@ import { createJSONStorage, persist, type StateStorage } from 'zustand/middlewar
 import {
   CAMPAIGN_FLOORS,
   addItem,
+  allDescentPerfect,
   bankFloor,
   cloneGame,
   configFor,
@@ -10,10 +11,12 @@ import {
   defaultStore,
   dig,
   emptyInventory,
+  emptyPerfectFloors,
   emptyStash,
   flag,
   headItemId,
   isCampaignFinale,
+  isPerfectClear,
   loadCollection,
   loadRun,
   mergeStash,
@@ -22,11 +25,13 @@ import {
   rollBonusKey,
   RUN_KEY,
   runStash,
+  sanitizePerfectFloors,
   sellLoot,
   spendEntry,
   stashToRewards,
   type CollectionState,
   type Difficulty,
+  type Game,
   type GameEvent,
   type Inventory,
   type ItemId,
@@ -77,11 +82,13 @@ function freshRun(mode: Difficulty, rng: Rng, stash = emptyStash()): Run {
     campaignStash: stash,
     bonusKey: null,
     bossRevealPending: false,
+    perfectFloors: emptyPerfectFloors(),
   };
 }
 
 function settleCampaign(
   run: Run,
+  game: Game,
   events: GameEvent[],
   meta: CollectionState,
   runLoot: Inventory,
@@ -92,9 +99,11 @@ function settleCampaign(
   runLoot: Inventory;
   campaignStash: ReturnType<typeof emptyStash>;
   bonusKey: ItemId | null;
+  perfectFloors: boolean[];
 } {
   const lost = events.some((e) => e.type === 'lost');
   const cleared = events.find((e) => e.type === 'cleared');
+  const perfectFloors = sanitizePerfectFloors(run.perfectFloors);
   if (run.mode !== 'campaign') {
     if (cleared && cleared.type === 'cleared') {
       const banked = bankFloor(meta, runLoot, cleared.rewards, run.grantKey, keyStore);
@@ -103,17 +112,34 @@ function settleCampaign(
         runLoot: banked.runLoot,
         campaignStash: emptyStash(),
         bonusKey: null,
+        perfectFloors,
       };
     }
-    return { meta, runLoot, campaignStash: emptyStash(), bonusKey: null };
+    return { meta, runLoot, campaignStash: emptyStash(), bonusKey: null, perfectFloors };
   }
 
   if (lost) {
-    return { meta, runLoot: emptyInventory(), campaignStash: emptyStash(), bonusKey: null };
+    return {
+      meta,
+      runLoot: emptyInventory(),
+      campaignStash: emptyStash(),
+      bonusKey: null,
+      perfectFloors,
+    };
   }
 
   if (!cleared || cleared.type !== 'cleared') {
-    return { meta, runLoot, campaignStash: runStash(run), bonusKey: run.bonusKey ?? null };
+    return {
+      meta,
+      runLoot,
+      campaignStash: runStash(run),
+      bonusKey: run.bonusKey ?? null,
+      perfectFloors,
+    };
+  }
+
+  if (run.floor >= 0 && run.floor < perfectFloors.length) {
+    perfectFloors[run.floor] = isPerfectClear(game);
   }
 
   let stash = mergeStash(runStash(run), cleared.rewards);
@@ -122,12 +148,15 @@ function settleCampaign(
   let nextLoot = { ...stash.items };
 
   if (isCampaignFinale(run.mode, run.floor)) {
-    const bossId = run.game.boss?.id ?? 'gluttony';
+    const bossId = game.boss?.id ?? 'gluttony';
     const head = headItemId(bossId);
     stash = { gold: stash.gold, items: addItem(stash.items, head) };
     bonusKey = rollBonusKey(rng);
     if (bonusKey) {
       stash = { gold: stash.gold, items: addItem(stash.items, bonusKey) };
+    }
+    if (allDescentPerfect(perfectFloors)) {
+      stash = { gold: stash.gold, items: addItem(stash.items, 'gold-cup') };
     }
     nextLoot = { ...stash.items };
     const banked = bankFloor(nextMeta, emptyInventory(), stashToRewards(stash), run.grantKey, keyStore);
@@ -135,7 +164,7 @@ function settleCampaign(
     nextLoot = banked.runLoot;
   }
 
-  return { meta: nextMeta, runLoot: nextLoot, campaignStash: stash, bonusKey };
+  return { meta: nextMeta, runLoot: nextLoot, campaignStash: stash, bonusKey, perfectFloors };
 }
 
 export function createGameStore(keyStore: KeyStore = defaultStore()) {
@@ -180,6 +209,7 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
               campaignStash: runStash(run),
               bonusKey: null,
               bossRevealPending: Boolean(game.boss),
+              perfectFloors: sanitizePerfectFloors(run.perfectFloors),
             },
           });
         },
@@ -190,6 +220,10 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
             return;
           }
           const game = createGame(configFor(run.mode, run.floor), rng, run.mode);
+          const perfectFloors = sanitizePerfectFloors(run.perfectFloors);
+          if (run.mode === 'campaign' && run.floor >= 0 && run.floor < perfectFloors.length) {
+            perfectFloors[run.floor] = false;
+          }
           set({
             run: {
               ...run,
@@ -197,6 +231,7 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
               grantKey: newGrantKey(),
               bonusKey: null,
               bossRevealPending: Boolean(game.boss),
+              perfectFloors,
             },
           });
         },
@@ -211,13 +246,14 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
           if (run.bossRevealPending) return [];
           const game = cloneGame(run.game);
           const events = dig(game, index, rng, run.mode);
-          const settled = settleCampaign(run, events, meta, runLoot, rng, keyStore);
+          const settled = settleCampaign(run, game, events, meta, runLoot, rng, keyStore);
           set({
             run: {
               ...run,
               game,
               campaignStash: settled.campaignStash,
               bonusKey: settled.bonusKey,
+              perfectFloors: settled.perfectFloors,
             },
             meta: settled.meta,
             runLoot: settled.runLoot,
@@ -233,13 +269,14 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
           if (events.length === 0 && game.cells[index]?.state === run.game.cells[index]?.state) {
             return [];
           }
-          const settled = settleCampaign(run, events, meta, runLoot, rng, keyStore);
+          const settled = settleCampaign(run, game, events, meta, runLoot, rng, keyStore);
           set({
             run: {
               ...run,
               game,
               campaignStash: settled.campaignStash,
               bonusKey: settled.bonusKey,
+              perfectFloors: settled.perfectFloors,
             },
             meta: settled.meta,
             runLoot: settled.runLoot,

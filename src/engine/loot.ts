@@ -14,6 +14,7 @@ export const ITEM_IDS = [
   'bronze-medal',
   'silver-medal',
   'gold-medal',
+  'gold-cup',
 ] as const;
 
 export type ItemId = (typeof ITEM_IDS)[number];
@@ -53,7 +54,9 @@ export function isChestTier(value: unknown): value is ChestTier {
 
 /** Visible chest shell. Inner loot stays hidden until the floor is cleared. */
 export function tierForLoot(itemId: ItemId): ChestTier {
-  if (itemId === 'hard-key' || itemId === 'campaign-key' || isMedal(itemId)) return 'rare';
+  if (itemId === 'hard-key' || itemId === 'campaign-key' || isMedal(itemId) || itemId === 'gold-cup') {
+    return 'rare';
+  }
   if (itemId === 'relic-shard') return 'gilded';
   if (itemId === 'gem' || itemId === 'torch-charm') return 'iron';
   return 'wooden';
@@ -146,6 +149,12 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     flavor: 'A perfect Hard clear. Every mine marked.',
     grantsGold: false,
   },
+  'gold-cup': {
+    id: 'gold-cup',
+    name: 'Gold cup',
+    flavor: 'A trophy from a campaign whose every descent floor was perfect.',
+    grantsGold: false,
+  },
 };
 
 const BASE_LOOT_TABLE: ReadonlyArray<{ itemId: ItemId; weight: number }> = [
@@ -228,7 +237,7 @@ export function isTicketKey(itemId: ItemId): boolean {
   return itemId === 'hard-key' || itemId === 'campaign-key';
 }
 
-/** Title-shop unit prices. Pouches, ticket keys, and heads do not sell. */
+/** Title-shop unit prices. Pouches, ticket keys, heads, and the gold cup do not sell. */
 const SELL_GOLD: Partial<Record<ItemId, number>> = {
   'rusty-key': 4,
   'torch-charm': 2,

@@ -12,8 +12,10 @@ export function medalForMode(mode: Difficulty): ItemId | null {
 }
 
 /**
- * Perfect clear: no cell exploded, and flags match mines exactly.
- * Zero flags is not perfect. Wrecked chests without an exploded mine do not fail this.
+ * Perfect clear: no cell exploded, no flag on a safe cell, and flags match mines.
+ * Zero flags is not perfect unless the floor already auto-won with exactly one
+ * leftover unflagged mine (treated as flagged) and every other mine is flagged.
+ * Two or more leftover mines do not count. Wrecked chests do not fail this.
  */
 export function isPerfectClear(game: Game): boolean {
   let mines = 0;
@@ -28,7 +30,9 @@ export function isPerfectClear(game: Game): boolean {
       flaggedSafe += 1;
     }
   }
-  return mines > 0 && flaggedMines === mines && flaggedSafe === 0;
+  if (flaggedSafe !== 0 || mines === 0) return false;
+  if (flaggedMines === mines) return true;
+  return mines - flaggedMines === 1 && allSafeRevealed(game);
 }
 
 /**

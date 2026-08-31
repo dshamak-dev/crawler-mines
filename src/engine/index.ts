@@ -132,7 +132,9 @@ export {
 export type { EntryKind, EntryQuote, PaidMode } from './ticket';
 export {
   RUN_KEY,
+  allDescentPerfect,
   bankFloor,
+  emptyPerfectFloors,
   floorReport,
   loadRun,
   newGrantKey,
@@ -141,6 +143,7 @@ export {
   resumeLabel,
   rewardsFromGame,
   runStash,
+  sanitizePerfectFloors,
   sanitizeRun,
 } from './runPersist';
 export type { FloorOutcome, FloorReport, PersistedRunSlice, Run } from './runPersist';
