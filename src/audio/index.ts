@@ -1,7 +1,7 @@
 import { getAudio } from './player';
 
 export { AUDIO_KEY, LEGACY_SOUND_KEY, loadMuted, saveMuted } from './settings';
-export { bossFloorActive, campaignFloorActive, desiredBgm, sfxFromEvents } from './cues';
+export { bossFloorActive, campaignFloorActive, desiredBgm, finaleBgm, sfxFromEvents } from './cues';
 export type { AppScreen, DifficultyMode } from './cues';
 export { audioUrl, bgmUrl, sfxUrl } from './urls';
 export type { BgmId, SfxId } from './urls';

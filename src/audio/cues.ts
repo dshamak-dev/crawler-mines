@@ -1,4 +1,4 @@
-import type { GameEvent } from '../engine';
+import type { BossId, GameEvent } from '../engine';
 import { isCampaignFinale, type Difficulty } from '../engine';
 import type { BgmId, SfxId } from './urls';
 
@@ -20,7 +20,7 @@ export function campaignFloorActive(
   return screen === 'collection' && collectionFrom === 'play';
 }
 
-/** Last campaign floor only — Gluttony fight, including pack opened from it. */
+/** Last campaign floor only — Gluttony or Wrath fight, including pack opened from it. */
 export function bossFloorActive(
   screen: AppScreen,
   mode: DifficultyMode | null,
@@ -34,13 +34,19 @@ export function bossFloorActive(
   );
 }
 
+/** Live campaign-run boss — never a second roll. Default is Gluttony's loop. */
+export function finaleBgm(bossId: BossId | null | undefined): BgmId {
+  return bossId === 'wrath' ? 'wrath' : 'boss';
+}
+
 export function desiredBgm(
   screen: AppScreen,
   mode: DifficultyMode | null,
   collectionFrom: AppScreen | null = null,
   floor = 0,
+  bossId: BossId | null = null,
 ): BgmId {
-  if (bossFloorActive(screen, mode, collectionFrom, floor)) return 'boss';
+  if (bossFloorActive(screen, mode, collectionFrom, floor)) return finaleBgm(bossId);
   if (campaignFloorActive(screen, mode, collectionFrom)) return 'campaign';
   return 'cozy';
 }

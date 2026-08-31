@@ -68,6 +68,7 @@ export default function App() {
     run?.mode ?? null,
     collectionFrom,
     run?.floor ?? 0,
+    run?.game.boss?.id ?? null,
   );
 
   const cueUi = () => playSfx('ui');

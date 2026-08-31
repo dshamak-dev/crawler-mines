@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import type { BossId } from '../engine';
 import type { AppScreen, DifficultyMode } from './cues';
 import { desiredBgm } from './cues';
 import { getAudio } from './player';
@@ -10,6 +11,7 @@ export function useGameAudio(
   mode: DifficultyMode | null,
   collectionFrom: AppScreen | null,
   floor = 0,
+  bossId: BossId | null = null,
 ) {
   const [muted, setMutedState] = useState(() => loadMuted());
 
@@ -40,8 +42,8 @@ export function useGameAudio(
   }, []);
 
   useEffect(() => {
-    getAudio().setBgm(desiredBgm(screen, mode, collectionFrom, floor));
-  }, [screen, mode, collectionFrom, floor]);
+    getAudio().setBgm(desiredBgm(screen, mode, collectionFrom, floor, bossId));
+  }, [screen, mode, collectionFrom, floor, bossId]);
 
   const setMuted = useCallback((next: boolean) => {
     getAudio().setMuted(next);

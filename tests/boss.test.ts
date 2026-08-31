@@ -27,6 +27,7 @@ import {
   type Inventory,
   type KeyStore,
 } from '../src/engine';
+import { desiredBgm } from '../src/audio';
 import { createGameStore } from '../src/store/gameStore';
 
 function idx(game: { width: number }, x: number, y: number): number {
@@ -194,6 +195,12 @@ describe('floor 5 rolls and persists boss id', () => {
     const s2 = createGameStore(store);
     expect(s2.getState().run?.game.boss?.id).toBe('wrath');
     expect(s2.getState().run?.bossRevealPending).toBe(false);
+    expect(
+      desiredBgm('play', 'campaign', null, s2.getState().run?.floor ?? 0, s2.getState().run?.game.boss?.id ?? null),
+    ).toBe('wrath');
+    expect(
+      desiredBgm('collection', 'campaign', 'play', 4, s2.getState().run?.game.boss?.id ?? null),
+    ).toBe('wrath');
   });
 
   it('descending onto floor 5 marks reveal pending and does not name bosses on earlier floors', () => {
@@ -244,6 +251,9 @@ describe('floor 5 rolls and persists boss id', () => {
     expect(s2.getState().run?.game.boss?.id).toBe('gluttony');
     expect(s2.getState().run?.bossRevealPending).toBe(false);
     expect(s2.getState().run?.campaignStash?.gold).toBe(3);
+    expect(
+      desiredBgm('play', 'campaign', null, s2.getState().run?.floor ?? 0, s2.getState().run?.game.boss?.id ?? null),
+    ).toBe('boss');
   });
 });
 
