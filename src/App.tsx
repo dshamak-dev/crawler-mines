@@ -462,7 +462,7 @@ function Play({
             ? boss.lives <= 0
               ? 'The boss is dead. Find the door and extract.'
               : boss.id === 'lust'
-                ? 'Tap Lust or blast a mine next to him. Hearts hide numbers until a blast.'
+                ? 'Blast a mine next to him. Hearts hide numbers until a blast.'
                 : 'Hit it with a blast. Eating a flag is not a loss.'
             : `Tap to ${flagMode ? 'flag' : 'dig'} · hold 400ms to flag`}
         </p>

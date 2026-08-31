@@ -72,7 +72,7 @@ export const BOSS_COPY: Record<BossId, { name: string; blurb: string }> = {
   lust: {
     name: 'Lust',
     blurb:
-      'Walks to the highest open number that still has a hidden neighbor and plants a heart. Tap him or blast a mine next to him. Hearts stay until a blast strips them. When he falls, leave through the door.',
+      'Walks to the highest open number that still has a hidden neighbor and plants a heart. Blast a mine next to him. Hearts stay until a blast strips them. When he falls, leave through the door.',
   },
 };
 
@@ -388,16 +388,6 @@ export function stripHeartsFromBlasts(game: Game, blastIndices: readonly number[
       game.cells[n].hearted = false;
     }
   }
-}
-
-/** Tap Lust's current cell — hit the walker, not a heart overlay. */
-export function chipBoss(game: Game): GameEvent[] {
-  const boss = game.boss;
-  if (!boss || boss.lives <= 0) return [];
-  boss.lives -= 1;
-  const events: GameEvent[] = [{ type: 'boss-hit', lives: boss.lives }];
-  if (boss.lives <= 0) events.push({ type: 'boss-death' });
-  return events;
 }
 
 /** Each exploding mine whose 8-neighborhood contains the boss deals 1 life. */
