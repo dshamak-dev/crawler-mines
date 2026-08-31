@@ -13,6 +13,7 @@ import {
   createGameFromLayout,
   configFor,
   dig,
+  explodeChain,
   extract,
   emptyInventory,
   emptyStash,
@@ -514,7 +515,7 @@ describe('Lust movement and combat', () => {
     expect(game.cells[0].hearted).toBe(false);
   });
 
-  it('tapping a heart does not remove it and denies unless Lust is on that cell', () => {
+  it('tapping a heart denies and does not strip it, including when Lust is on that cell', () => {
     const game = createGameFromLayout(
       ['B....', '.....', '*..**', '.....'],
       10,
@@ -529,9 +530,9 @@ describe('Lust movement and combat', () => {
     expect(game.cells[low].hearted).toBe(true);
     expect(game.boss?.index).toBe(low);
 
-    const chip = dig(game, low, mulberry32(1));
-    expect(chip.some((e) => e.type === 'boss-hit' && e.lives === LUST_MAX_LIVES - 1)).toBe(true);
-    expect(game.boss?.lives).toBe(LUST_MAX_LIVES - 1);
+    const onHim = dig(game, low, mulberry32(1));
+    expect(onHim).toEqual([{ type: 'deny' }]);
+    expect(game.boss?.lives).toBe(LUST_MAX_LIVES);
     expect(game.cells[low].hearted).toBe(true);
     expect(game.status).toBe('playing');
 
@@ -544,7 +545,28 @@ describe('Lust movement and combat', () => {
     const denied = dig(game, low, mulberry32(1));
     expect(denied).toEqual([{ type: 'deny' }]);
     expect(game.cells[low].hearted).toBe(true);
+    expect(game.boss?.lives).toBe(LUST_MAX_LIVES);
+  });
+
+  it('tapping a boss cell does not chip; a neighboring mine blast still does', () => {
+    for (const id of ['gluttony', 'wrath', 'lust'] as const) {
+      const game = createGameFromLayout(['B.', '..'], 10, 'gold-pouch', undefined, id);
+      const lives = game.boss!.lives;
+      const events = dig(game, game.boss!.index, mulberry32(1));
+      expect(events.filter((e) => e.type === 'boss-hit')).toEqual([]);
+      expect(game.boss?.lives).toBe(lives);
+    }
+
+    const game = createGameFromLayout(['*B.', '...'], 10, 'gold-pouch', undefined, 'lust');
+    expect(game.boss?.index).toBe(1);
+    expect(game.boss?.lives).toBe(LUST_MAX_LIVES);
+    const tap = dig(game, 1, mulberry32(1));
+    expect(tap.filter((e) => e.type === 'boss-hit')).toEqual([]);
+    expect(game.boss?.lives).toBe(LUST_MAX_LIVES);
+    const blasts = explodeChain(game, 0);
+    expect(blasts.some((e) => e.type === 'boss-hit' && e.lives === LUST_MAX_LIVES - 1)).toBe(true);
     expect(game.boss?.lives).toBe(LUST_MAX_LIVES - 1);
+    expect(game.cells[0].exploded).toBe(true);
   });
 
   it('a blast in Lust’s 8-ring chips him and walking beside a live mine does not', () => {
@@ -868,7 +890,7 @@ describe('boss win rewards', () => {
   it('killing Lust grants lust-head and does not grant other heads', () => {
     const { store } = withWallet(4);
     const s = createGameStore(store);
-    const game = createGameFromLayout(['B.', '..'], 10, 'gold-pouch', undefined, 'lust');
+    const game = createGameFromLayout(['*B*.', '***.', '....', '....'], 10, 'gold-pouch', undefined, 'lust');
     s.setState({
       meta: loadCollection(store),
       run: {
@@ -884,8 +906,12 @@ describe('boss win rewards', () => {
     });
     const rng = seqRng([0.9, 0.9]);
     let death = false;
-    for (let hit = 0; hit < LUST_MAX_LIVES + 1; hit++) {
-      const events = s.getState().applyDig(0, rng);
+    for (let hit = 0; hit < LUST_MAX_LIVES + 2; hit++) {
+      const g = s.getState().run?.game;
+      if (!g || g.boss?.lives === 0) break;
+      const mine = g.cells.findIndex((c) => c.kind === 'mine' && !c.exploded);
+      if (mine < 0) break;
+      const events = s.getState().applyDig(mine, rng);
       if (events.some((e) => e.type === 'boss-death')) {
         death = true;
         break;

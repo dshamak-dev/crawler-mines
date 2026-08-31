@@ -1,5 +1,5 @@
 import { allSafeRevealed, ensureFirstClickSafe, isWon, neighbors } from './board';
-import { chipBoss, hitBossFromBlasts, stepBoss, stripHeartsFromBlasts } from './boss';
+import { hitBossFromBlasts, stepBoss, stripHeartsFromBlasts } from './boss';
 import { addItem, type ChestTier, type ItemId } from './loot';
 import type { Cell, ChestReward, Difficulty, Game, GameEvent, Rng } from './types';
 
@@ -271,13 +271,6 @@ export function dig(game: Game, index: number, rng: Rng, mode?: Difficulty): Gam
   if (!cell) return events;
 
   const boss = game.boss;
-  if (boss && boss.id === 'lust' && boss.lives > 0 && boss.index === index) {
-    events.push(...chipBoss(game));
-    game.lastPlayerAction = index;
-    events.push(...afterPlayerAction(game, mode, events));
-    return events;
-  }
-
   if (game.doorIndex === index && cell.state === 'revealed') {
     if (!boss || boss.lives > 0) return [{ type: 'deny' }];
     if (!allSafeRevealed(game)) return [{ type: 'extract-prompt' }];
