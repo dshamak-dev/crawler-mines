@@ -1,5 +1,5 @@
 import { allSafeRevealed, ensureFirstClickSafe, isWon, neighbors } from './board';
-import { hitBossFromBlasts, stepBoss, stripHeartsFromBlasts } from './boss';
+import { capLustHearts, hitBossFromBlasts, stepBoss, stripHeartsFromBlasts } from './boss';
 import { addItem, type ChestTier, type ItemId } from './loot';
 import type { Cell, ChestReward, Difficulty, Game, GameEvent, Rng } from './types';
 
@@ -114,6 +114,7 @@ function finishBossTurn(game: Game, bossEvents: GameEvent[], _mode?: Difficulty)
     }
   }
   if (game.boss && game.boss.lives <= 0) {
+    capLustHearts(game);
     game.turn = 'player';
     if (!events.some((e) => e.type === 'boss-death')) events.push({ type: 'boss-death' });
     return events;
@@ -135,6 +136,7 @@ export function resolvePendingBossTurn(game: Game, mode?: Difficulty): void {
     return;
   }
   if (game.boss.lives <= 0) {
+    capLustHearts(game);
     game.turn = 'player';
     return;
   }
@@ -156,6 +158,7 @@ export function afterPlayerAction(
 
   if (game.boss) {
     if (game.boss.lives <= 0) {
+      capLustHearts(game);
       game.turn = 'player';
       return events;
     }

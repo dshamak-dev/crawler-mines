@@ -8,7 +8,8 @@ const BGM_VOL: Record<BgmId, number> = {
   wrath: 0.24,
   lust: 0.24,
 };
-const CROSSFADE_MS = 700;
+/** Incoming-only fade. Outgoing BGM is hard-stopped — never a dual-loop crossfade. */
+const FADE_IN_MS = 700;
 const SFX_VOL: Record<SfxId, number> = {
   dig: 0.44,
   flag: 0.48,
@@ -38,6 +39,32 @@ function makeTrack(src: string, loop: boolean): HTMLAudioElement | null {
   el.setAttribute('webkit-playsinline', '');
   el.volume = 0;
   return el;
+}
+
+type StoppableBgm = {
+  volume: number;
+  paused: boolean;
+  pause: () => void;
+};
+
+/** Pause + silence every BGM clip except `except`. Position may stay. */
+export function stopOtherBgm(
+  tracks: Record<BgmId, StoppableBgm | null>,
+  except: BgmId | null,
+): void {
+  for (const id of Object.keys(tracks) as BgmId[]) {
+    if (except != null && id === except) continue;
+    const el = tracks[id];
+    if (!el) continue;
+    el.volume = 0;
+    if (!el.paused) el.pause();
+  }
+}
+
+function silenceBgm(el: HTMLAudioElement | null): void {
+  if (!el) return;
+  el.volume = 0;
+  if (!el.paused) el.pause();
 }
 
 export class GameAudio {
@@ -118,11 +145,7 @@ export class GameAudio {
     saveMuted(muted);
     if (muted) {
       this.fadeGen += 1;
-      for (const el of Object.values(this.bgm)) {
-        if (!el) continue;
-        el.volume = 0;
-        el.pause();
-      }
+      for (const el of Object.values(this.bgm)) silenceBgm(el);
       return;
     }
     if (this.unlocked) this.syncBgm(true);
@@ -151,11 +174,7 @@ export class GameAudio {
   suspendForHidden(): void {
     this.hiddenSuspended = true;
     this.fadeGen += 1;
-    for (const el of Object.values(this.bgm)) {
-      if (!el) continue;
-      el.volume = 0;
-      if (!el.paused) el.pause();
-    }
+    for (const el of Object.values(this.bgm)) silenceBgm(el);
     for (const el of Object.values(this.sfx)) {
       if (!el || el.paused) continue;
       el.pause();
@@ -177,19 +196,20 @@ export class GameAudio {
   private syncBgm(fromMute = false): void {
     if (!this.unlocked || this.muted || this.hiddenSuspended) return;
     const next = this.pending;
-    if (this.current === next) {
-      const el = this.bgm[next];
-      if (el && el.paused) {
-        el.volume = BGM_VOL[next];
-        void el.play().catch(() => {
+    const incoming = this.bgm[next];
+    const switching = this.current !== next;
+    // Hard-stop every other loop before the incoming clip starts (or resumes).
+    stopOtherBgm(this.bgm, next);
+    if (!switching) {
+      if (incoming && incoming.paused) {
+        incoming.volume = BGM_VOL[next];
+        void incoming.play().catch(() => {
           this.unlocked = false;
         });
       }
       return;
     }
-    const incoming = this.bgm[next];
-    const outgoingId = this.current;
-    const outgoing = outgoingId ? this.bgm[outgoingId] : null;
+    const hadCurrent = this.current != null;
     this.current = next;
     if (!incoming) return;
 
@@ -199,33 +219,17 @@ export class GameAudio {
       this.unlocked = false;
     });
 
-    const fadeMs = fromMute || !outgoing || outgoing.paused ? 180 : CROSSFADE_MS;
+    const fadeMs = fromMute || !hadCurrent ? 180 : FADE_IN_MS;
     this.ramp(incoming, 0, BGM_VOL[next], fadeMs, gen);
-    if (outgoing && outgoing !== incoming) {
-      this.ramp(outgoing, outgoing.volume, 0, fadeMs, gen, () => {
-        outgoing.pause();
-      });
-    }
   }
 
-  private ramp(
-    el: HTMLAudioElement,
-    from: number,
-    to: number,
-    ms: number,
-    gen: number,
-    onDone?: () => void,
-  ): void {
+  private ramp(el: HTMLAudioElement, from: number, to: number, ms: number, gen: number): void {
     const start = performance.now();
     const tick = (now: number) => {
       if (gen !== this.fadeGen || this.muted || this.hiddenSuspended) return;
       const k = ms <= 0 ? 1 : Math.min(1, (now - start) / ms);
       el.volume = Math.max(0, Math.min(1, from + (to - from) * k));
-      if (k < 1) {
-        requestAnimationFrame(tick);
-        return;
-      }
-      onDone?.();
+      if (k < 1) requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
   }

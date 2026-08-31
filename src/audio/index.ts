@@ -5,7 +5,7 @@ export { bossFloorActive, campaignFloorActive, desiredBgm, finaleBgm, sfxFromEve
 export type { AppScreen, DifficultyMode } from './cues';
 export { audioUrl, bgmUrl, sfxUrl } from './urls';
 export type { BgmId, SfxId } from './urls';
-export { getAudio } from './player';
+export { GameAudio, getAudio, stopOtherBgm } from './player';
 export { useGameAudio } from './useGameAudio';
 
 /** Play when Hard/Campaign entry is blocked (short gold and no matching key). */
