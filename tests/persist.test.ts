@@ -7,6 +7,7 @@ import {
   dig,
   emptyCollection,
   emptyInventory,
+  emptyStash,
   grantIntactLoot,
   inventoryTotal,
   loadCollection,
@@ -140,6 +141,33 @@ describe('run snapshot hydrate', () => {
     const s2 = createGameStore(store);
     expect(s2.getState().run?.game.cells[0].state).toBe('flagged');
     expect(s2.getState().run?.game.firstClickDone).toBe(true);
+  });
+
+  it('hydrates Lust hearts and the finale door index', () => {
+    const game = createGameFromLayout(['B...', '....', '...*'], 10, 'gold-pouch', undefined, 'lust');
+    const marked = idx(game, 1, 0);
+    game.cells[marked].state = 'revealed';
+    game.cells[marked].hearted = true;
+    expect(game.doorIndex).not.toBeNull();
+    const store = memoryStore();
+    const s1 = createGameStore(store);
+    s1.setState({
+      meta: loadCollection(store),
+      run: {
+        mode: 'campaign',
+        floor: 4,
+        game: cloneGame(game),
+        grantKey: 'heart-door',
+        campaignStash: emptyStash(),
+        bonusKey: null,
+        bossRevealPending: false,
+      },
+      runLoot: emptyInventory(),
+    });
+    const s2 = createGameStore(store);
+    expect(s2.getState().run?.game.cells[marked].hearted).toBe(true);
+    expect(s2.getState().run?.game.doorIndex).toBe(game.doorIndex);
+    expect(s2.getState().run?.game.boss?.id).toBe('lust');
   });
 
   it('discards corrupt payloads', () => {

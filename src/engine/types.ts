@@ -16,8 +16,6 @@ export interface BossState {
   id: BossId;
   index: number;
   lives: number;
-  /** Lust occupies this cell as a heart. Other sins ignore it. */
-  heart?: boolean;
 }
 
 export type Rng = () => number;
@@ -33,6 +31,8 @@ export interface Cell {
   tier: ChestTier | null;
   /** Rolled at generation; granted only after a successful clear. */
   loot: ItemId | null;
+  /** Lust heart overlay. Hides a revealed number until a neighboring blast strips it. */
+  hearted: boolean;
 }
 
 export interface FloorConfig {
@@ -65,6 +65,8 @@ export interface Game {
   turn: Turn;
   /** Last successful dig or flag/unflag cell. Wrath hunts this. */
   lastPlayerAction: number | null;
+  /** Campaign finale exit. Null on Easy/Medium/Hard and campaign floors 1–4. */
+  doorIndex: number | null;
 }
 
 export interface ChestReward {
@@ -84,7 +86,10 @@ export type GameEvent =
   | { type: 'boss-smash-chest'; index: number; tier: ChestTier }
   | { type: 'boss-slam'; index: number }
   | { type: 'boss-hit'; lives: number }
-  | { type: 'boss-death' };
+  | { type: 'boss-death' }
+  | { type: 'boss-plant-heart'; index: number }
+  | { type: 'extract-prompt' }
+  | { type: 'deny' };
 
 export const DIFFICULTIES: Record<'easy' | 'medium' | 'hard', FloorConfig> = {
   easy: { width: 8, height: 8, mines: 8, chests: 6, chestValue: 10 },
@@ -120,6 +125,7 @@ export function newCell(partial: Partial<Cell> = {}): Cell {
     gold: 0,
     tier: null,
     loot: null,
+    hearted: false,
     ...partial,
   };
 }

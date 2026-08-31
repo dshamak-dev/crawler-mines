@@ -130,6 +130,45 @@ export function FlagIcon({ ember = false }: { ember?: boolean }) {
   );
 }
 
+export function HeartIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 32 32" className={className ?? 'glyph'} aria-hidden="true">
+      <path
+        d="M16 27.2c-1.2 0-2.2-.5-8.2-6.2C3.4 16.4 4.2 10.2 8.6 8.2c2.6-1.2 5.2-.2 7.4 2.2 2.2-2.4 4.8-3.4 7.4-2.2 4.4 2 5.2 8.2.8 12.8-6 5.7-7 6.2-8.2 6.2z"
+        fill="#4a1024"
+      />
+      <path
+        d="M16 25.4c-1 0-1.8-.4-7.2-5.5C5.2 16.2 5.8 11.2 9.2 9.6c2.1-1 4.3-.1 6.1 2.1l.7.8.7-.8c1.8-2.2 4-3.1 6.1-2.1 3.4 1.6 4 6.6.4 10.3-5.4 5.1-6.2 5.5-7.2 5.5z"
+        fill="#c43a5c"
+      />
+      <path
+        d="M10.2 11.2c1.6-1.4 3.6-.8 5.2 1.2"
+        stroke="#f6b4c4"
+        strokeWidth="1.3"
+        fill="none"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function DoorIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 32 32" className={className ?? 'glyph'} aria-hidden="true">
+      <path d="M8 28V12.5c0-4.6 3.4-8.2 8-8.2s8 3.6 8 8.2V28z" fill="#3a322c" />
+      <path d="M9.4 27.2V12.8c0-3.8 2.8-6.8 6.6-6.8s6.6 3 6.6 6.8v14.4z" fill="#1a1210" />
+      <path
+        d="M9.4 12.8c0-3.8 2.8-6.8 6.6-6.8s6.6 3 6.6 6.8"
+        stroke="#c9b59a"
+        strokeWidth="1.4"
+        fill="none"
+      />
+      <path d="M8 27.2h16" stroke="#5a4a3c" strokeWidth="1.6" strokeLinecap="round" />
+      <circle cx="19.4" cy="18.6" r="1.15" fill="#e0b44a" />
+    </svg>
+  );
+}
+
 export function ShovelIcon() {
   return (
     <svg viewBox="0 0 32 32" className="glyph">

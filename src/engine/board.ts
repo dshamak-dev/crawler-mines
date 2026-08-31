@@ -111,7 +111,7 @@ export function createGame(
     const index = spawn[0];
     cells[index].state = 'revealed';
     const id = rollBossId(rng, lockedBossId);
-    boss = { id, index, lives: bossMaxLives(id), heart: id === 'lust' };
+    boss = { id, index, lives: bossMaxLives(id) };
     bossRing = new Set([index, ...neighbors(width, height, index)]);
   }
   const mineBanned = new Set([...chestIdx, ...bossRing]);
@@ -120,6 +120,8 @@ export function createGame(
     cells[i].kind = 'mine';
   }
   computeAdjacency(width, height, cells);
+  const doorIndex =
+    boss != null ? pickDoorIndex(width, height, cells, boss.index, rng) : null;
   return {
     width,
     height,
@@ -137,6 +139,7 @@ export function createGame(
     boss,
     turn: 'player',
     lastPlayerAction: null,
+    doorIndex,
   };
 }
 
@@ -180,6 +183,8 @@ export function createGameFromLayout(
     }
   }
   computeAdjacency(width, height, cells);
+  const doorIndex =
+    bossIndex >= 0 ? pickDoorIndex(width, height, cells, bossIndex) : null;
   return {
     width,
     height,
@@ -200,11 +205,11 @@ export function createGameFromLayout(
             id: bossId,
             index: bossIndex,
             lives: bossMaxLives(bossId),
-            heart: bossId === 'lust',
           }
         : null,
     turn: 'player',
     lastPlayerAction: null,
+    doorIndex,
   };
 }
 
@@ -235,8 +240,49 @@ export function allSafeRevealed(game: Game): boolean {
   return game.cells.every((c) => c.kind === 'mine' || c.state === 'revealed');
 }
 
+/** Empty zero that is not the boss spawn — valid finale door tile. */
+export function isDoorCandidate(cells: readonly Cell[], index: number, bossIndex: number): boolean {
+  const cell = cells[index];
+  return Boolean(cell && cell.kind === 'empty' && cell.adjacentMines === 0 && index !== bossIndex);
+}
+
+/**
+ * Prefer empty zeros off the boss spawn ring. If none remain, use a ring zero
+ * (still never the spawn, a mine, a number, or a chest).
+ */
+export function pickDoorIndex(
+  width: number,
+  height: number,
+  cells: readonly Cell[],
+  bossIndex: number,
+  rng?: Rng,
+): number | null {
+  const ring = new Set([bossIndex, ...neighbors(width, height, bossIndex)]);
+  const offRing: number[] = [];
+  const onRing: number[] = [];
+  for (let i = 0; i < cells.length; i++) {
+    if (!isDoorCandidate(cells, i, bossIndex)) continue;
+    if (ring.has(i)) onRing.push(i);
+    else offRing.push(i);
+  }
+  const pool = offRing.length > 0 ? offRing : onRing;
+  if (pool.length === 0) return null;
+  if (!rng) return pool[0];
+  return pool[Math.floor(rng() * pool.length)];
+}
+
+export function ensureDoorValid(game: Game, rng?: Rng): void {
+  if (!game.boss) {
+    game.doorIndex = null;
+    return;
+  }
+  const bossIndex = game.boss.index;
+  if (game.doorIndex != null && isDoorCandidate(game.cells, game.doorIndex, bossIndex)) return;
+  game.doorIndex = pickDoorIndex(game.width, game.height, game.cells, bossIndex, rng);
+}
+
 export function isWon(game: Game): boolean {
-  if (game.boss) return game.boss.lives <= 0;
+  if (game.boss) return false;
   return allSafeRevealed(game);
 }
 
@@ -254,10 +300,12 @@ export function ensureFirstClickSafe(game: Game, index: number, rng: Rng): void 
   if (cell.kind !== 'mine') return;
 
   const bossIndex = game.boss?.index ?? -1;
+  const doorIndex = game.doorIndex ?? -1;
+  const doorRing = doorIndex >= 0 ? new Set(neighbors(game.width, game.height, doorIndex)) : new Set<number>();
   const empties: number[] = [];
   const chestIdx: number[] = [];
   for (let i = 0; i < game.cells.length; i++) {
-    if (i === index || i === bossIndex) continue;
+    if (i === index || i === bossIndex || i === doorIndex || doorRing.has(i)) continue;
     if (game.cells[i].kind === 'empty') empties.push(i);
     else if (game.cells[i].kind === 'chest') chestIdx.push(i);
   }
@@ -285,4 +333,5 @@ export function ensureFirstClickSafe(game: Game, index: number, rng: Rng): void 
   }
 
   computeAdjacency(game.width, game.height, game.cells);
+  ensureDoorValid(game, rng);
 }

@@ -65,6 +65,7 @@ export function sfxFromEvents(events: ReadonlyArray<GameEvent>): SfxId[] {
   let bossEat = false;
   let bossHit = false;
   let bossDeath = false;
+  let deny = false;
   for (const e of events) {
     if (e.type === 'reveal') revealed = true;
     else if (e.type === 'explode') {
@@ -78,6 +79,7 @@ export function sfxFromEvents(events: ReadonlyArray<GameEvent>): SfxId[] {
     else if (e.type === 'boss-smash-chest') wrecked = true;
     else if (e.type === 'boss-hit') bossHit = true;
     else if (e.type === 'boss-death') bossDeath = true;
+    else if (e.type === 'deny') deny = true;
   }
   const out: SfxId[] = [];
   if (revealed) out.push('dig');
@@ -90,5 +92,6 @@ export function sfxFromEvents(events: ReadonlyArray<GameEvent>): SfxId[] {
   if (bossEat) out.push('boss-eat-flag');
   if (cleared) out.push('clear');
   if (lost) out.push('campaign-lose');
+  if (deny) out.push('deny');
   return out;
 }

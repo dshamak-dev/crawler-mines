@@ -1,5 +1,5 @@
 import { allSafeRevealed, ensureFirstClickSafe, isWon, neighbors } from './board';
-import { chipLustHeart, hitBossFromBlasts, isLustHeart, stepBoss } from './boss';
+import { chipBoss, hitBossFromBlasts, stepBoss, stripHeartsFromBlasts } from './boss';
 import { addItem, type ChestTier, type ItemId } from './loot';
 import type { Cell, ChestReward, Difficulty, Game, GameEvent, Rng } from './types';
 
@@ -78,6 +78,7 @@ export function explodeChain(game: Game, startIndex: number): GameEvent[] {
   }
 
   const blasts = events.filter((e) => e.type === 'explode').map((e) => e.index);
+  stripHeartsFromBlasts(game, blasts);
   events.push(...hitBossFromBlasts(game, blasts));
   return events;
 }
@@ -103,7 +104,7 @@ function resolveBossSlam(game: Game, mineIndex: number): GameEvent[] {
   return events;
 }
 
-function finishBossTurn(game: Game, bossEvents: GameEvent[], mode?: Difficulty): GameEvent[] {
+function finishBossTurn(game: Game, bossEvents: GameEvent[], _mode?: Difficulty): GameEvent[] {
   const events: GameEvent[] = [];
   for (const e of bossEvents) {
     if (e.type === 'boss-slam') {
@@ -113,10 +114,8 @@ function finishBossTurn(game: Game, bossEvents: GameEvent[], mode?: Difficulty):
     }
   }
   if (game.boss && game.boss.lives <= 0) {
-    game.status = 'cleared';
     game.turn = 'player';
-    events.push({ type: 'boss-death' });
-    events.push({ type: 'cleared', rewards: grantIntactLoot(game, mode) });
+    if (!events.some((e) => e.type === 'boss-death')) events.push({ type: 'boss-death' });
     return events;
   }
   if (allSafeRevealed(game) && game.boss && game.boss.lives > 0) {
@@ -132,6 +131,10 @@ function finishBossTurn(game: Game, bossEvents: GameEvent[], mode?: Difficulty):
 /** Reload must finish a persisted boss turn instead of skipping it. */
 export function resolvePendingBossTurn(game: Game, mode?: Difficulty): void {
   if (game.status !== 'playing' || !game.boss) {
+    game.turn = 'player';
+    return;
+  }
+  if (game.boss.lives <= 0) {
     game.turn = 'player';
     return;
   }
@@ -153,10 +156,7 @@ export function afterPlayerAction(
 
   if (game.boss) {
     if (game.boss.lives <= 0) {
-      game.status = 'cleared';
       game.turn = 'player';
-      events.push({ type: 'boss-death' });
-      events.push({ type: 'cleared', rewards: grantIntactLoot(game, mode) });
       return events;
     }
     if (allSafeRevealed(game)) {
@@ -270,11 +270,22 @@ export function dig(game: Game, index: number, rng: Rng, mode?: Difficulty): Gam
   const cell = game.cells[index];
   if (!cell) return events;
 
-  if (isLustHeart(game, index)) {
-    events.push(...chipLustHeart(game));
+  const boss = game.boss;
+  if (boss && boss.id === 'lust' && boss.lives > 0 && boss.index === index) {
+    events.push(...chipBoss(game));
     game.lastPlayerAction = index;
     events.push(...afterPlayerAction(game, mode, events));
     return events;
+  }
+
+  if (game.doorIndex === index && cell.state === 'revealed') {
+    if (!boss || boss.lives > 0) return [{ type: 'deny' }];
+    if (!allSafeRevealed(game)) return [{ type: 'extract-prompt' }];
+    return extract(game, mode);
+  }
+
+  if (cell.hearted) {
+    return [{ type: 'deny' }];
   }
 
   if (cell.state === 'revealed' || cell.state === 'flagged') return events;
@@ -295,4 +306,16 @@ export function dig(game: Game, index: number, rng: Rng, mode?: Difficulty): Gam
   game.lastPlayerAction = index;
   events.push(...afterPlayerAction(game, mode, events));
   return events;
+}
+
+/** Campaign finale: leave through the revealed door after the boss is dead. */
+export function extract(game: Game, mode?: Difficulty): GameEvent[] {
+  if (game.status !== 'playing') return [];
+  const boss = game.boss;
+  if (!boss || boss.lives > 0) return [];
+  const door = game.doorIndex;
+  if (door == null || game.cells[door].state !== 'revealed') return [];
+  game.status = 'cleared';
+  game.turn = 'player';
+  return [{ type: 'cleared', rewards: grantIntactLoot(game, mode) }];
 }

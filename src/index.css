@@ -470,9 +470,27 @@ button {
 .cell.is-boss.is-lust .boss-glyph {
   filter: drop-shadow(0 0 4px rgba(220, 60, 110, 0.7));
 }
-.cell.is-heart .boss-glyph {
-  width: 92%;
-  height: 92%;
+.cell.is-heart .heart-glyph {
+  width: 78%;
+  height: 78%;
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+  filter: drop-shadow(0 0 4px rgba(220, 60, 110, 0.55));
+}
+.cell.is-heart.is-boss .heart-glyph {
+  width: 62%;
+  height: 62%;
+  opacity: 0.92;
+}
+.cell.is-boss.is-dead .boss-glyph {
+  transform: rotate(90deg);
+  filter: grayscale(0.65) brightness(0.72);
+  opacity: 0.88;
+}
+.cell.is-door .door-glyph {
+  width: 78%;
+  height: 78%;
 }
 .cell .boss-under {
   opacity: 0.35;
