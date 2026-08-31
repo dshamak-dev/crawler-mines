@@ -1,5 +1,11 @@
 import { saveCollection, type CollectionState, type KeyStore } from './collection';
 import { removeItem, type ItemId } from './loot';
+import {
+  hasSocketedCampaignKey,
+  normalizeOfferings,
+  socketedList,
+  type OfferingSlots,
+} from './offerings';
 import type { Difficulty } from './types';
 
 export const HARD_COST = 30;
@@ -33,15 +39,34 @@ export function entryKeyId(mode: Difficulty): ItemId | null {
   return null;
 }
 
-/** Key wins over gold. Easy/Medium are always free. */
-export function quoteEntry(mode: Difficulty, meta: CollectionState): EntryQuote {
+/**
+ * Hard: a matching key wins over gold.
+ * Campaign: a Campaign key only counts when socketed in `slots`. Unsocketed
+ * keys stay in the pack; missing gold still blocks.
+ */
+export function quoteEntry(
+  mode: Difficulty,
+  meta: CollectionState,
+  slots?: readonly (ItemId | null | undefined)[] | null,
+): EntryQuote {
   const cost = entryCost(mode);
-  const keyId = entryKeyId(mode);
-  const keyCount = keyId ? Math.max(0, meta.items[keyId] ?? 0) : 0;
   const gold = Math.max(0, Math.floor(meta.gold));
   if (cost <= 0) {
     return { mode, kind: 'free', cost: 0, keyId: null, keyCount: 0, gold };
   }
+  if (mode === 'campaign') {
+    const offs = normalizeOfferings(slots, meta);
+    if (hasSocketedCampaignKey(offs)) {
+      const keyCount = Math.max(0, meta.items['campaign-key'] ?? 0);
+      return { mode, kind: 'key', cost, keyId: 'campaign-key', keyCount, gold };
+    }
+    if (gold >= cost) {
+      return { mode, kind: 'gold', cost, keyId: null, keyCount: 0, gold };
+    }
+    return { mode, kind: 'blocked', cost, keyId: null, keyCount: 0, gold };
+  }
+  const keyId = entryKeyId(mode);
+  const keyCount = keyId ? Math.max(0, meta.items[keyId] ?? 0) : 0;
   if (keyCount > 0) {
     return { mode, kind: 'key', cost, keyId, keyCount, gold };
   }
@@ -53,7 +78,7 @@ export function quoteEntry(mode: Difficulty, meta: CollectionState): EntryQuote 
 
 export function confirmLabel(quote: EntryQuote): string {
   if (quote.kind === 'key') {
-    return quote.mode === 'hard' ? 'Use Hard key' : 'Use Campaign key';
+    return quote.mode === 'hard' ? 'Use Hard key' : 'Dive free';
   }
   if (quote.kind === 'gold') {
     return `Spend ${quote.cost} gold`;
@@ -65,7 +90,7 @@ export function confirmCopy(quote: EntryQuote): string {
   if (quote.kind === 'key') {
     return quote.mode === 'hard'
       ? 'Use Hard key · burns on enter. No refund if the floor is wrecked.'
-      : 'Use Campaign key · burns on enter. Covers the whole five-floor descent. No refund.';
+      : 'Dive free. Socketed offerings burn on enter. Covers the whole five-floor descent. No refund.';
   }
   if (quote.kind === 'gold') {
     return quote.mode === 'hard'
@@ -73,39 +98,42 @@ export function confirmCopy(quote: EntryQuote): string {
       : `Spend ${CAMPAIGN_COST} gold · charged on enter. Covers the whole five-floor descent. No refund.`;
   }
   if (quote.kind === 'blocked') {
-    const need = quote.mode === 'hard' ? 'a Hard key' : 'a Campaign key';
+    const need = quote.mode === 'hard' ? 'a Hard key' : 'socket a Campaign key';
     return `Need ${quote.cost} gold or ${need}.`;
   }
   return '';
 }
 
 /**
- * Deduct gold or consume one matching key. Call only after the player confirms.
- * Cancel never reaches here. Returns null when blocked (wallet and keys unchanged).
+ * Deduct gold and/or burn socketed campaign offerings. Call only after confirm.
+ * Cancel never reaches here. Returns null when blocked (wallet and pack unchanged).
  */
 export function spendEntry(
   meta: CollectionState,
   mode: Difficulty,
   store: KeyStore,
+  slots?: readonly (ItemId | null | undefined)[] | null,
 ): CollectionState | null {
-  const quote = quoteEntry(mode, meta);
+  const offs: OfferingSlots = mode === 'campaign' ? normalizeOfferings(slots, meta) : [null, null];
+  const quote = quoteEntry(mode, meta, offs);
   if (quote.kind === 'blocked') return null;
   if (quote.kind === 'free') return meta;
-  if (quote.kind === 'key' && quote.keyId) {
-    const next: CollectionState = {
-      ...meta,
-      items: removeItem(meta.items, quote.keyId),
-    };
-    saveCollection(next, store);
-    return next;
+
+  let items = { ...meta.items };
+  if (mode === 'campaign') {
+    for (const id of socketedList(offs)) {
+      items = removeItem(items, id);
+    }
+  } else if (quote.kind === 'key' && quote.keyId) {
+    items = removeItem(items, quote.keyId);
   }
+
+  let gold = Math.max(0, Math.floor(meta.gold));
   if (quote.kind === 'gold') {
-    const next: CollectionState = {
-      ...meta,
-      gold: Math.max(0, Math.floor(meta.gold) - quote.cost),
-    };
-    saveCollection(next, store);
-    return next;
+    gold = Math.max(0, gold - quote.cost);
   }
-  return null;
+
+  const next: CollectionState = { ...meta, gold, items };
+  saveCollection(next, store);
+  return next;
 }

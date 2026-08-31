@@ -45,9 +45,17 @@ export function bossMaxLives(id: BossId): number {
 }
 
 /** Equal-weight Gluttony / Wrath / Lust roll for a fresh campaign floor-5 board. */
-export function rollBossId(rng: Rng): BossId {
+export function rollBossId(rng: Rng, locked?: BossId | null): BossId {
+  if (locked && (BOSS_IDS as readonly string[]).includes(locked)) return locked;
   const i = Math.floor(rng() * BOSS_IDS.length);
   return BOSS_IDS[Math.min(Math.max(i, 0), BOSS_IDS.length - 1)];
+}
+
+export function bossIdFromHead(id: unknown): BossId | null {
+  if (id === 'wrath-head') return 'wrath';
+  if (id === 'lust-head') return 'lust';
+  if (id === 'gluttony-head') return 'gluttony';
+  return null;
 }
 
 export const BOSS_COPY: Record<BossId, { name: string; blurb: string }> = {

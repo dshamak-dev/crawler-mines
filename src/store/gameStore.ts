@@ -21,12 +21,14 @@ import {
   loadRun,
   mergeStash,
   newGrantKey,
+  normalizeOfferings,
   recoverBank,
   rollBonusKey,
   RUN_KEY,
   runStash,
   sanitizePerfectFloors,
   sellLoot,
+  socketedBossId,
   spendEntry,
   stashToRewards,
   type CollectionState,
@@ -36,6 +38,7 @@ import {
   type Inventory,
   type ItemId,
   type KeyStore,
+  type OfferingSlots,
   type Rng,
   type Run,
 } from '../engine';
@@ -47,7 +50,7 @@ export interface GameStoreState {
   meta: CollectionState;
   run: Run | null;
   runLoot: Inventory;
-  start: (mode: Difficulty, rng?: Rng) => boolean;
+  start: (mode: Difficulty, rng?: Rng, offerings?: OfferingSlots) => boolean;
   abandon: () => void;
   nextFloor: (rng?: Rng) => void;
   retryFloor: (rng?: Rng) => void;
@@ -72,8 +75,13 @@ function asStateStorage(store: KeyStore): StateStorage {
   };
 }
 
-function freshRun(mode: Difficulty, rng: Rng, stash = emptyStash()): Run {
-  const game = createGame(configFor(mode, 0), rng, mode);
+function freshRun(
+  mode: Difficulty,
+  rng: Rng,
+  stash = emptyStash(),
+  lockedBossId: Run['lockedBossId'] = null,
+): Run {
+  const game = createGame(configFor(mode, 0), rng, mode, lockedBossId ?? null);
   return {
     mode,
     floor: 0,
@@ -83,6 +91,7 @@ function freshRun(mode: Difficulty, rng: Rng, stash = emptyStash()): Run {
     bonusKey: null,
     bossRevealPending: false,
     perfectFloors: emptyPerfectFloors(),
+    lockedBossId: lockedBossId ?? null,
   };
 }
 
@@ -178,12 +187,14 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
         meta: recovered.meta,
         run: loaded.run,
         runLoot: recovered.runLoot,
-        start: (mode, rng = Math.random) => {
-          const spent = spendEntry(get().meta, mode, keyStore);
+        start: (mode, rng = Math.random, offerings) => {
+          const slots = mode === 'campaign' ? normalizeOfferings(offerings, get().meta) : undefined;
+          const spent = spendEntry(get().meta, mode, keyStore, slots);
           if (!spent) return false;
+          const locked = mode === 'campaign' ? socketedBossId(slots ?? [null, null]) : null;
           set({
             meta: spent,
-            run: freshRun(mode, rng),
+            run: freshRun(mode, rng, emptyStash(), locked),
             runLoot: emptyInventory(),
           });
           return true;
@@ -199,7 +210,8 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
             return;
           }
           const floor = run.floor + 1;
-          const game = createGame(configFor('campaign', floor), rng, 'campaign');
+          const locked = run.lockedBossId ?? null;
+          const game = createGame(configFor('campaign', floor), rng, 'campaign', locked);
           set({
             run: {
               mode: 'campaign',
@@ -210,6 +222,7 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
               bonusKey: null,
               bossRevealPending: Boolean(game.boss),
               perfectFloors: sanitizePerfectFloors(run.perfectFloors),
+              lockedBossId: locked,
             },
           });
         },
@@ -219,7 +232,8 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
           if (run.mode === 'campaign' && isCampaignFinale(run.mode, run.floor) && run.game.status !== 'playing') {
             return;
           }
-          const game = createGame(configFor(run.mode, run.floor), rng, run.mode);
+          const locked = run.lockedBossId ?? null;
+          const game = createGame(configFor(run.mode, run.floor), rng, run.mode, locked);
           const perfectFloors = sanitizePerfectFloors(run.perfectFloors);
           if (run.mode === 'campaign' && run.floor >= 0 && run.floor < perfectFloors.length) {
             perfectFloors[run.floor] = false;
@@ -232,6 +246,7 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
               bonusKey: null,
               bossRevealPending: Boolean(game.boss),
               perfectFloors,
+              lockedBossId: locked,
             },
           });
         },

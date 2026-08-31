@@ -9,6 +9,7 @@ import {
   stackedEntries,
   type Difficulty,
   type GameEvent,
+  type OfferingSlots,
 } from './engine';
 import {
   floorReport,
@@ -89,8 +90,8 @@ export default function App() {
     setFlagMode(false);
   };
 
-  const start = (mode: Difficulty) => {
-    const ok = startRun(mode);
+  const start = (mode: Difficulty, offerings?: OfferingSlots) => {
+    const ok = startRun(mode, undefined, offerings);
     if (!ok) {
       playDeny();
       return;
