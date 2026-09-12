@@ -3,8 +3,23 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "@/*": ["./*"]
+      "@/*": [
+        "./*"
+      ],
+      "zustand": [
+        "./node_modules/zustand"
+      ],
+      "zustand/*": [
+        "./node_modules/zustand/*"
+      ]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx", "../src/engine/**/*.ts", "../src/store/**/*.ts"]
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "../src/engine/**/*.ts",
+    "../src/store/**/*.ts",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ]
 }

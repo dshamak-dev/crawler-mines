@@ -146,6 +146,7 @@ export const stone = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 10,
     shadowColor: colors.stoneLo,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 1,
@@ -162,6 +163,7 @@ export const stone = StyleSheet.create({
     letterSpacing: 0.8,
     fontSize: 17,
     color: colors.ink,
+    flexShrink: 1,
   },
   goldLabel: { color: colors.gold2 },
   ghost: {
@@ -173,7 +175,7 @@ export const stone = StyleSheet.create({
     justifyContent: 'center',
   },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(8, 6, 5, 0.72)',
     alignItems: 'center',
     justifyContent: 'center',

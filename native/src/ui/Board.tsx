@@ -155,7 +155,7 @@ export default function Board({
             />
           ))}
         </View>
-        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        <View pointerEvents="none" style={StyleSheet.absoluteFill as object}>
           {blasts.map((b) => (
             <Burst
               key={b.id}
@@ -383,7 +383,15 @@ const styles = StyleSheet.create({
   bossLust: { backgroundColor: '#2a1218' },
   door: {},
   rune: { fontFamily: fonts.display, fontWeight: '700' },
-  bossGlyph: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  bossGlyph: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   bossDead: { transform: [{ rotate: '90deg' }], opacity: 0.88 },
   burst: {
     position: 'absolute',
