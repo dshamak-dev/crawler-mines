@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -17,7 +17,7 @@ import {
   type GameEvent,
 } from '../../../src/engine';
 import { colors, fonts, NUMBER_COLORS } from '../theme';
-import { BOARD_GAP, boardPixelSize, fitBoardCellPx } from './fitBoardCell';
+import { BOARD_GAP } from './fitBoardCell';
 import { BombIcon, BossIcon, ChestIcon, DoorIcon, FlagIcon, HeartIcon } from './icons';
 
 const LONG_MS = 400;
@@ -62,6 +62,7 @@ export function chainDuration(maxWave: number, reduce: boolean): number {
 
 interface BoardProps {
   game: Game;
+  cellPx: number;
   flagMode: boolean;
   blasts: BlastFx[];
   sparkles: Array<{ id: number; index: number }>;
@@ -73,6 +74,7 @@ interface BoardProps {
 
 export default function Board({
   game,
+  cellPx,
   flagMode,
   blasts,
   sparkles,
@@ -81,17 +83,14 @@ export default function Board({
   onDig,
   onFlag,
 }: BoardProps) {
-  const [cellPx, setCellPx] = useState(32);
-  const slot = useRef({ w: 0, h: 0 });
-  const applyFit = useCallback((w: number, h: number) => {
-    slot.current = { w, h };
-    const next = fitBoardCellPx(w, h, game.width, game.height);
-    setCellPx((prev) => (prev === next ? prev : next));
-  }, [game.width, game.height]);
-  useEffect(() => {
-    const { w, h } = slot.current;
-    if (w > 0 && h > 0) applyFit(w, h);
-  }, [applyFit]);
+  const rows = useMemo(() => {
+    const out: number[][] = [];
+    for (let y = 0; y < game.height; y += 1) {
+      const start = y * game.width;
+      out.push(Array.from({ length: game.width }, (_, x) => start + x));
+    }
+    return out;
+  }, [game.height, game.width]);
   const waveOf = useMemo(() => {
     const map = new Map<number, number>();
     for (const b of blasts) map.set(b.index, b.wave);
@@ -120,41 +119,37 @@ export default function Board({
     );
   }
 
+  if (cellPx < 1) return null;
+
   return (
-    <View
-      style={styles.wrap}
-      onLayout={(e) => {
-        const { width, height } = e.nativeEvent.layout;
-        applyFit(width, height);
-      }}
-    >
+    <View style={styles.wrap}>
       <Animated.View style={[styles.stage, shakeStyle]}>
-        <View
-          style={[
-            styles.board,
-            boardPixelSize(game.width, game.height, cellPx),
-          ]}
-          accessibilityRole="none"
-          accessibilityLabel="Dungeon floor"
-        >
-          {game.cells.map((cell, i) => (
-            <DungeonCell
-              key={i}
-              index={i}
-              cell={cell}
-              size={cellPx}
-              flagMode={flagMode}
-              wave={waveOf.get(i)}
-              wreckedWave={wreckWave.get(i)}
-              reduce={reduceMotion}
-              bossHere={game.boss != null && game.boss.index === i && game.status === 'playing'}
-              bossId={game.boss?.id ?? 'gluttony'}
-              bossDead={game.boss != null && game.boss.lives <= 0}
-              hearted={cell.hearted === true}
-              door={game.doorIndex === i && cell.state === 'revealed'}
-              onDig={onDig}
-              onFlag={onFlag}
-            />
+        <View style={styles.board} accessibilityRole="none" accessibilityLabel="Dungeon floor">
+          {rows.map((indexes, y) => (
+            <View key={y} style={styles.row}>
+              {indexes.map((i) => {
+                const cell = game.cells[i];
+                return (
+                  <DungeonCell
+                    key={i}
+                    index={i}
+                    cell={cell}
+                    size={cellPx}
+                    flagMode={flagMode}
+                    wave={waveOf.get(i)}
+                    wreckedWave={wreckWave.get(i)}
+                    reduce={reduceMotion}
+                    bossHere={game.boss != null && game.boss.index === i && game.status === 'playing'}
+                    bossId={game.boss?.id ?? 'gluttony'}
+                    bossDead={game.boss != null && game.boss.lives <= 0}
+                    hearted={cell.hearted === true}
+                    door={game.doorIndex === i && cell.state === 'revealed'}
+                    onDig={onDig}
+                    onFlag={onFlag}
+                  />
+                );
+              })}
+            </View>
           ))}
         </View>
         <View pointerEvents="none" style={StyleSheet.absoluteFill as object}>
@@ -367,16 +362,10 @@ function ariaFor(visual: string, n: number, tier: Cell['tier']): string {
 }
 
 const styles = StyleSheet.create({
-  wrap: {
-    flex: 1,
-    width: '100%',
-    minHeight: 0,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
+  wrap: { alignItems: 'center', justifyContent: 'flex-end' },
   stage: { position: 'relative' },
-  board: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
+  board: { gap: GAP },
+  row: { flexDirection: 'row', gap: GAP },
   cell: {
     borderRadius: 6,
     alignItems: 'center',

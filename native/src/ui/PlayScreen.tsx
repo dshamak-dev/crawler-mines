@@ -1,5 +1,6 @@
-import { useCallback, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReducedMotion } from 'react-native-reanimated';
 import {
   BOSS_COPY,
@@ -16,6 +17,7 @@ import { keyStore } from '../storage';
 import { floorReport, useGameStore, type FloorReport, type Run } from '../store';
 import { colors, fonts } from '../theme';
 import Board, { chainDuration, collectFx, type BlastFx } from './Board';
+import { clampBoardSlot, fitBoardCellPx } from './fitBoardCell';
 import { BagIcon, BossIcon, ChestIcon, FlagIcon, GoldIcon, ItemIcon, MenuIcon, ShovelIcon } from './icons';
 import LootQueue, { type LootToastItem } from './LootToast';
 import MuteButton from './MuteButton';
@@ -59,6 +61,9 @@ export default function PlayScreen({
   const [lootQueue, setLootQueue] = useState<LootToastItem[]>([]);
   const [extractPrompt, setExtractPrompt] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const insets = useSafeAreaInsets();
+  const win = useWindowDimensions();
+  const [slot, setSlot] = useState({ w: 0, h: 0 });
   const fxId = useRef(1);
   const toastId = useRef(1);
   const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -177,6 +182,23 @@ export default function PlayScreen({
     setTutorial(false);
   };
 
+  const boardW = run?.game.width ?? 8;
+  const boardH = run?.game.height ?? 8;
+  const cellPx = useMemo(() => {
+    if (slot.w <= 0 || slot.h <= 0) return 0;
+    const capped = clampBoardSlot(
+      slot.w,
+      slot.h,
+      win.width,
+      win.height,
+      insets.left,
+      insets.right,
+      insets.top,
+      insets.bottom,
+    );
+    return fitBoardCellPx(capped.w, capped.h, boardW, boardH);
+  }, [slot, win.width, win.height, insets.left, insets.right, insets.top, insets.bottom, boardW, boardH]);
+
   if (!run) return null;
 
   const { game, mode, floor } = run;
@@ -233,16 +255,28 @@ export default function PlayScreen({
         <Text style={styles.pill}>{floorLabel}</Text>
       </View>
 
-      <Board
-        game={game}
-        flagMode={flagMode}
-        blasts={blasts}
-        sparkles={sparkles}
-        shaking={shaking}
-        reduceMotion={reduceMotion}
-        onDig={onDig}
-        onFlag={onFlag}
-      />
+      <View
+        style={styles.boardSlot}
+        collapsable={false}
+        onLayout={(e) => {
+          const { width, height } = e.nativeEvent.layout;
+          setSlot((prev) => (prev.w === width && prev.h === height ? prev : { w: width, h: height }));
+        }}
+      >
+        <View style={styles.boardCanvas} pointerEvents="box-none">
+          <Board
+            game={game}
+            cellPx={cellPx}
+            flagMode={flagMode}
+            blasts={blasts}
+            sparkles={sparkles}
+            shaking={shaking}
+            reduceMotion={reduceMotion}
+            onDig={onDig}
+            onFlag={onFlag}
+          />
+        </View>
+      </View>
 
       <LootQueue
         queue={lootQueue}
@@ -547,8 +581,22 @@ export default function PlayScreen({
 }
 
 const styles = StyleSheet.create({
-  shell: { flex: 1, minHeight: 0, overflow: 'hidden', gap: 6 },
+  shell: { flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden', gap: 6 },
   hud: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
+  boardSlot: {
+    flex: 1,
+    alignSelf: 'stretch',
+    width: '100%',
+    minWidth: 0,
+    minHeight: 0,
+    overflow: 'hidden',
+  },
+  boardCanvas: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
   stats: { flex: 1, flexDirection: 'row', gap: 4, justifyContent: 'center' },
   stat: {
     flex: 1,

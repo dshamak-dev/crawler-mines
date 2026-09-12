@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme';
+import { PLAY_SIDE_PAD } from './fitBoardCell';
 
 export default function Shell({ children, tight }: { children: ReactNode; tight?: boolean }) {
   const insets = useSafeAreaInsets();
@@ -19,8 +20,8 @@ export default function Shell({ children, tight }: { children: ReactNode; tight?
         {
           paddingTop: (tight ? 8 : 10) + padT,
           paddingBottom: (tight ? 0 : 10) + padB,
-          paddingLeft: (tight ? 6 : 12) + padL,
-          paddingRight: (tight ? 6 : 12) + padR,
+          paddingLeft: (tight ? PLAY_SIDE_PAD : 12) + padL,
+          paddingRight: (tight ? PLAY_SIDE_PAD : 12) + padR,
         },
       ]}
     >

@@ -64,7 +64,7 @@ export default function RootLayout() {
           <Stack
             screenOptions={{
               headerShown: false,
-              contentStyle: { backgroundColor: colors.bg },
+              contentStyle: { backgroundColor: colors.bg, flex: 1, overflow: 'hidden' },
               animation: 'fade',
             }}
           />

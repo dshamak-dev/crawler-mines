@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boardPixelSize, fitBoardCellPx } from '../native/src/ui/fitBoardCell';
+import { boardPixelSize, clampBoardSlot, fitBoardCellPx } from '../native/src/ui/fitBoardCell';
 
 describe('fitBoardCellPx', () => {
   it('fits campaign floor 4 (9×12) and floor 5 (12×16) inside a short phone slot', () => {
@@ -26,5 +26,15 @@ describe('fitBoardCellPx', () => {
   it('uses the full width on a tall 8×8 slot', () => {
     const cell = fitBoardCellPx(340, 600, 8, 8);
     expect(cell).toBe(Math.floor((340 - 3 * 7) / 8));
+  });
+
+  it('clamps an overflowing onLayout slot to the inset window', () => {
+    const slot = clampBoardSlot(2000, 2000, 430, 932, 0, 0, 59, 34);
+    expect(slot.w).toBe(430 - 12);
+    expect(slot.h).toBe(932 - 59 - 34);
+    const cell = fitBoardCellPx(slot.w, slot.h, 12, 16);
+    const box = boardPixelSize(12, 16, cell);
+    expect(box.width).toBeLessThanOrEqual(slot.w);
+    expect(box.height).toBeLessThanOrEqual(slot.h);
   });
 });
