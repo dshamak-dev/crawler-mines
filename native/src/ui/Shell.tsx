@@ -55,6 +55,8 @@ const styles = StyleSheet.create({
   },
   shell: {
     flex: 1,
+    minHeight: 0,
+    overflow: 'hidden',
     backgroundColor: colors.bg,
     position: 'relative',
   },

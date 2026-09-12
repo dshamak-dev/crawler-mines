@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -17,10 +17,11 @@ import {
   type GameEvent,
 } from '../../../src/engine';
 import { colors, fonts, NUMBER_COLORS } from '../theme';
+import { BOARD_GAP, boardPixelSize, fitBoardCellPx } from './fitBoardCell';
 import { BombIcon, BossIcon, ChestIcon, DoorIcon, FlagIcon, HeartIcon } from './icons';
 
 const LONG_MS = 400;
-const GAP = 3;
+const GAP = BOARD_GAP;
 export const BLAST_STAGGER_MS = 95;
 
 export interface BlastFx {
@@ -81,6 +82,16 @@ export default function Board({
   onFlag,
 }: BoardProps) {
   const [cellPx, setCellPx] = useState(32);
+  const slot = useRef({ w: 0, h: 0 });
+  const applyFit = useCallback((w: number, h: number) => {
+    slot.current = { w, h };
+    const next = fitBoardCellPx(w, h, game.width, game.height);
+    setCellPx((prev) => (prev === next ? prev : next));
+  }, [game.width, game.height]);
+  useEffect(() => {
+    const { w, h } = slot.current;
+    if (w > 0 && h > 0) applyFit(w, h);
+  }, [applyFit]);
   const waveOf = useMemo(() => {
     const map = new Map<number, number>();
     for (const b of blasts) map.set(b.index, b.wave);
@@ -114,23 +125,14 @@ export default function Board({
       style={styles.wrap}
       onLayout={(e) => {
         const { width, height } = e.nativeEvent.layout;
-        const cs = Math.floor(
-          Math.min(
-            (width - GAP * (game.width - 1)) / game.width,
-            (height - GAP * (game.height - 1)) / game.height,
-          ),
-        );
-        setCellPx(Math.max(26, cs));
+        applyFit(width, height);
       }}
     >
       <Animated.View style={[styles.stage, shakeStyle]}>
         <View
           style={[
             styles.board,
-            {
-              width: game.width * cellPx + GAP * (game.width - 1),
-              height: game.height * cellPx + GAP * (game.height - 1),
-            },
+            boardPixelSize(game.width, game.height, cellPx),
           ]}
           accessibilityRole="none"
           accessibilityLabel="Dungeon floor"
@@ -365,7 +367,14 @@ function ariaFor(visual: string, n: number, tier: Cell['tier']): string {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, width: '100%', minHeight: 0, alignItems: 'center', justifyContent: 'flex-end' },
+  wrap: {
+    flex: 1,
+    width: '100%',
+    minHeight: 0,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
   stage: { position: 'relative' },
   board: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
   cell: {

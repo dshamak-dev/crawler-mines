@@ -53,6 +53,8 @@ function silence(clip: Clip | null): void {
   }
 }
 
+type ExpoAudio = typeof import('expo-audio');
+
 export class GameAudio {
   private muted = loadMuted();
   private unlocked = false;
@@ -61,6 +63,9 @@ export class GameAudio {
   private pending: BgmId = 'cozy';
   private fadeGen = 0;
   private loading: Promise<void> | null = null;
+  private audioApi: ExpoAudio | null = null;
+  private resumeRetry: ReturnType<typeof setTimeout> | null = null;
+  private sessionGen = 0;
   private readonly bgm: Record<BgmId, Clip | null> = emptyClips(BGM_IDS);
   private readonly sfx: Record<SfxId, Clip | null> = emptyClips(SFX_IDS);
 
@@ -119,23 +124,72 @@ export class GameAudio {
   suspendForHidden(): void {
     this.hiddenSuspended = true;
     this.fadeGen += 1;
+    if (this.resumeRetry) {
+      clearTimeout(this.resumeRetry);
+      this.resumeRetry = null;
+    }
     this.stopOtherBgm(null);
     for (const id of SFX_IDS) {
       const el = this.sfx[id];
-      if (!el || el.paused) continue;
+      if (!el) continue;
       try {
         el.pause();
       } catch {
         /* ignore */
       }
     }
+    this.sessionGen += 1;
   }
 
+  /** Resume from the pause point when the app is active again. */
   resumeFromHidden(): void {
-    if (!this.hiddenSuspended) return;
+    void this.resumeFromHiddenAsync();
+  }
+
+  private async resumeFromHiddenAsync(): Promise<void> {
     this.hiddenSuspended = false;
     if (this.muted || !this.unlocked) return;
-    this.syncBgm();
+    await this.reactivateSession();
+    if (this.hiddenSuspended || this.muted) return;
+    this.syncBgm(true);
+    // iOS often finishes session activation a beat after AppState 'active'.
+    if (this.resumeRetry) clearTimeout(this.resumeRetry);
+    this.resumeRetry = setTimeout(() => {
+      this.resumeRetry = null;
+      if (this.hiddenSuspended || this.muted || !this.unlocked) return;
+      this.playCurrentBgm();
+    }, 200);
+  }
+
+  private async reactivateSession(): Promise<void> {
+    const audio = this.audioApi;
+    if (!audio) return;
+    const gen = ++this.sessionGen;
+    try {
+      await audio.setIsAudioActiveAsync(true);
+      if (gen !== this.sessionGen) return;
+      await audio.setAudioModeAsync({
+        playsInSilentMode: true,
+        shouldPlayInBackground: false,
+        interruptionMode: 'doNotMix',
+      });
+    } catch {
+      /* session is best-effort */
+    }
+  }
+
+  private playCurrentBgm(): void {
+    const next = this.pending;
+    const incoming = this.bgm[next];
+    this.stopOtherBgm(next);
+    this.current = next;
+    if (!incoming) return;
+    try {
+      incoming.volume = BGM_VOL[next];
+      incoming.play();
+    } catch {
+      /* ignore — do not lock the player */
+    }
   }
 
   isHiddenSuspended(): boolean {
@@ -155,8 +209,10 @@ export class GameAudio {
     // missing native module cannot crash layout / Metro on import.
     const audio = await import('expo-audio').catch(() => null);
     if (!audio) return;
+    this.audioApi = audio;
 
     try {
+      await audio.setIsAudioActiveAsync(true);
       await audio.setAudioModeAsync({
         playsInSilentMode: true,
         shouldPlayInBackground: false,
@@ -196,12 +252,12 @@ export class GameAudio {
     const switching = this.current !== next;
     this.stopOtherBgm(next);
     if (!switching) {
-      if (incoming && incoming.paused) {
+      if (incoming) {
         try {
           incoming.volume = BGM_VOL[next];
           incoming.play();
         } catch {
-          this.unlocked = false;
+          /* ignore — do not lock the player */
         }
       }
       return;
@@ -214,7 +270,6 @@ export class GameAudio {
       incoming.volume = 0;
       incoming.play();
     } catch {
-      this.unlocked = false;
       return;
     }
     const fadeMs = fromMute || !hadCurrent ? 180 : FADE_IN_MS;

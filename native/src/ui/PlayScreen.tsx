@@ -547,8 +547,8 @@ export default function PlayScreen({
 }
 
 const styles = StyleSheet.create({
-  shell: { flex: 1, gap: 6 },
-  hud: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  shell: { flex: 1, minHeight: 0, overflow: 'hidden', gap: 6 },
+  hud: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
   stats: { flex: 1, flexDirection: 'row', gap: 4, justifyContent: 'center' },
   stat: {
     flex: 1,
@@ -588,7 +588,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     borderRadius: 999,
   },
-  dock: { paddingBottom: 8 },
+  dock: { paddingBottom: 8, flexShrink: 0 },
   toggle: {
     flexDirection: 'row',
     gap: 8,
