@@ -41,5 +41,11 @@
     "ios": "expo start --ios",
     "web": "expo start --web"
   },
+  "pnpm": {
+    "publicHoistPattern": [
+      "*@expo*",
+      "*expo*"
+    ]
+  },
   "private": true
 }
