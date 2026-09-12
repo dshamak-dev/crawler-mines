@@ -12,8 +12,13 @@ config.watchFolders = [
   path.join(workspaceRoot, 'src', 'store'),
 ];
 
+// Resolve packages from native/ first. Do not disable hierarchical lookup —
+// pnpm nests Expo Router peers (e.g. @expo/metro-runtime) and Metro must
+// walk those folders. Block the Vite root node_modules instead (different React).
 config.resolver.nodeModulesPaths = [path.resolve(projectRoot, 'node_modules')];
-// Keep Vite's root node_modules (different React) out of this bundle.
-config.resolver.disableHierarchicalLookup = true;
+const rootNm = path.resolve(workspaceRoot, 'node_modules').replace(/[/\\]/g, '[/\\\\]');
+const parentBlock = new RegExp(`^${rootNm}[/\\\\].*`);
+const existing = config.resolver.blockList;
+config.resolver.blockList = existing ? [existing, parentBlock].flat() : parentBlock;
 
 module.exports = config;

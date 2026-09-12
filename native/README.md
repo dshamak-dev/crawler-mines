@@ -6,14 +6,17 @@ Phone client for the same dungeon-crawler minesweeper as the Vite web app at the
 
 ```bash
 cd native
-npm i
+npm i          # or: pnpm i
 npx expo start
 ```
+
+`native/.npmrc` uses `node-linker=hoisted` so pnpm exposes Expo Router peers (including `@expo/metro-runtime`) where Metro can see them. After pulling this change, reinstall in `native/` (`rm -rf node_modules && pnpm i`).
 
 | Command | What |
 | --- | --- |
 | `npx expo start` | Metro + Expo Go / dev client |
-| `npx expo start --web` | Browser smoke test |
+| `npx expo start --web` | Browser smoke test (phone-sized frame on desktop) |
+| `npx expo export --platform web` | Confirms Metro can bundle shared `src/engine` |
 | `npx expo start --ios` / `--android` | Simulator (needs Xcode / Android SDK) |
 
 Web stays at the repo root:
@@ -35,7 +38,7 @@ npm test && npm run build
 
 ## Shared engine
 
-Metro `watchFolders` points at `../src/engine` and `../src/store` so rules stay identical to web. Native `node_modules` is isolated (`disableHierarchicalLookup`) so Vite’s React does not leak in.
+Metro `watchFolders` points at `../src/engine` and `../src/store` so rules stay identical to web. The Vite root `node_modules` is on Metro’s block list so its React does not leak in. `@expo/metro-runtime` is a direct dependency (Expo Router peer).
 
 **Follow-up:** if Metro packaging of the parent `src/` folders becomes painful, copy `src/engine` (and the store helpers) into `native/` and unify later. Do not invent gameplay in either copy.
 

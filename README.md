@@ -31,7 +31,7 @@ The React Native app lives in `native/` and does **not** replace the Vite app. G
 
 ```bash
 cd native
-npm i
+npm i          # or pnpm i (native/.npmrc hoists Expo peers)
 npx expo start
 ```
 
