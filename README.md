@@ -10,6 +10,8 @@ In the repo **Settings → Pages**, set Source to **GitHub Actions** (not Deploy
 
 ## Run
 
+### Web (Vite — this is the GitHub Pages product)
+
 ```bash
 npm i && npm run dev
 ```
@@ -20,6 +22,24 @@ Then open the printed local URL on a phone or a ~390x844 viewport.
 npm test    # engine unit tests (vitest)
 npm run build
 ```
+
+Root `dev` / `build` / `test` / `preview` still build the web game in `src/`. Do not run Expo from the repo root.
+
+### Native (Expo Router, phones)
+
+The React Native app lives in `native/` and does **not** replace the Vite app. Gameplay rules come from the same `src/engine` (and `src/store`) via Metro `watchFolders`. Audio files are copies of `public/audio/*` (not re-encoded).
+
+```bash
+cd native
+npm i
+npx expo start
+```
+
+Then scan the QR code with Expo Go, or press `i` / `a` for a simulator. `npx expo start --web` is a smoke-test surface only.
+
+Storage prefers `react-native-mmkv` on a native build. Expo Go / web fall back to Expo’s sync SQLite kv-store or `localStorage`.
+
+See [native/README.md](native/README.md) for stack notes and a follow-up to keep sharing the engine if Metro ever fights you.
 
 ## How to play (the twist)
 

@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Crawler Mines",
+    "slug": "crawler-mines",
+    "scheme": "crawler-mines",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#120e0c",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "dev.dshamak.crawlermines"
+    },
+    "android": {
+      "package": "dev.dshamak.crawlermines",
+      "adaptiveIcon": {
+        "backgroundColor": "#120e0c",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png",
+      "backgroundColor": "#120e0c"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#120e0c",
+          "image": "./assets/icon.png"
+        }
+      ],
+      "expo-font",
+      "expo-sqlite"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
