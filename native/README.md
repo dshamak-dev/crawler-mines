@@ -32,7 +32,7 @@ npm test && npm run build
 - Expo SDK 57 + Expo Router (`app/` routes: title, play, collection, shop)
 - Zustand store factory from `../src/store/gameStore.ts` with a native `KeyStore`
 - Sync persist: **MMKV** on a native build; **expo-sqlite/kv-store** (Expo Go) or `localStorage` (web)
-- `expo-av` for exclusive BGM + SFX (same `public/audio/*` bytes, copied into `assets/audio/`)
+- `expo-audio` for exclusive BGM + SFX (same `public/audio/*` bytes, copied into `assets/audio/`). `expo-av` is not in Expo Go.
 - `react-native-svg` icons ported from `src/ui/icons.tsx`
 - Gesture Handler long-press (400ms) + Reanimated board FX
 

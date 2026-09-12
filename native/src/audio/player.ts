@@ -1,8 +1,16 @@
-import { Audio, InterruptionModeAndroid, InterruptionModeIOS, type AVPlaybackStatus } from 'expo-av';
 import { loadMuted, saveMuted } from './settings';
 import { BGM_ASSETS, SFX_ASSETS, type BgmId, type SfxId } from './urls';
 
-type Sound = Audio.Sound;
+type Clip = {
+  volume: number;
+  loop: boolean;
+  paused: boolean;
+  playing: boolean;
+  isLoaded: boolean;
+  play: () => void;
+  pause: () => void;
+  seekTo: (seconds: number) => Promise<unknown>;
+};
 
 const BGM_VOL: Record<BgmId, number> = {
   cozy: 0.2,
@@ -31,12 +39,15 @@ const SFX_VOL: Record<SfxId, number> = {
 const BGM_IDS = Object.keys(BGM_ASSETS) as BgmId[];
 const SFX_IDS = Object.keys(SFX_ASSETS) as SfxId[];
 
-async function silence(sound: Sound | null): Promise<void> {
-  if (!sound) return;
+function emptyClips<T extends string>(ids: readonly T[]): Record<T, Clip | null> {
+  return Object.fromEntries(ids.map((id) => [id, null])) as Record<T, Clip | null>;
+}
+
+function silence(clip: Clip | null): void {
+  if (!clip) return;
   try {
-    await sound.setVolumeAsync(0);
-    const status = await sound.getStatusAsync();
-    if (status.isLoaded && status.isPlaying) await sound.pauseAsync();
+    clip.volume = 0;
+    if (!clip.paused) clip.pause();
   } catch {
     /* ignore */
   }
@@ -50,32 +61,12 @@ export class GameAudio {
   private pending: BgmId = 'cozy';
   private fadeGen = 0;
   private loading: Promise<void> | null = null;
-  private readonly bgm: Record<BgmId, Sound | null> = {
-    cozy: null,
-    campaign: null,
-    boss: null,
-    wrath: null,
-    lust: null,
-  };
-  private readonly sfx: Record<SfxId, Sound | null> = {
-    dig: null,
-    flag: null,
-    chest: null,
-    blast: null,
-    wreck: null,
-    clear: null,
-    ui: null,
-    deny: null,
-    'boss-move': null,
-    'boss-eat-flag': null,
-    'boss-hit': null,
-    'boss-death': null,
-    'campaign-lose': null,
-  };
+  private readonly bgm: Record<BgmId, Clip | null> = emptyClips(BGM_IDS);
+  private readonly sfx: Record<SfxId, Clip | null> = emptyClips(SFX_IDS);
 
   async unlock(): Promise<void> {
     if (this.unlocked) {
-      await this.syncBgm();
+      this.syncBgm();
       return;
     }
     if (!this.loading) this.loading = this.loadAll();
@@ -86,7 +77,7 @@ export class GameAudio {
       return;
     }
     this.unlocked = true;
-    await this.syncBgm();
+    this.syncBgm();
   }
 
   isMuted(): boolean {
@@ -98,15 +89,15 @@ export class GameAudio {
     saveMuted(muted);
     if (muted) {
       this.fadeGen += 1;
-      void this.stopOtherBgm(null);
+      this.stopOtherBgm(null);
       return;
     }
-    if (this.unlocked) void this.syncBgm(true);
+    if (this.unlocked) this.syncBgm(true);
   }
 
   setBgm(id: BgmId): void {
     this.pending = id;
-    if (this.unlocked && !this.muted) void this.syncBgm();
+    if (this.unlocked && !this.muted) this.syncBgm();
   }
 
   playSfx = (id: SfxId): void => {
@@ -115,11 +106,10 @@ export class GameAudio {
     if (!el) return;
     void (async () => {
       try {
-        const status = await el.getStatusAsync();
-        if (!status.isLoaded) return;
-        await el.setPositionAsync(0);
-        await el.setVolumeAsync(SFX_VOL[id]);
-        await el.playAsync();
+        el.pause();
+        await el.seekTo(0);
+        el.volume = SFX_VOL[id];
+        el.play();
       } catch {
         /* ignore */
       }
@@ -129,13 +119,15 @@ export class GameAudio {
   suspendForHidden(): void {
     this.hiddenSuspended = true;
     this.fadeGen += 1;
-    void this.stopOtherBgm(null);
+    this.stopOtherBgm(null);
     for (const id of SFX_IDS) {
       const el = this.sfx[id];
-      if (!el) continue;
-      void el.getStatusAsync().then((status: AVPlaybackStatus) => {
-        if (status.isLoaded && status.isPlaying) void el.pauseAsync();
-      });
+      if (!el || el.paused) continue;
+      try {
+        el.pause();
+      } catch {
+        /* ignore */
+      }
     }
   }
 
@@ -143,7 +135,7 @@ export class GameAudio {
     if (!this.hiddenSuspended) return;
     this.hiddenSuspended = false;
     if (this.muted || !this.unlocked) return;
-    void this.syncBgm();
+    this.syncBgm();
   }
 
   isHiddenSuspended(): boolean {
@@ -151,52 +143,63 @@ export class GameAudio {
   }
 
   /** Pause + silence every BGM clip except `except`. Position stays. */
-  async stopOtherBgm(except: BgmId | null): Promise<void> {
-    await Promise.all(
-      BGM_IDS.filter((id) => except == null || id !== except).map((id) => silence(this.bgm[id])),
-    );
+  stopOtherBgm(except: BgmId | null): void {
+    for (const id of BGM_IDS) {
+      if (except != null && id === except) continue;
+      silence(this.bgm[id]);
+    }
   }
 
   private async loadAll(): Promise<void> {
-    await Audio.setAudioModeAsync({
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: false,
-      shouldDuckAndroid: true,
-      interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
-      interruptionModeIOS: InterruptionModeIOS.DoNotMix,
-    });
-    await Promise.all([
-      ...BGM_IDS.map(async (id) => {
-        const { sound } = await Audio.Sound.createAsync(
-          BGM_ASSETS[id],
-          { isLooping: true, volume: 0, shouldPlay: false },
-        );
-        this.bgm[id] = sound;
-      }),
-      ...SFX_IDS.map(async (id) => {
-        const { sound } = await Audio.Sound.createAsync(
-          SFX_ASSETS[id],
-          { isLooping: false, volume: SFX_VOL[id], shouldPlay: false },
-        );
-        this.sfx[id] = sound;
-      }),
-    ]);
+    // expo-av's ExponentAV is not in Expo Go. Load expo-audio only here so a
+    // missing native module cannot crash layout / Metro on import.
+    const audio = await import('expo-audio').catch(() => null);
+    if (!audio) return;
+
+    try {
+      await audio.setAudioModeAsync({
+        playsInSilentMode: true,
+        shouldPlayInBackground: false,
+        interruptionMode: 'doNotMix',
+      });
+    } catch {
+      /* session mode is best-effort */
+    }
+
+    const opts = { keepAudioSessionActive: true, updateInterval: 1000 };
+    for (const id of BGM_IDS) {
+      try {
+        const clip = audio.createAudioPlayer(BGM_ASSETS[id], opts);
+        clip.loop = true;
+        clip.volume = 0;
+        this.bgm[id] = clip;
+      } catch {
+        this.bgm[id] = null;
+      }
+    }
+    for (const id of SFX_IDS) {
+      try {
+        const clip = audio.createAudioPlayer(SFX_ASSETS[id], opts);
+        clip.loop = false;
+        clip.volume = SFX_VOL[id];
+        this.sfx[id] = clip;
+      } catch {
+        this.sfx[id] = null;
+      }
+    }
   }
 
-  private async syncBgm(fromMute = false): Promise<void> {
+  private syncBgm(fromMute = false): void {
     if (!this.unlocked || this.muted || this.hiddenSuspended) return;
     const next = this.pending;
     const incoming = this.bgm[next];
     const switching = this.current !== next;
-    await this.stopOtherBgm(next);
+    this.stopOtherBgm(next);
     if (!switching) {
-      if (incoming) {
+      if (incoming && incoming.paused) {
         try {
-          const status = await incoming.getStatusAsync();
-          if (status.isLoaded && !status.isPlaying) {
-            await incoming.setVolumeAsync(BGM_VOL[next]);
-            await incoming.playAsync();
-          }
+          incoming.volume = BGM_VOL[next];
+          incoming.play();
         } catch {
           this.unlocked = false;
         }
@@ -208,8 +211,8 @@ export class GameAudio {
     if (!incoming) return;
     const gen = ++this.fadeGen;
     try {
-      await incoming.setVolumeAsync(0);
-      await incoming.playAsync();
+      incoming.volume = 0;
+      incoming.play();
     } catch {
       this.unlocked = false;
       return;
@@ -218,12 +221,16 @@ export class GameAudio {
     this.ramp(incoming, 0, BGM_VOL[next], fadeMs, gen);
   }
 
-  private ramp(el: Sound, from: number, to: number, ms: number, gen: number): void {
+  private ramp(el: Clip, from: number, to: number, ms: number, gen: number): void {
     const start = Date.now();
     const tick = () => {
       if (gen !== this.fadeGen || this.muted || this.hiddenSuspended) return;
       const k = ms <= 0 ? 1 : Math.min(1, (Date.now() - start) / ms);
-      void el.setVolumeAsync(Math.max(0, Math.min(1, from + (to - from) * k)));
+      try {
+        el.volume = Math.max(0, Math.min(1, from + (to - from) * k));
+      } catch {
+        return;
+      }
       if (k < 1) setTimeout(tick, 32);
     };
     tick();
