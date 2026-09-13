@@ -17,6 +17,7 @@ import {
   isShopOnly,
   isTicketKey,
   isUsable,
+  canUseFromPreview,
   stackedEntries,
   loadCollection,
   sellGold,
@@ -155,6 +156,9 @@ describe('sell catalog', () => {
     expect(isCollectible('scroll-of-portal')).toBe(true);
     expect(isUsable('witchcraft-bag')).toBe(true);
     expect(isUsable('scroll-of-portal')).toBe(false);
+    expect(canUseFromPreview('witchcraft-bag', 1)).toBe(true);
+    expect(canUseFromPreview('witchcraft-bag', 0)).toBe(false);
+    expect(canUseFromPreview('bone-dust', 2)).toBe(false);
   });
 });
 
@@ -430,6 +434,20 @@ describe('title shop wiring', () => {
     expect(route).toContain('onBuy');
     expect(route).toContain('buyFromShop');
     expect(vitestCfg).toContain("exclude: ['**/node_modules/**', 'native/**']");
+  });
+
+  it('opens the shared item preview from Buy and Sell rows', () => {
+    expect(shop).toContain('ItemPreviewSheet');
+    expect(shop).toContain('previewForItem');
+    expect(shop).toContain('RitualSheet');
+    expect(shop).toContain('onStartRite');
+    expect(shop).toContain('setRitualOpen(true)');
+    expect(route).toContain('startRite');
+    expect(route).toContain('onStartRite');
+    const preview = readFileSync(resolve(__dirname, '../native/src/ui/ItemPreviewSheet.tsx'), 'utf8');
+    expect(preview).toContain('canUseFromPreview');
+    expect(preview).toContain('Use');
+    expect(preview).toContain('Close');
   });
 
   it('gives bone dust and the witchcraft bag their own stone-gold glyphs', () => {

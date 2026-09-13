@@ -12,6 +12,7 @@ import {
   emptyRitual,
   extract,
   isArenaFloor,
+  canUseFromPreview,
   isUsable,
   loadCollection,
   loadRun,
@@ -91,6 +92,14 @@ describe('ritual combo', () => {
     expect(isUsable('scroll-of-portal')).toBe(false);
     expect(isUsable('bone-dust')).toBe(false);
     expect(isUsable('gluttony-head')).toBe(false);
+    expect(canUseFromPreview('witchcraft-bag', 1)).toBe(true);
+    expect(canUseFromPreview('witchcraft-bag', 2)).toBe(true);
+    expect(canUseFromPreview('witchcraft-bag', 0)).toBe(false);
+    expect(canUseFromPreview('witchcraft-bag', -1)).toBe(false);
+    expect(canUseFromPreview('bone-dust', 4)).toBe(false);
+    expect(canUseFromPreview('scroll-of-portal', 1)).toBe(false);
+    expect(canUseFromPreview('gluttony-head', 1)).toBe(false);
+    expect(canUseFromPreview('gem', 9)).toBe(false);
   });
 });
 
@@ -266,15 +275,22 @@ describe('arena door wreck', () => {
 
 describe('ritual UI wiring', () => {
   const collection = readFileSync(resolve(__dirname, '../native/src/ui/CollectionScreen.tsx'), 'utf8');
+  const preview = readFileSync(resolve(__dirname, '../native/src/ui/ItemPreviewSheet.tsx'), 'utf8');
   const sheet = readFileSync(resolve(__dirname, '../native/src/ui/RitualSheet.tsx'), 'utf8');
   const route = readFileSync(resolve(__dirname, '../native/app/collection.tsx'), 'utf8');
   const play = readFileSync(resolve(__dirname, '../native/src/ui/PlayScreen.tsx'), 'utf8');
   const board = readFileSync(resolve(__dirname, '../native/src/ui/Board.tsx'), 'utf8');
 
-  it('opens a 3-slot Use / Close sheet from Collection bag tap', () => {
-    expect(collection).toContain('RitualSheet');
-    expect(collection).toContain('isUsable');
-    expect(collection).toContain('Use');
+  it('opens a preview sheet on item tap, then ritual from preview Use', () => {
+    expect(collection).toContain('ItemPreviewSheet');
+    expect(collection).toContain('previewForItem');
+    expect(collection).toContain("tab === 'all' && Boolean(onStartRite)");
+    expect(collection).toContain('setRitualOpen(true)');
+    expect(collection).not.toContain('isUsable');
+    expect(preview).toContain('canUseFromPreview');
+    expect(preview).toContain('Use');
+    expect(preview).toContain('Close');
+    expect(preview).toContain('preview.qty');
     expect(sheet).toContain('RITUAL_COPY');
     expect(sheet).toContain('Use');
     expect(sheet).toContain('Close');
@@ -282,6 +298,7 @@ describe('ritual UI wiring', () => {
     expect(route).toContain('startRite');
     expect(route).toContain('onStartRite');
     expect(route).toContain('playDeny');
+    expect(board).toContain('Gesture.LongPress()');
   });
 
   it('hides Found/Broken on arena floors and tags Fight/Exit', () => {

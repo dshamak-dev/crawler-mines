@@ -50,6 +50,7 @@ export {
   isShopOnly,
   isTicketKey,
   isUsable,
+  canUseFromPreview,
   removeItem,
   sellableEntries,
   sellGold,
