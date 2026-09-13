@@ -382,6 +382,37 @@ function GoldCupGlyph({ size = 24 }: GlyphProps) {
   );
 }
 
+function BoneDustGlyph({ size = 24 }: GlyphProps) {
+  return (
+    <Svg viewBox="0 0 32 32" width={size} height={size}>
+      <Ellipse cx="16" cy="25.2" rx="10.4" ry="3.2" fill="#5a4534" />
+      <Path d="M6.8 22.4c1.6-5.2 4.8-8.6 9.2-8.6s7.6 3.4 9.2 8.6c-2.2 1.6-5.6 2.4-9.2 2.4s-7-.8-9.2-2.4z" fill="#c9b59a" />
+      <Path d="M9.2 20.6c1.2-3.6 3.4-5.8 6.8-5.8s5.6 2.2 6.8 5.8c-1.6 1-4 1.6-6.8 1.6s-5.2-.6-6.8-1.6z" fill="#e8dcc8" />
+      <Path d="M12.2 8.6l1.6 6.4-2.2.8 2.8 2.2-3.2 4.6" stroke="#8a7348" strokeWidth="1.3" fill="none" strokeLinecap="round" />
+      <Ellipse cx="13.4" cy="8.2" rx="2.1" ry="1.6" fill="#f3e6d0" />
+      <Ellipse cx="20.8" cy="18.4" rx="1.5" ry="1.1" fill="#f3e6d0" />
+      <Ellipse cx="11.2" cy="21.2" rx="1.2" ry="0.9" fill="#8a7348" opacity="0.7" />
+    </Svg>
+  );
+}
+
+function WitchcraftBagGlyph({ size = 24 }: GlyphProps) {
+  return (
+    <Svg viewBox="0 0 32 32" width={size} height={size}>
+      <Path d="M12 6.4v6.4M20 6.4v6.4" stroke="#e0b44a" strokeWidth="2.1" strokeLinecap="round" />
+      <Path d="M8.2 12.2h15.6l-1.2 14.2c0 1.4-1.2 2.4-2.6 2.4H12c-1.4 0-2.6-1-2.6-2.4L8.2 12.2z" fill="#3a1848" />
+      <Path d="M9.6 13.4h12.8l-1 12.2c0 1-1 1.8-2.1 1.8h-6.6c-1.1 0-2.1-.8-2.1-1.8l-1-12.2z" fill="#6b2d7a" />
+      <Path d="M8.2 12.2h15.6v5.2c-2.4 1-5.2 1.5-7.8 1.5s-5.4-.5-7.8-1.5V12.2z" fill="#4a2d6a" />
+      <Circle cx="16" cy="21.6" r="3.1" fill="#2a1840" />
+      <Path
+        d="M16 19.2l.7 1.5 1.6.2-1.2 1.1.3 1.6L16 22.6l-1.4.8.3-1.6-1.2-1.1 1.6-.2z"
+        fill="#e0b44a"
+      />
+      <Path d="M13.4 8.6h5.2l-.8 3.4h-3.6z" fill="#8a6419" />
+    </Svg>
+  );
+}
+
 function HeadGlyph({ kind, size = 24 }: { kind: 'gluttony' | 'wrath' | 'lust'; size?: number }) {
   if (kind === 'lust') {
     return (
@@ -430,5 +461,7 @@ export function ItemIcon({ id, size = 24 }: { id: ItemId; size?: number }) {
   if (id === 'silver-medal') return <MedalGlyph metal="#8a93a0" shine="#c5d0dc" rim="#3a4048" size={size} />;
   if (id === 'gold-medal') return <MedalGlyph metal="#e0b44a" shine="#f3d27a" rim="#8a6419" size={size} />;
   if (id === 'gold-cup') return <GoldCupGlyph size={size} />;
+  if (id === 'bone-dust') return <BoneDustGlyph size={size} />;
+  if (id === 'witchcraft-bag') return <WitchcraftBagGlyph size={size} />;
   return <ShardGlyph size={size} />;
 }

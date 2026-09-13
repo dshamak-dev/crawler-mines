@@ -46,6 +46,7 @@ export {
   isItemId,
   isMedal,
   isSellable,
+  isShopOnly,
   isTicketKey,
   removeItem,
   sellableEntries,

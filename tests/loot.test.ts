@@ -18,6 +18,7 @@ import {
   loadCollection,
   mulberry32,
   campaignKeyDropRate,
+  lootTableFor,
   rollLoot,
   saveCollection,
   stackedEntries,
@@ -63,14 +64,23 @@ describe('loot table', () => {
     expect(hardSeen.has('campaign-key')).toBe(true);
   });
 
-  it('never rolls medals or the gold cup from chests', () => {
+  it('never rolls medals, the gold cup, or shop-only reagents from chests', () => {
     for (const mode of ['easy', 'medium', 'hard', 'campaign'] as const) {
+      const table = lootTableFor(mode);
+      expect(table.some((row) => row.itemId === 'bone-dust' || row.itemId === 'witchcraft-bag')).toBe(
+        false,
+      );
       const rng = mulberry32(21);
       for (let i = 0; i < 3000; i++) {
         const id = rollLoot(rng, mode);
-        expect(id === 'bronze-medal' || id === 'silver-medal' || id === 'gold-medal' || id === 'gold-cup').toBe(
-          false,
-        );
+        expect(
+          id === 'bronze-medal' ||
+            id === 'silver-medal' ||
+            id === 'gold-medal' ||
+            id === 'gold-cup' ||
+            id === 'bone-dust' ||
+            id === 'witchcraft-bag',
+        ).toBe(false);
       }
     }
   });
@@ -300,6 +310,23 @@ describe('meta collection persistence', () => {
     expect(loaded.gold).toBe(0);
   });
 
+  it('persists shop-only reagents so Collection can list them when owned', () => {
+    const store = memoryStore();
+    let meta = emptyCollection();
+    meta = collectLoot(meta, 'bone-dust', store);
+    meta = collectLoot(meta, 'bone-dust', store);
+    meta = collectLoot(meta, 'witchcraft-bag', store);
+    expect(meta.items['bone-dust']).toBe(2);
+    expect(meta.items['witchcraft-bag']).toBe(1);
+    const loaded = loadCollection(store);
+    expect(loaded.items['bone-dust']).toBe(2);
+    expect(loaded.items['witchcraft-bag']).toBe(1);
+    expect(stackedEntries(loaded.items).map((row) => row.item.id)).toEqual([
+      'bone-dust',
+      'witchcraft-bag',
+    ]);
+  });
+
   it('reloads a persisted gold integer; rewards still only add coins', () => {
     const store = memoryStore({
       [COLLECTION_KEY]: JSON.stringify({
@@ -337,5 +364,7 @@ describe('item catalog', () => {
     expect(tierForLoot('silver-medal')).toBe('rare');
     expect(tierForLoot('gold-medal')).toBe('rare');
     expect(tierForLoot('gold-cup')).toBe('rare');
+    expect(tierForLoot('bone-dust')).toBe('wooden');
+    expect(tierForLoot('witchcraft-bag')).toBe('wooden');
   });
 });
