@@ -15,6 +15,8 @@ export const ITEM_IDS = [
   'silver-medal',
   'gold-medal',
   'gold-cup',
+  'bone-dust',
+  'witchcraft-bag',
 ] as const;
 
 export type ItemId = (typeof ITEM_IDS)[number];
@@ -155,6 +157,19 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     flavor: 'A trophy from a campaign whose every descent floor was perfect.',
     grantsGold: false,
   },
+  'bone-dust': {
+    id: 'bone-dust',
+    name: 'Bone dust',
+    flavor: 'Pale grit scraped from something that used to walk.',
+    grantsGold: false,
+  },
+  /** Shop-only. Use / 3-slot ritual is #46 — do not consume or open a modal here. */
+  'witchcraft-bag': {
+    id: 'witchcraft-bag',
+    name: 'Witchcraft bag',
+    flavor: 'A stitched pouch that wants three offerings.',
+    grantsGold: false,
+  },
 };
 
 const BASE_LOOT_TABLE: ReadonlyArray<{ itemId: ItemId; weight: number }> = [
@@ -237,6 +252,11 @@ export function isTicketKey(itemId: ItemId): boolean {
   return itemId === 'hard-key' || itemId === 'campaign-key';
 }
 
+/** Shop-only reagents. Never on chest tables. Bag Use is #46; portal scroll is #47. */
+export function isShopOnly(itemId: ItemId): boolean {
+  return itemId === 'bone-dust' || itemId === 'witchcraft-bag';
+}
+
 /** Title-shop unit prices. Pouches, ticket keys, heads, and the gold cup do not sell. */
 const SELL_GOLD: Partial<Record<ItemId, number>> = {
   'rusty-key': 4,
@@ -246,6 +266,7 @@ const SELL_GOLD: Partial<Record<ItemId, number>> = {
   'bronze-medal': 3,
   'silver-medal': 14,
   'gold-medal': 20,
+  'bone-dust': 15,
 };
 
 export function sellGold(itemId: ItemId): number {
@@ -293,9 +314,9 @@ export function sellableEntries(
  * #45 bone-dust / witchcraft-bag, #47 scroll-of-portal, #49 skins.
  */
 export const SHOP_BUY: Partial<Record<ItemId, number>> = {
-  // 'bone-dust': n,
-  // 'witchcraft-bag': n,
-  // 'scroll-of-portal': n,
+  'bone-dust': 50,
+  'witchcraft-bag': 150,
+  // 'scroll-of-portal': n, // #47
 };
 
 export type ShopBuyCatalog = Partial<Record<ItemId, number>>;

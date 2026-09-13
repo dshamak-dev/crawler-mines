@@ -14,7 +14,9 @@ import {
   isBuyable,
   isCollectible,
   isSellable,
+  isShopOnly,
   isTicketKey,
+  stackedEntries,
   loadCollection,
   sellGold,
   sellLoot,
@@ -59,6 +61,7 @@ describe('sell catalog', () => {
     expect(sellGold('bronze-medal')).toBe(3);
     expect(sellGold('silver-medal')).toBe(14);
     expect(sellGold('gold-medal')).toBe(20);
+    expect(sellGold('bone-dust')).toBe(15);
     const sellable = new Set([
       'rusty-key',
       'torch-charm',
@@ -67,6 +70,7 @@ describe('sell catalog', () => {
       'bronze-medal',
       'silver-medal',
       'gold-medal',
+      'bone-dust',
     ]);
     for (const id of ITEM_IDS) {
       if (sellable.has(id)) {
@@ -78,7 +82,7 @@ describe('sell catalog', () => {
     }
   });
 
-  it('does not list pouches, ticket keys, heads, or the gold cup as sellable', () => {
+  it('does not list pouches, ticket keys, heads, the gold cup, or the witchcraft bag as sellable', () => {
     const hidden: ItemId[] = [
       'gold-pouch',
       'hard-key',
@@ -87,11 +91,16 @@ describe('sell catalog', () => {
       'wrath-head',
       'lust-head',
       'gold-cup',
+      'witchcraft-bag',
     ];
     for (const id of hidden) {
       expect(isSellable(id)).toBe(false);
       expect(
-        isTicketKey(id) || id === 'gold-pouch' || id.endsWith('-head') || id === 'gold-cup',
+        isTicketKey(id) ||
+          id === 'gold-pouch' ||
+          id.endsWith('-head') ||
+          id === 'gold-cup' ||
+          id === 'witchcraft-bag',
       ).toBe(true);
     }
     const rows = sellableEntries({
@@ -110,6 +119,8 @@ describe('sell catalog', () => {
       'bronze-medal': 1,
       'silver-medal': 2,
       'gold-medal': 1,
+      'bone-dust': 2,
+      'witchcraft-bag': 3,
     });
     expect(rows.map((row) => row.item.id)).toEqual([
       'rusty-key',
@@ -119,6 +130,7 @@ describe('sell catalog', () => {
       'bronze-medal',
       'silver-medal',
       'gold-medal',
+      'bone-dust',
     ]);
   });
 
@@ -133,6 +145,8 @@ describe('sell catalog', () => {
     expect(isCollectible('silver-medal')).toBe(true);
     expect(isCollectible('gold-medal')).toBe(true);
     expect(isCollectible('gold-cup')).toBe(true);
+    expect(isCollectible('bone-dust')).toBe(true);
+    expect(isCollectible('witchcraft-bag')).toBe(true);
   });
 });
 
@@ -159,6 +173,7 @@ describe('sellLoot gold math', () => {
         'wrath-head': 1,
         'lust-head': 1,
         'gold-cup': 2,
+        'witchcraft-bag': 2,
         'rusty-key': 1,
       },
       10,
@@ -169,6 +184,7 @@ describe('sellLoot gold math', () => {
     expect(sellLoot(meta, 'wrath-head', 1, store)).toBeNull();
     expect(sellLoot(meta, 'lust-head', 1, store)).toBeNull();
     expect(sellLoot(meta, 'gold-cup', 1, store)).toBeNull();
+    expect(sellLoot(meta, 'witchcraft-bag', 1, store)).toBeNull();
     expect(sellLoot(meta, 'gold-pouch', 1, store)).toBeNull();
     expect(loadCollection(store).gold).toBe(0);
     expect(loadCollection(store).items['hard-key']).toBe(0);
@@ -216,13 +232,28 @@ describe('sellLoot gold math', () => {
 });
 
 describe('buy catalog', () => {
-  it('stays empty so #45 / #47 / #49 can register prices later', () => {
-    expect(buyableEntries()).toEqual([]);
+  it('lists only the locked #45 shop reagents at the locked prices', () => {
+    expect(buyGold('bone-dust')).toBe(50);
+    expect(buyGold('witchcraft-bag')).toBe(150);
+    expect(SHOP_BUY['bone-dust']).toBe(50);
+    expect(SHOP_BUY['witchcraft-bag']).toBe(150);
+    expect(buyableEntries().map((row) => [row.item.id, row.gold])).toEqual([
+      ['bone-dust', 50],
+      ['witchcraft-bag', 150],
+    ]);
     for (const id of ITEM_IDS) {
-      expect(isBuyable(id)).toBe(false);
-      expect(buyGold(id)).toBe(0);
-      expect(SHOP_BUY[id]).toBeUndefined();
+      if (id === 'bone-dust' || id === 'witchcraft-bag') {
+        expect(isBuyable(id)).toBe(true);
+        expect(isShopOnly(id)).toBe(true);
+      } else {
+        expect(isBuyable(id)).toBe(false);
+        expect(buyGold(id)).toBe(0);
+        expect(SHOP_BUY[id]).toBeUndefined();
+        expect(isShopOnly(id)).toBe(false);
+      }
     }
+    expect(isSellable('bone-dust')).toBe(true);
+    expect(isSellable('witchcraft-bag')).toBe(false);
   });
 
   it('clears the slotted item and qty when Sell↔Buy changes', () => {
@@ -266,6 +297,35 @@ describe('buyLoot gold math', () => {
     expect(loadCollection(store).items.gem).toBe(0);
     expect(buyLoot(packed({}, 19), 'gem', 2, store, catalog)).toBeNull();
     expect(loadCollection(store).gold).toBe(0);
+    expect(buyLoot(packed({}, 49), 'bone-dust', 1, store)).toBeNull();
+    expect(buyLoot(packed({}, 149), 'witchcraft-bag', 1, store)).toBeNull();
+    expect(loadCollection(store).gold).toBe(0);
+  });
+
+  it('deducts gold and stacks bone dust or a witchcraft bag from the locked catalog', () => {
+    const store = memoryStore();
+    const dust = buyLoot(packed({ gem: 1 }, 250), 'bone-dust', 2, store);
+    expect(dust).not.toBeNull();
+    expect(dust!.gold).toBe(150);
+    expect(dust!.items['bone-dust']).toBe(2);
+    expect(dust!.items.gem).toBe(1);
+    expect(loadCollection(store).gold).toBe(150);
+    expect(loadCollection(store).items['bone-dust']).toBe(2);
+    const bag = buyLoot(dust!, 'witchcraft-bag', 1, store);
+    expect(bag).not.toBeNull();
+    expect(bag!.gold).toBe(0);
+    expect(bag!.items['witchcraft-bag']).toBe(1);
+    expect(bag!.items['bone-dust']).toBe(2);
+    expect(loadCollection(store).items['witchcraft-bag']).toBe(1);
+    expect(sellLoot(bag!, 'witchcraft-bag', 1, store)).toBeNull();
+    expect(loadCollection(store).gold).toBe(0);
+    expect(loadCollection(store).items['witchcraft-bag']).toBe(1);
+    const sold = sellLoot(loadCollection(store), 'bone-dust', 1, store);
+    expect(sold!.gold).toBe(15);
+    expect(sold!.items['bone-dust']).toBe(1);
+    expect(
+      stackedEntries(sold!.items).map((row) => row.item.id),
+    ).toEqual(['gem', 'bone-dust', 'witchcraft-bag']);
   });
 
   it('rejects a missing catalog price and does not charge partial', () => {
@@ -279,30 +339,30 @@ describe('buyLoot gold math', () => {
   });
 
   it('updates the game store meta immediately and fails when gold is short', () => {
-    const prev = SHOP_BUY['torch-charm'];
-    SHOP_BUY['torch-charm'] = 2;
-    try {
-      const store = memoryStore({
-        [COLLECTION_KEY]: JSON.stringify({
-          v: 1,
-          gold: 5,
-          items: { gem: 1 },
-        }),
-      });
-      const game = createGameStore(store);
-      expect(game.getState().buy('torch-charm', 2)).toBe(true);
-      expect(game.getState().meta.gold).toBe(1);
-      expect(game.getState().meta.items['torch-charm']).toBe(2);
-      expect(game.getState().meta.items.gem).toBe(1);
-      expect(loadCollection(store).gold).toBe(1);
-      expect(game.getState().buy('torch-charm', 1)).toBe(false);
-      expect(game.getState().meta.gold).toBe(1);
-      expect(game.getState().meta.items['torch-charm']).toBe(2);
-      expect(game.getState().buy('gem', 1)).toBe(false);
-    } finally {
-      if (prev === undefined) delete SHOP_BUY['torch-charm'];
-      else SHOP_BUY['torch-charm'] = prev;
-    }
+    const store = memoryStore({
+      [COLLECTION_KEY]: JSON.stringify({
+        v: 1,
+        gold: 250,
+        items: { gem: 1 },
+      }),
+    });
+    const game = createGameStore(store);
+    expect(game.getState().buy('bone-dust', 2)).toBe(true);
+    expect(game.getState().meta.gold).toBe(150);
+    expect(game.getState().meta.items['bone-dust']).toBe(2);
+    expect(game.getState().meta.items.gem).toBe(1);
+    expect(loadCollection(store).gold).toBe(150);
+    expect(game.getState().buy('witchcraft-bag', 1)).toBe(true);
+    expect(game.getState().meta.gold).toBe(0);
+    expect(game.getState().meta.items['witchcraft-bag']).toBe(1);
+    expect(game.getState().buy('bone-dust', 1)).toBe(false);
+    expect(game.getState().meta.gold).toBe(0);
+    expect(game.getState().meta.items['bone-dust']).toBe(2);
+    expect(game.getState().buy('gem', 1)).toBe(false);
+    expect(game.getState().sell('witchcraft-bag', 1)).toBe(false);
+    expect(game.getState().sell('bone-dust', 1)).toBe(true);
+    expect(game.getState().meta.gold).toBe(15);
+    expect(game.getState().meta.items['bone-dust']).toBe(1);
   });
 });
 
@@ -354,5 +414,13 @@ describe('title shop wiring', () => {
     expect(route).toContain('onBuy');
     expect(route).toContain('buyFromShop');
     expect(vitestCfg).toContain("exclude: ['**/node_modules/**', 'native/**']");
+  });
+
+  it('gives bone dust and the witchcraft bag their own stone-gold glyphs', () => {
+    const icons = readFileSync(resolve(__dirname, '../native/src/ui/icons.tsx'), 'utf8');
+    expect(icons).toContain("id === 'bone-dust'");
+    expect(icons).toContain("id === 'witchcraft-bag'");
+    expect(icons).toContain('function BoneDustGlyph');
+    expect(icons).toContain('function WitchcraftBagGlyph');
   });
 });
