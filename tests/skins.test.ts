@@ -7,8 +7,12 @@ import {
   DEFAULT_GRID_SKIN,
   FLAG_SKIN_IDS,
   FLAG_SKIN_PAINT,
+  CLASSIC_GRID_NUMBERS,
+  GRAY_GRID_NUMBERS,
   GRID_SKIN_IDS,
   GRID_SKIN_PAINT,
+  VINTAGE_GRID_NUMBERS,
+  gridNumberColor,
   SHOP_BUY,
   SKIN_IDS,
   SKINS,
@@ -89,6 +93,37 @@ describe('#49 skin catalog', () => {
     expect(FLAG_SKIN_PAINT['flag-pirate'].mark).toBe('skull');
     expect(GRID_SKIN_PAINT['grid-classic'].hidden).not.toBe(GRID_SKIN_PAINT['grid-gray'].hidden);
     expect(GRID_SKIN_PAINT['grid-vintage'].hidden).not.toBe(GRID_SKIN_PAINT['grid-gray'].hidden);
+  });
+
+  it('ships 1–8 number colors on every grid skin and not on flags', () => {
+    expect(GRID_SKIN_PAINT['grid-gray'].numbers).toEqual(GRAY_GRID_NUMBERS);
+    expect(GRID_SKIN_PAINT['grid-classic'].numbers).toEqual(CLASSIC_GRID_NUMBERS);
+    expect(GRID_SKIN_PAINT['grid-vintage'].numbers).toEqual(VINTAGE_GRID_NUMBERS);
+    expect(GRAY_GRID_NUMBERS).toEqual([
+      '',
+      '#7ec8ff',
+      '#6ee7a8',
+      '#ff6b6b',
+      '#c9a0ff',
+      '#ffb347',
+      '#5eead4',
+      '#f5e6c8',
+      '#d4d4d4',
+    ]);
+    for (const id of GRID_SKIN_IDS) {
+      const paint = GRID_SKIN_PAINT[id];
+      expect(paint.numbers).toHaveLength(9);
+      for (let n = 1; n <= 8; n += 1) {
+        expect(paint.numbers[n]).toMatch(/^#[0-9a-fA-F]{6}$/);
+        expect(paint.numbers[n].toLowerCase()).not.toBe(paint.revealed.toLowerCase());
+        expect(gridNumberColor(id, n)).toBe(paint.numbers[n]);
+      }
+    }
+    expect(gridNumberColor('grid-classic', 1)).toBe('#1d39d8');
+    expect(gridNumberColor('grid-classic', 3)).toBe('#d61c1c');
+    expect(gridNumberColor('grid-vintage', 1)).not.toBe(gridNumberColor('grid-gray', 1));
+    expect(gridNumberColor(GRID_SKIN_PAINT['grid-gray'], 99)).toBe(GRAY_GRID_NUMBERS[1]);
+    expect(FLAG_SKIN_PAINT['flag-red']).not.toHaveProperty('numbers');
   });
 });
 
@@ -236,6 +271,7 @@ describe('#49 collection and shop wiring', () => {
     expect(play).toContain('gridSkin={gridSkin}');
     expect(board).toContain('flagSkin');
     expect(board).toContain('gridSkinPaint');
+    expect(board).toContain('gridNumberColor');
     expect(board).toContain('skin={flagSkin}');
     expect(icons).toContain('flagSkinPaint');
     expect(icons).toContain("mark === 'skull'");

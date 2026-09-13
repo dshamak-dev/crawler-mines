@@ -135,13 +135,66 @@ export function flagSkinPaint(id: FlagSkinId): FlagSkinPaint {
   return FLAG_SKIN_PAINT[isFlagSkinId(id) ? id : DEFAULT_FLAG_SKIN];
 }
 
+/** Index 0 unused; 1–8 are adjacent-mine colors for an open cell. */
+export type GridNumberColors = readonly [
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+];
+
 export interface GridSkinPaint {
   hidden: string;
   revealed: string;
   chest: string;
   wrecked: string;
   exploded: string;
+  numbers: GridNumberColors;
 }
+
+/** Current cave-stone number palette — Gray grid keeps these defaults. */
+export const GRAY_GRID_NUMBERS: GridNumberColors = [
+  '',
+  '#7ec8ff',
+  '#6ee7a8',
+  '#ff6b6b',
+  '#c9a0ff',
+  '#ffb347',
+  '#5eead4',
+  '#f5e6c8',
+  '#d4d4d4',
+];
+
+/** Classic Minesweeper hues, darkened enough to read on mid-gray open tiles. */
+export const CLASSIC_GRID_NUMBERS: GridNumberColors = [
+  '',
+  '#1d39d8',
+  '#157a15',
+  '#d61c1c',
+  '#1a1a8c',
+  '#7a1414',
+  '#0d6e70',
+  '#141414',
+  '#3d3d40',
+];
+
+/** Warmer ink for sepia open stone. */
+export const VINTAGE_GRID_NUMBERS: GridNumberColors = [
+  '',
+  '#8eb8e8',
+  '#9ed27a',
+  '#e07048',
+  '#d4b06a',
+  '#e8a04a',
+  '#7cbcac',
+  '#f3e0c0',
+  '#d8c8b0',
+];
 
 /** Cave-stone defaults plus locked #49 classic / vintage contrast. */
 export const GRID_SKIN_PAINT: Record<GridSkinId, GridSkinPaint> = {
@@ -151,6 +204,7 @@ export const GRID_SKIN_PAINT: Record<GridSkinId, GridSkinPaint> = {
     chest: '#2a2214',
     wrecked: '#161210',
     exploded: '#2a140c',
+    numbers: GRAY_GRID_NUMBERS,
   },
   'grid-classic': {
     hidden: '#c8c8cc',
@@ -158,6 +212,7 @@ export const GRID_SKIN_PAINT: Record<GridSkinId, GridSkinPaint> = {
     chest: '#c4b48a',
     wrecked: '#6a6a70',
     exploded: '#b07060',
+    numbers: CLASSIC_GRID_NUMBERS,
   },
   'grid-vintage': {
     hidden: '#8a6e4e',
@@ -165,11 +220,18 @@ export const GRID_SKIN_PAINT: Record<GridSkinId, GridSkinPaint> = {
     chest: '#7a5a30',
     wrecked: '#3a2a1c',
     exploded: '#5a2a18',
+    numbers: VINTAGE_GRID_NUMBERS,
   },
 };
 
 export function gridSkinPaint(id: GridSkinId): GridSkinPaint {
   return GRID_SKIN_PAINT[isGridSkinId(id) ? id : DEFAULT_GRID_SKIN];
+}
+
+export function gridNumberColor(idOrPaint: GridSkinId | GridSkinPaint, n: number): string {
+  const paint = typeof idOrPaint === 'string' ? gridSkinPaint(idOrPaint) : idOrPaint;
+  if (!Number.isInteger(n) || n < 1 || n > 8) return paint.numbers[1];
+  return paint.numbers[n];
 }
 
 export function skinEntries(slot: SkinSlot): SkinDef[] {

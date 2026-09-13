@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react';
+import { memo, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -11,6 +11,7 @@ import * as Haptics from 'expo-haptics';
 import {
   BOSS_COPY,
   cellVisual,
+  gridNumberColor,
   gridSkinPaint,
   type BossId,
   type Cell,
@@ -20,7 +21,7 @@ import {
   type GridSkinId,
   type GridSkinPaint,
 } from '../../../src/engine';
-import { colors, fonts, NUMBER_COLORS } from '../theme';
+import { colors, fonts } from '../theme';
 import { BOARD_GAP } from './fitBoardCell';
 import { BombIcon, BossIcon, ChestIcon, DoorIcon, FlagIcon, HeartIcon } from './icons';
 
@@ -117,7 +118,8 @@ export default function Board({
     transform: [{ translateX: shakeX.value }],
   }));
 
-  if (shaking && !reduceMotion) {
+  useEffect(() => {
+    if (!shaking || reduceMotion) return;
     shakeX.value = withSequence(
       withTiming(-4, { duration: 90 }),
       withTiming(4, { duration: 90 }),
@@ -125,7 +127,7 @@ export default function Board({
       withTiming(2, { duration: 90 }),
       withTiming(0, { duration: 90 }),
     );
-  }
+  }, [shaking, reduceMotion, shakeX]);
 
   if (cellPx < 1) return null;
 
@@ -244,10 +246,17 @@ const DungeonCell = memo(function DungeonCell({
   const popStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pop.value }],
   }));
+  const playedWave = useRef<number | undefined>(undefined);
 
-  if (!reduce && wave != null) {
-    pop.value = withSequence(withTiming(0.55, { duration: 1 }), withTiming(1.08, { duration: 180 }), withTiming(1, { duration: 240 }));
-  }
+  useEffect(() => {
+    if (reduce || wave == null || playedWave.current === wave) return;
+    playedWave.current = wave;
+    pop.value = withSequence(
+      withTiming(0.55, { duration: 1 }),
+      withTiming(1.08, { duration: 180 }),
+      withTiming(1, { duration: 240 }),
+    );
+  }, [reduce, wave, pop]);
 
   const bossName = BOSS_COPY[bossId].name;
   const label = bossHere
@@ -290,7 +299,7 @@ const DungeonCell = memo(function DungeonCell({
           <Text
             style={[
               styles.rune,
-              { color: NUMBER_COLORS[cell.adjacentMines], fontSize: size * 0.46 },
+              { color: gridNumberColor(gridPaint, cell.adjacentMines), fontSize: size * 0.46 },
             ]}
           >
             {cell.adjacentMines}
@@ -299,7 +308,7 @@ const DungeonCell = memo(function DungeonCell({
           <Text
             style={[
               styles.rune,
-              { color: NUMBER_COLORS[cell.adjacentMines], fontSize: size * 0.32, opacity: 0.35 },
+              { color: gridNumberColor(gridPaint, cell.adjacentMines), fontSize: size * 0.32, opacity: 0.35 },
             ]}
           >
             {cell.adjacentMines}
@@ -341,8 +350,10 @@ function Burst({
     opacity: opacity.value,
   }));
 
-  scale.value = withTiming(kind === 'bomb' ? 9 : 6, { duration: 520 + delay });
-  opacity.value = withTiming(0, { duration: 520 + delay });
+  useEffect(() => {
+    scale.value = withTiming(kind === 'bomb' ? 9 : 6, { duration: 520 + delay });
+    opacity.value = withTiming(0, { duration: 520 + delay });
+  }, [delay, kind, opacity, scale]);
 
   return <Animated.View pointerEvents="none" style={[styles.burst, kind === 'bomb' ? styles.burstBomb : styles.burstGold, style]} />;
 }

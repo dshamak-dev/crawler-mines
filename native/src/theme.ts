@@ -1,4 +1,5 @@
 import { StyleSheet } from 'react-native';
+import { GRAY_GRID_NUMBERS } from '../../src/engine';
 
 export const colors = {
   bg: '#120e0c',
@@ -24,17 +25,7 @@ export const fonts = {
   uiBold: 'SourceSans3_700Bold',
 } as const;
 
-export const NUMBER_COLORS = [
-  '',
-  '#7ec8ff',
-  '#6ee7a8',
-  '#ff6b6b',
-  '#c9a0ff',
-  '#ffb347',
-  '#5eead4',
-  '#f5e6c8',
-  '#d4d4d4',
-] as const;
+export const NUMBER_COLORS = GRAY_GRID_NUMBERS;
 
 export const styles = StyleSheet.create({
   flex: { flex: 1 },
