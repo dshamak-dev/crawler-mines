@@ -1192,15 +1192,17 @@ describe('last campaign floor spawns a boss', () => {
 });
 
 describe('finale door extract', () => {
-  it('never places the door on a mine, number, chest, or the boss spawn', () => {
+  it('never places the door on a mine, chest, or the boss spawn', () => {
+    let fragile = 0;
     for (let seed = 0; seed < 40; seed++) {
-      const game = createGame(configFor('campaign', 4), mulberry32(seed));
+      const game = createGame(configFor('campaign', 4), mulberry32(seed), 'campaign');
       expect(game.doorIndex).not.toBeNull();
       const door = game.cells[game.doorIndex!];
       expect(door.kind).toBe('empty');
-      expect(door.adjacentMines).toBe(0);
       expect(game.doorIndex).not.toBe(game.boss?.index);
+      if (door.adjacentMines > 0) fragile += 1;
     }
+    expect(fragile).toBeGreaterThan(30);
     const easy = createGame(configFor('easy', 0), mulberry32(1), 'easy');
     expect(easy.doorIndex).toBeNull();
     const floor0 = createGame(configFor('campaign', 0), mulberry32(1), 'campaign');

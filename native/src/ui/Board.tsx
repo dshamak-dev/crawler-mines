@@ -143,7 +143,9 @@ export default function Board({
                     bossId={game.boss?.id ?? 'gluttony'}
                     bossDead={game.boss != null && game.boss.lives <= 0}
                     hearted={cell.hearted === true}
-                    door={game.doorIndex === i && cell.state === 'revealed'}
+                    door={
+                      game.doorIndex === i && (cell.state === 'revealed' || cell.wrecked)
+                    }
                     onDig={onDig}
                     onFlag={onFlag}
                   />
@@ -238,9 +240,11 @@ const DungeonCell = memo(function DungeonCell({
     ? `${bossDead ? `Fallen ${bossName}` : bossName}${hearted ? ', heart covering the number' : ''}`
     : hearted
       ? `Heart covering ${cell.adjacentMines} adjacent bombs`
-      : door
-        ? 'Exit door'
-        : ariaFor(visual, cell.adjacentMines, cell.tier);
+      : door && cell.wrecked
+        ? 'Wrecked exit door'
+        : door
+          ? 'Exit door'
+          : ariaFor(visual, cell.adjacentMines, cell.tier);
 
   return (
     <GestureDetector gesture={gesture}>
@@ -262,6 +266,8 @@ const DungeonCell = memo(function DungeonCell({
           <BombIcon cracked size={icon} />
         ) : visual === 'chest' ? (
           <ChestIcon tier={cell.tier ?? 'wooden'} size={icon} />
+        ) : visual === 'wrecked' && door ? (
+          <DoorIcon size={Math.round(size * 0.78)} />
         ) : visual === 'wrecked' ? (
           <ChestIcon wrecked tier={cell.tier ?? 'wooden'} size={icon} />
         ) : door ? (

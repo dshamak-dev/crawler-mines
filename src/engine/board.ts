@@ -8,6 +8,7 @@ import {
   type FloorConfig,
   type Game,
   type Rng,
+  isArenaFloor,
   newCell,
 } from './types';
 
@@ -120,8 +121,9 @@ export function createGame(
     cells[i].kind = 'mine';
   }
   computeAdjacency(width, height, cells);
+  const arena = boss != null && chests === 0;
   const doorIndex =
-    boss != null ? pickDoorIndex(width, height, cells, boss.index, rng) : null;
+    boss != null ? pickDoorIndex(width, height, cells, boss.index, rng, arena) : null;
   return {
     width,
     height,
@@ -243,15 +245,25 @@ export function allSafeRevealed(game: Game): boolean {
   return game.cells.every((c) => c.kind === 'mine' || c.state === 'revealed');
 }
 
-/** Empty zero that is not the boss spawn — valid finale door tile. */
-export function isDoorCandidate(cells: readonly Cell[], index: number, bossIndex: number): boolean {
+/**
+ * Empty cell that is not the boss spawn. Non-arena doors must also be zeros.
+ * Arena doors may sit on numbers so a neighboring blast can wreck the exit.
+ */
+export function isDoorCandidate(
+  cells: readonly Cell[],
+  index: number,
+  bossIndex: number,
+  arena = false,
+): boolean {
   const cell = cells[index];
-  return Boolean(cell && cell.kind === 'empty' && cell.adjacentMines === 0 && index !== bossIndex);
+  if (!cell || cell.kind !== 'empty' || index === bossIndex) return false;
+  return arena || cell.adjacentMines === 0;
 }
 
 /**
- * Prefer empty zeros off the boss spawn ring. If none remain, use a ring zero
- * (still never the spawn, a mine, a number, or a chest).
+ * Prefer empty tiles off the boss spawn ring. Arena boards prefer a number
+ * (fragile) so the door's 8-ring can actually contain a mine. Non-arena still
+ * uses zeros only (never the spawn, a mine, a number, or a chest).
  */
 export function pickDoorIndex(
   width: number,
@@ -259,16 +271,31 @@ export function pickDoorIndex(
   cells: readonly Cell[],
   bossIndex: number,
   rng?: Rng,
+  arena = false,
 ): number | null {
   const ring = new Set([bossIndex, ...neighbors(width, height, bossIndex)]);
-  const offRing: number[] = [];
-  const onRing: number[] = [];
+  const offFragile: number[] = [];
+  const offSafe: number[] = [];
+  const onFragile: number[] = [];
+  const onSafe: number[] = [];
   for (let i = 0; i < cells.length; i++) {
-    if (!isDoorCandidate(cells, i, bossIndex)) continue;
-    if (ring.has(i)) onRing.push(i);
-    else offRing.push(i);
+    if (!isDoorCandidate(cells, i, bossIndex, arena)) continue;
+    const on = ring.has(i);
+    const fragile = cells[i].adjacentMines > 0;
+    if (on) (fragile ? onFragile : onSafe).push(i);
+    else (fragile ? offFragile : offSafe).push(i);
   }
-  const pool = offRing.length > 0 ? offRing : onRing;
+  const pool = arena
+    ? offFragile.length > 0
+      ? offFragile
+      : onFragile.length > 0
+        ? onFragile
+        : offSafe.length > 0
+          ? offSafe
+          : onSafe
+    : offSafe.length > 0
+      ? offSafe
+      : onSafe;
   if (pool.length === 0) return null;
   if (!rng) return pool[0];
   return pool[Math.floor(rng() * pool.length)];
@@ -280,8 +307,11 @@ export function ensureDoorValid(game: Game, rng?: Rng): void {
     return;
   }
   const bossIndex = game.boss.index;
-  if (game.doorIndex != null && isDoorCandidate(game.cells, game.doorIndex, bossIndex)) return;
-  game.doorIndex = pickDoorIndex(game.width, game.height, game.cells, bossIndex, rng);
+  const arena = isArenaFloor(game);
+  if (game.doorIndex != null && isDoorCandidate(game.cells, game.doorIndex, bossIndex, arena)) {
+    return;
+  }
+  game.doorIndex = pickDoorIndex(game.width, game.height, game.cells, bossIndex, rng, arena);
 }
 
 export function isWon(game: Game): boolean {

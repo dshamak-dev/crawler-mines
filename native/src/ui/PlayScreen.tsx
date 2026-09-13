@@ -7,6 +7,7 @@ import {
   CAMPAIGN_FLOORS,
   ITEMS,
   chestNotices,
+  isArenaFloor,
   isTicketKey,
   stackedEntries,
   type GameEvent,
@@ -202,12 +203,17 @@ export default function PlayScreen({
   if (!run) return null;
 
   const { game, mode, floor } = run;
+  const arena = isArenaFloor(game);
   const floorLabel = run.rite
     ? 'Boss rite'
     : mode === 'campaign'
       ? `Floor ${floor + 1}/${CAMPAIGN_FLOORS.length}`
       : mode;
-  const showChestHud = game.chests > 0;
+  const arenaPhase = arena ? (game.boss && game.boss.lives <= 0 ? 'Exit' : 'Fight') : null;
+  const hudPill = arenaPhase ? `${floorLabel} · ${arenaPhase}` : floorLabel;
+  const showChestHud = !arena && game.chests > 0;
+  const doorWrecked =
+    game.doorIndex != null && game.cells[game.doorIndex]?.wrecked === true;
   const salvage = report ? stackedEntries(report.loot) : [];
   const boss = game.boss;
   const bossName = boss ? BOSS_COPY[boss.id].name : 'Boss';
@@ -261,7 +267,7 @@ export default function PlayScreen({
             </View>
           ) : null}
         </View>
-        <Text style={styles.pill}>{floorLabel}</Text>
+        <Text style={styles.pill}>{hudPill}</Text>
       </View>
 
       <View
@@ -427,7 +433,9 @@ export default function PlayScreen({
           <Tablet>
             <DisplayText>Leave now?</DisplayText>
             <MutedText style={styles.pad}>
-              Treasure still lies buried. Exit with what you have, or keep digging.
+              {arena
+                ? 'Safe tiles remain. Exit now, or keep digging.'
+                : 'Treasure still lies buried. Exit with what you have, or keep digging.'}
             </MutedText>
             <View style={styles.col}>
               <StoneButton
@@ -467,19 +475,25 @@ export default function PlayScreen({
                     : 'Floor cleared'}
             </DisplayText>
             {report.outcome === 'lost' ? (
-              <MutedText style={styles.pad}>The boss kept the stash. Every coin and relic is gone.</MutedText>
+              <MutedText style={styles.pad}>
+                {doorWrecked
+                  ? 'The exit is wrecked. The boss kept the stash. Every coin and relic is gone.'
+                  : 'The boss kept the stash. Every coin and relic is gone.'}
+              </MutedText>
             ) : (
               <>
-                <View style={styles.tally}>
-                  <View>
-                    <Text style={styles.tallyEm}>Found</Text>
-                    <Text style={styles.pos}>{report.opened}</Text>
+                {arena ? null : (
+                  <View style={styles.tally}>
+                    <View>
+                      <Text style={styles.tallyEm}>Found</Text>
+                      <Text style={styles.pos}>{report.opened}</Text>
+                    </View>
+                    <View>
+                      <Text style={styles.tallyEm}>Broken</Text>
+                      <Text style={styles.neg}>{report.wrecked}</Text>
+                    </View>
                   </View>
-                  <View>
-                    <Text style={styles.tallyEm}>Broken</Text>
-                    <Text style={styles.neg}>{report.wrecked}</Text>
-                  </View>
-                </View>
+                )}
                 {report.outcome === 'stashed' ? (
                   <MutedText>Loot is stashed until the boss falls.</MutedText>
                 ) : null}

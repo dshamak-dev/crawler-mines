@@ -232,8 +232,9 @@ function sanitizeGame(raw: unknown): Game | null {
   let doorIndex =
     isInt(g.doorIndex) && g.doorIndex >= 0 && g.doorIndex < cells.length ? g.doorIndex : null;
   if (boss) {
-    if (doorIndex == null || !isDoorCandidate(cells, doorIndex, boss.index)) {
-      doorIndex = pickDoorIndex(g.width as number, g.height as number, cells, boss.index);
+    const arena = g.chests === 0;
+    if (doorIndex == null || !isDoorCandidate(cells, doorIndex, boss.index, arena)) {
+      doorIndex = pickDoorIndex(g.width as number, g.height as number, cells, boss.index, undefined, arena);
     }
   } else {
     doorIndex = null;
