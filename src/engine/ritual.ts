@@ -141,11 +141,9 @@ export function consumeRitual(
 }
 
 /**
- * One-floor boss rite uses Campaign floor-5 size/mines/door/boss.
- * #52 arena: 0 chests. Door wreck in the blast ring is an instant lose.
- * Campaign floor 5 still uses the loot config until #52 lands there.
+ * One-floor boss rite shares the Campaign floor-5 arena layout
+ * (size, mines, 0 chests, door, boss). No per-boss mine tweaks yet.
  */
 export function riteFloorConfig(): FloorConfig {
-  const finale = CAMPAIGN_FLOORS[CAMPAIGN_FLOORS.length - 1];
-  return { ...finale, chests: 0 };
+  return { ...CAMPAIGN_FLOORS[CAMPAIGN_FLOORS.length - 1] };
 }

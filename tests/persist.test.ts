@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CAMPAIGN_FLOORS,
   COLLECTION_KEY,
   RUN_KEY,
   cloneGame,
+  createGame,
   createGameFromLayout,
   dig,
   emptyCollection,
@@ -174,6 +176,31 @@ describe('run snapshot hydrate', () => {
     expect(s2.getState().run?.game.heartOrder).toEqual([older, newer]);
     expect(s2.getState().run?.game.doorIndex).toBe(game.doorIndex);
     expect(s2.getState().run?.game.boss?.id).toBe('lust');
+  });
+
+  it('keeps a generated arena door on a number after hydrate', () => {
+    const game = createGame(CAMPAIGN_FLOORS[4], mulberry32(4), 'campaign');
+    expect(game.doorIndex).not.toBeNull();
+    expect(game.cells[game.doorIndex!].adjacentMines).toBeGreaterThan(0);
+    const store = memoryStore();
+    const s1 = createGameStore(store);
+    s1.setState({
+      meta: loadCollection(store),
+      run: {
+        mode: 'campaign',
+        floor: 4,
+        game: cloneGame(game),
+        grantKey: 'arena-door',
+        campaignStash: emptyStash(),
+        bonusKey: null,
+        bossRevealPending: false,
+      },
+      runLoot: emptyInventory(),
+    });
+    const s2 = createGameStore(store);
+    expect(s2.getState().run?.game.doorIndex).toBe(game.doorIndex);
+    expect(s2.getState().run?.game.chests).toBe(0);
+    expect(s2.getState().run?.game.cells[game.doorIndex!].adjacentMines).toBeGreaterThan(0);
   });
 
   it('discards corrupt payloads', () => {

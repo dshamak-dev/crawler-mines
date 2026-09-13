@@ -63,7 +63,8 @@ describe('board generation', () => {
     for (let i = 1; i < densities.length; i++) {
       expect(densities[i]).toBeGreaterThan(densities[i - 1]);
     }
-    expect(CAMPAIGN_FLOORS[CAMPAIGN_FLOORS.length - 1].chests).toBeGreaterThan(
+    expect(CAMPAIGN_FLOORS[CAMPAIGN_FLOORS.length - 1].chests).toBe(0);
+    expect(CAMPAIGN_FLOORS[CAMPAIGN_FLOORS.length - 2].chests).toBeGreaterThan(
       CAMPAIGN_FLOORS[0].chests,
     );
   });

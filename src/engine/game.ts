@@ -90,14 +90,17 @@ export function explodeChain(game: Game, startIndex: number): GameEvent[] {
   return events;
 }
 
-/** #52 arena: a blast in the door's 8-ring wrecks it and loses immediately. */
-function wreckArenaDoor(game: Game, events: readonly GameEvent[]): boolean {
+/** Arena: a blast in the door's 8-ring wrecks it and loses immediately. */
+function wreckArenaDoor(game: Game, events: GameEvent[]): boolean {
   if (!isArenaFloor(game) || game.doorIndex == null) return false;
   const door = game.doorIndex;
   const ring = new Set(neighbors(game.width, game.height, door));
-  const hit = events.some((e) => e.type === 'explode' && ring.has(e.index));
-  if (!hit) return false;
-  game.cells[door].wrecked = true;
+  const blast = events.find((e) => e.type === 'explode' && ring.has(e.index));
+  if (!blast || blast.type !== 'explode') return false;
+  const cell = game.cells[door];
+  cell.wrecked = true;
+  cell.state = 'revealed';
+  if (!blast.wrecked.includes(door)) blast.wrecked.push(door);
   return true;
 }
 

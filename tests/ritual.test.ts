@@ -5,6 +5,7 @@ import {
   CAMPAIGN_FLOORS,
   COLLECTION_KEY,
   consumeRitual,
+  createGame,
   createGameFromLayout,
   dig,
   emptyCollection,
@@ -15,6 +16,7 @@ import {
   loadCollection,
   loadRun,
   mulberry32,
+  neighbors,
   normalizeRitual,
   resumeLabel,
   riteFloorConfig,
@@ -178,12 +180,80 @@ describe('arena door wreck', () => {
     game.doorIndex = 1;
     const events = dig(game, 2, mulberry32(1));
     expect(game.cells[1].wrecked).toBe(true);
+    expect(game.cells[1].state).toBe('revealed');
+    expect(game.status).toBe('lost');
+    expect(events.some((e) => e.type === 'lost')).toBe(true);
+    const blast = events.find((e) => e.type === 'explode');
+    expect(blast && blast.type === 'explode' && blast.wrecked).toContain(1);
+    expect(extract(game, 'campaign')).toEqual([]);
+  });
+
+  it('spawns Campaign floor 5 with 0 chests and a fragile generated door', () => {
+    const game = createGame(CAMPAIGN_FLOORS[4], mulberry32(4), 'campaign');
+    expect(CAMPAIGN_FLOORS[4].chests).toBe(0);
+    expect(game.chests).toBe(0);
+    expect(game.cells.some((c) => c.kind === 'chest')).toBe(false);
+    expect(isArenaFloor(game)).toBe(true);
+    expect(game.boss).not.toBeNull();
+    expect(game.doorIndex).not.toBeNull();
+    expect(game.cells[game.doorIndex!].kind).toBe('empty');
+    expect(game.cells[game.doorIndex!].adjacentMines).toBeGreaterThan(0);
+    expect(riteFloorConfig().chests).toBe(0);
+    expect(riteFloorConfig()).toEqual(CAMPAIGN_FLOORS[4]);
+  });
+
+  it('loses a Campaign floor-5 arena when a door-ring mine blasts', () => {
+    const game = createGame(CAMPAIGN_FLOORS[4], mulberry32(4), 'campaign');
+    game.firstClickDone = true;
+    const door = game.doorIndex;
+    expect(door).not.toBeNull();
+    const ring = neighbors(game.width, game.height, door!);
+    const mine = ring.find((i) => game.cells[i].kind === 'mine' && !game.cells[i].exploded);
+    expect(mine).toBeDefined();
+    const events = dig(game, mine!, mulberry32(4), 'campaign');
+    expect(game.cells[door!].wrecked).toBe(true);
     expect(game.status).toBe('lost');
     expect(events.some((e) => e.type === 'lost')).toBe(true);
     expect(extract(game, 'campaign')).toEqual([]);
   });
 
-  it('does not wreck a campaign-finale door while that floor still has chests', () => {
+  it('extracts only when the arena door is still intact', () => {
+    const intact = createGameFromLayout(['*B.', '...', '...'], 10, 'gold-pouch', undefined, 'lust');
+    expect(isArenaFloor(intact)).toBe(true);
+    intact.boss!.lives = 0;
+    const door = intact.doorIndex!;
+    intact.cells[door].state = 'revealed';
+    const cleared = extract(intact, 'campaign');
+    expect(cleared.some((e) => e.type === 'cleared')).toBe(true);
+    expect(intact.status).toBe('cleared');
+
+    const wrecked = createGameFromLayout(['B.*', '...', '...'], 10, 'gold-pouch', undefined, 'lust');
+    wrecked.boss!.lives = 0;
+    wrecked.doorIndex = 1;
+    wrecked.cells[1].state = 'revealed';
+    wrecked.cells[1].wrecked = true;
+    expect(extract(wrecked, 'campaign')).toEqual([]);
+    expect(wrecked.status).toBe('playing');
+    expect(dig(wrecked, 1, mulberry32(1), 'campaign')).toEqual([{ type: 'deny' }]);
+  });
+
+  it('does not auto-extract after a killing blast that also wrecks the door', () => {
+    const game = createGameFromLayout(['B*.', '...', '...'], 10, 'gold-pouch', undefined, 'lust');
+    game.boss!.lives = 1;
+    game.doorIndex = 0;
+    for (let i = 0; i < game.cells.length; i++) {
+      if (game.cells[i].kind === 'empty') game.cells[i].state = 'revealed';
+    }
+    const mine = game.cells.findIndex((c) => c.kind === 'mine');
+    const events = dig(game, mine, mulberry32(1), 'campaign');
+    expect(game.cells[0].wrecked).toBe(true);
+    expect(game.status).toBe('lost');
+    expect(events.some((e) => e.type === 'lost')).toBe(true);
+    expect(events.some((e) => e.type === 'cleared')).toBe(false);
+    expect(extract(game, 'campaign')).toEqual([]);
+  });
+
+  it('does not wreck a door on a boss floor that still has chests', () => {
     const game = createGameFromLayout(['B$*', '...', '...']);
     expect(game.chests).toBeGreaterThan(0);
     expect(isArenaFloor(game)).toBe(false);
@@ -198,6 +268,8 @@ describe('ritual UI wiring', () => {
   const collection = readFileSync(resolve(__dirname, '../native/src/ui/CollectionScreen.tsx'), 'utf8');
   const sheet = readFileSync(resolve(__dirname, '../native/src/ui/RitualSheet.tsx'), 'utf8');
   const route = readFileSync(resolve(__dirname, '../native/app/collection.tsx'), 'utf8');
+  const play = readFileSync(resolve(__dirname, '../native/src/ui/PlayScreen.tsx'), 'utf8');
+  const board = readFileSync(resolve(__dirname, '../native/src/ui/Board.tsx'), 'utf8');
 
   it('opens a 3-slot Use / Close sheet from Collection bag tap', () => {
     expect(collection).toContain('RitualSheet');
@@ -210,6 +282,14 @@ describe('ritual UI wiring', () => {
     expect(route).toContain('startRite');
     expect(route).toContain('onStartRite');
     expect(route).toContain('playDeny');
+  });
+
+  it('hides Found/Broken on arena floors and tags Fight/Exit', () => {
+    expect(play).toContain('isArenaFloor');
+    expect(play).toContain("? 'Exit' : 'Fight'");
+    expect(play).toContain('showChestHud');
+    expect(play).toContain('The exit is wrecked');
+    expect(board).toContain('Wrecked exit door');
   });
 });
 

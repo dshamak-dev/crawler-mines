@@ -147,6 +147,12 @@ describe('SFX from engine events', () => {
     ).toEqual(['boss-hit', 'boss-death', 'clear']);
     expect(sfxFromEvents([{ type: 'lost' }])).toEqual(['campaign-lose']);
     expect(
+      sfxFromEvents([
+        { type: 'explode', index: 2, wrecked: [7], wave: 0 },
+        { type: 'lost' },
+      ]),
+    ).toEqual(['blast', 'wreck', 'campaign-lose']);
+    expect(
       sfxFromEvents([{ type: 'boss-smash-chest', index: 2, tier: 'iron' }]),
     ).toEqual(['wreck']);
     expect(sfxFromEvents([{ type: 'deny' }])).toEqual(['deny']);
