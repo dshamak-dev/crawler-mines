@@ -104,6 +104,7 @@ export default function ShopScreen({
 
   return (
     <View style={styles.shell}>
+      <View style={styles.stage}>
       <View style={styles.tablet}>
         <View style={styles.head}>
           <GhostButton
@@ -203,6 +204,7 @@ export default function ShopScreen({
           )}
         </StoneButton>
       </View>
+      </View>
       {preview ? (
         <ItemPreviewSheet
           preview={preview}
@@ -231,7 +233,8 @@ export default function ShopScreen({
 }
 
 const styles = StyleSheet.create({
-  shell: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  shell: { flex: 1, position: 'relative' },
+  stage: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   tablet: {
     width: '100%',
     maxWidth: 340,

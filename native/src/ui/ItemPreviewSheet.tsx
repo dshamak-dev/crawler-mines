@@ -109,10 +109,10 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 12,
   },
-  title: { color: colors.ink, textTransform: 'uppercase' },
+  title: { color: colors.ink, letterSpacing: 0.6 },
   flavor: { fontSize: 14, marginTop: 10, marginBottom: 6 },
   qty: {
-    fontFamily: fonts.display,
+    fontFamily: fonts.uiBold,
     color: colors.gold2,
     fontSize: 20,
     textAlign: 'center',
