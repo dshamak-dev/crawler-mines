@@ -87,19 +87,32 @@ export {
   sellLoot,
 } from './collection';
 export type { CollectionState, KeyStore } from './collection';
-export type { FlagSkinId, FlagSkinPaint, GridSkinId, GridSkinPaint, SkinDef, SkinId, SkinSlot } from './skins';
+export type {
+  FlagSkinId,
+  FlagSkinPaint,
+  GridNumberColors,
+  GridSkinId,
+  GridSkinPaint,
+  SkinDef,
+  SkinId,
+  SkinSlot,
+} from './skins';
 export {
+  CLASSIC_GRID_NUMBERS,
   DEFAULT_FLAG_SKIN,
   DEFAULT_GRID_SKIN,
   DEFAULT_OWNED_SKINS,
   FLAG_SKIN_IDS,
   FLAG_SKIN_PAINT,
+  GRAY_GRID_NUMBERS,
   GRID_SKIN_IDS,
   GRID_SKIN_PAINT,
   SKINS,
   SKIN_IDS,
+  VINTAGE_GRID_NUMBERS,
   defaultOwnedSkins,
   flagSkinPaint,
+  gridNumberColor,
   gridSkinPaint,
   isDefaultSkin,
   isFlagSkinId,
@@ -111,6 +124,30 @@ export {
   selectedGridSkin,
   skinEntries,
 } from './skins';
+export type { AppPath, HistoryLike, NavEntry, NavSnapshot } from './navPersist';
+export {
+  APP_PATHS,
+  HOME_ENTRY,
+  NAV_HYDRATE_FLAG,
+  NAV_KEY,
+  backTarget,
+  entryFromLocation,
+  entryFromRouter,
+  fullHref,
+  hydrateWebHistory,
+  isAppPath,
+  isNavHydrateState,
+  loadNavStack,
+  parseNavStack,
+  parseSearchFrom,
+  pathHref,
+  routerHref,
+  saveNavStack,
+  splitAppPath,
+  stackForCurrent,
+  sameEntry,
+  syncNavStack,
+} from './navPersist';
 export {
   allSafeRevealed,
   chestCount,

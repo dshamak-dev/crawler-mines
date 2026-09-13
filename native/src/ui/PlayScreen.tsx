@@ -588,7 +588,7 @@ export default function PlayScreen({
                   }}
                   style={styles.center}
                 >
-                  {mode === 'campaign' ? 'Return' : 'Menu'}
+                  {mode === 'campaign' ? 'Return' : 'Claim and leave'}
                 </StoneButton>
               )}
               {showReplay ? (

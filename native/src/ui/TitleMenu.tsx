@@ -130,21 +130,6 @@ export default function TitleMenu({
         <Text style={styles.rule}>Long-press to flag.</Text>
       </View>
       <View style={styles.nav}>
-        <StoneButton
-          onPress={() => {
-            onUi();
-            onCollection();
-          }}
-        >
-          <View style={styles.rowMain}>
-            <BagIcon size={26} />
-            <Text style={styles.rowLabel}>Collection</Text>
-          </View>
-          <View style={styles.wallet}>
-            <GoldIcon size={20} />
-            <Text style={styles.walletN}>{gold}</Text>
-          </View>
-        </StoneButton>
         {onResume && resumeCopy ? (
           <StoneButton
             onPress={() => {
@@ -165,6 +150,21 @@ export default function TitleMenu({
           style={styles.cta}
         >
           Start
+        </StoneButton>
+        <StoneButton
+          onPress={() => {
+            onUi();
+            onCollection();
+          }}
+        >
+          <View style={styles.rowMain}>
+            <BagIcon size={26} />
+            <Text style={styles.rowLabel}>Collection</Text>
+          </View>
+          <View style={styles.wallet}>
+            <GoldIcon size={20} />
+            <Text style={styles.walletN}>{gold}</Text>
+          </View>
         </StoneButton>
         <StoneButton
           onPress={() => {

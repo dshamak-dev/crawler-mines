@@ -8,8 +8,13 @@ import { StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useGameAudio, type AppScreen } from '../src/audio';
+import { useNavStackSync } from '../src/nav';
 import { useGameStore } from '../src/store';
 import { colors } from '../src/theme';
+
+export const unstable_settings = {
+  initialRouteName: 'index',
+};
 
 SplashScreen.preventAutoHideAsync().catch(() => {
   /* already hidden */
@@ -41,6 +46,11 @@ function AudioHost() {
   return null;
 }
 
+function NavSync() {
+  useNavStackSync();
+  return null;
+}
+
 export default function RootLayout() {
   const [loaded] = useFonts({
     Cinzel_700Bold,
@@ -60,6 +70,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <View style={styles.root}>
           <StatusBar style="light" />
+          <NavSync />
           <AudioHost />
           <Stack
             screenOptions={{
