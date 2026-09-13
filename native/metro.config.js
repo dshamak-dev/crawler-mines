@@ -50,7 +50,7 @@ function resolveNativePackage(pkg) {
 
 const config = getDefaultConfig(projectRoot);
 
-// Share the web engine + Zustand store without moving the Vite app.
+// Share the root engine + Zustand store (Vite UI is gone; Pages is Expo web).
 config.watchFolders = [
   path.join(workspaceRoot, 'src', 'engine'),
   path.join(workspaceRoot, 'src', 'store'),

@@ -209,16 +209,17 @@ describe('sellLoot gold math', () => {
 });
 
 describe('title shop wiring', () => {
-  const title = readFileSync(resolve(__dirname, '../src/ui/TitleMenu.tsx'), 'utf8');
-  const shop = readFileSync(resolve(__dirname, '../src/ui/Shop.tsx'), 'utf8');
-  const app = readFileSync(resolve(__dirname, '../src/App.tsx'), 'utf8');
+  const title = readFileSync(resolve(__dirname, '../native/src/ui/TitleMenu.tsx'), 'utf8');
+  const shop = readFileSync(resolve(__dirname, '../native/src/ui/ShopScreen.tsx'), 'utf8');
+  const play = readFileSync(resolve(__dirname, '../native/src/ui/PlayScreen.tsx'), 'utf8');
+  const layout = readFileSync(resolve(__dirname, '../native/app/_layout.tsx'), 'utf8');
 
   it('places Shop under Start and before Sound, with no NEW badge', () => {
-    const navStart = title.indexOf('className="menu-nav"');
+    const navStart = title.indexOf('style={styles.nav}');
     const nav = title.slice(navStart);
-    const start = nav.indexOf('start-cta');
+    const start = nav.indexOf('style={styles.cta}');
     const shopBtn = nav.indexOf('<ScalesIcon');
-    const sound = nav.indexOf('MuteButton variant="row"');
+    const sound = nav.indexOf('<MuteButton');
     expect(start).toBeGreaterThan(-1);
     expect(shopBtn).toBeGreaterThan(start);
     expect(sound).toBeGreaterThan(shopBtn);
@@ -227,13 +228,13 @@ describe('title shop wiring', () => {
   });
 
   it('keeps Shop off the in-run hamburger', () => {
-    const menuStart = app.indexOf('id="game-menu-title"');
-    const menuEnd = app.indexOf('</nav>', menuStart);
-    const menu = app.slice(menuStart, menuEnd);
+    const menuStart = play.indexOf('<DisplayText>Menu</DisplayText>');
+    const menuEnd = play.indexOf('</Overlay>', menuStart);
+    const menu = play.slice(menuStart, menuEnd);
     expect(menu).toContain('Continue');
     expect(menu).toContain('Collection');
     expect(menu).not.toContain('Shop');
-    expect(app).toContain('screen === \'shop\'');
+    expect(layout).toContain("path.includes('shop')");
   });
 
   it('uses the locked shop sheet copy and sell-only confirm', () => {

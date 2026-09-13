@@ -124,25 +124,25 @@ describe('#17 sealed in-run collection hides inner loot', () => {
 });
 
 describe('#17 play HUD and hamburger menu wiring', () => {
-  const appSource = readFileSync(resolve(__dirname, '../src/App.tsx'), 'utf8');
+  const playSource = readFileSync(resolve(__dirname, '../native/src/ui/PlayScreen.tsx'), 'utf8');
+  const collectionRoute = readFileSync(resolve(__dirname, '../native/app/collection.tsx'), 'utf8');
 
   it('removes mute and collection buttons from the play HUD', () => {
-    const hudStart = appSource.indexOf('<header className="hud">');
-    const hudEnd = appSource.indexOf('</header>', hudStart);
-    const hud = appSource.slice(hudStart, hudEnd);
-    expect(hud).not.toContain('mute-btn');
-    expect(hud).not.toContain('bag-btn');
+    const hudStart = playSource.indexOf('<View style={styles.hud}>');
+    const hudEnd = playSource.indexOf('styles.boardSlot');
+    const hud = playSource.slice(hudStart, hudEnd);
     expect(hud).not.toContain('MuteButton');
+    expect(hud).not.toContain('BagIcon');
     expect(hud).toContain('MenuIcon');
-    expect(hud).toContain('aria-label="Game menu"');
+    expect(hud).toContain('accessibilityLabel="Game menu"');
   });
 
   it('exposes Continue, Collection, Sound, and Exit run in the in-run menu', () => {
-    expect(appSource).toContain('id="game-menu-title">Menu</h2>');
-    expect(appSource).toContain('Continue');
-    expect(appSource).toContain('Exit run');
-    expect(appSource).toContain('<MuteButton variant="row"');
-    expect(appSource).toContain('onExitRun');
-    expect(appSource).toContain('sealed={collectionFrom === \'play\'');
+    expect(playSource).toContain('<DisplayText>Menu</DisplayText>');
+    expect(playSource).toContain('Continue');
+    expect(playSource).toContain('Exit run');
+    expect(playSource).toContain('<MuteButton');
+    expect(playSource).toContain('onExitRun');
+    expect(collectionRoute).toContain('sealed={fromPlay}');
   });
 });

@@ -6,28 +6,13 @@ Dungeon-crawler minesweeper for phones. Bombs do **not** end the run — they de
 
 [https://dshamak-dev.github.io/crawler-mines/](https://dshamak-dev.github.io/crawler-mines/)
 
-In the repo **Settings → Pages**, set Source to **GitHub Actions** (not Deploy from a branch / master / root). Master/root cannot host both the Vite source and the built site.
+That URL is the **Expo web** client (`native/`). After merge, GitHub Pages deploys `npx expo export --platform web` with base path `/crawler-mines/` — not the old Vite app (removed).
+
+In the repo **Settings → Pages**, set Source to **GitHub Actions** (not Deploy from a branch / master / root).
 
 ## Run
 
-### Web (Vite — this is the GitHub Pages product)
-
-```bash
-npm i && npm run dev
-```
-
-Then open the printed local URL on a phone or a ~390x844 viewport.
-
-```bash
-npm test    # engine unit tests (vitest)
-npm run build
-```
-
-Root `dev` / `build` / `test` / `preview` still build the web game in `src/`. Do not run Expo from the repo root.
-
-### Native (Expo Router, phones)
-
-The React Native app lives in `native/` and does **not** replace the Vite app. Gameplay rules come from the same `src/engine` (and `src/store`) via Metro `watchFolders`. Audio files are copies of `public/audio/*` (not re-encoded).
+The product is Expo:
 
 ```bash
 cd native
@@ -35,11 +20,18 @@ npm i          # or: rm -rf node_modules && pnpm i
 npx expo start
 ```
 
-Then scan the QR code with Expo Go, or press `i` / `a` for a simulator. `npx expo start --web` is a smoke-test surface only.
+Then scan the QR code with Expo Go, or press `i` / `a` for a simulator. `npx expo start --web` is a local preview of the same client Pages deploys.
+
+```bash
+# from repo root — shared engine + store tests (vitest)
+npm test
+```
+
+Shared rules live in `src/engine` and `src/store`. Metro `watchFolders` imports them from `native/`. The legacy Vite web app (`index.html`, `src/ui`, HTMLAudio `src/audio`) has been deleted.
 
 Storage prefers `react-native-mmkv` on a native build. Expo Go / web fall back to Expo’s sync SQLite kv-store or `localStorage`.
 
-See [native/README.md](native/README.md) for stack notes and a follow-up to keep sharing the engine if Metro ever fights you.
+See [native/README.md](native/README.md) for stack notes.
 
 ## How to play (the twist)
 
@@ -62,4 +54,4 @@ A mid-floor refresh restores the live board (Zustand + localStorage): sealed che
 
 Campaign loot is **stashed** until you beat the floor-5 boss (**Gluttony**, **Wrath**, or **Lust**) and extract through the door. The finale rolls equally when that floor starts unless offerings already resolved it at enter. Floors 1–4 never name which boss is coming. Kill Gluttony or Wrath with three adjacent-mine hits; Lust has five lives (blast a mine next to him). Lust walks to the highest open number that still has a hidden neighbor and plants a heart overlay that hides that digit (never more hearts than his remaining lives; at cap, planting another removes the oldest FIFO); tapping a heart never removes it (deny). A neighboring mine blast strips hearts and drops them from plant order; a hit drops extras oldest-first to match remaining lives, and death clears every heart. Killing the boss does not end the floor — the corpse stays, and a door is hidden on a random empty zero (not a mine, number, chest, or the spawn; prefer off the spawn ring). When that cell is revealed (including by flood), it shows a door. Tap it to extract if the boss is dead and any safe cell is still hidden; a tablet asks Exit or Keep digging. If the boss is already dead and every non-mine cell is revealed, extract is immediate (loot/head/cup/key, status cleared) without a door tap. Open every safe tile while the boss still lives and the campaign fails — no stash, no head, no cup, no key. The stash dumps on extract, that sin's head trophy always stacks in Collection, and there is a 25% chance of a bonus Hard or Campaign key (50/50 inside that 25%). If every descent floor (1–4) was a perfect clear (same rules, including the last leftover mine), a stacking unsellable **gold cup** trophy is granted with the head. Floor 5 / the boss fight does not need to be perfect. Hard is a normal paid floor with no boss.
 
-Audio (`public/audio/`): **cozy-descent** is the violin loop on the title and Easy/Medium/Hard (quiet violin only ~30–70s, soft edges); campaign-depths on campaign floors 1–4; **flag-eater-boss** loops on the floor-5 Gluttony fight; **wrath-boss** loops when the rolled boss is Wrath; **lust-boss** loops when the rolled boss is Lust. Finale tracks stay up if Collection is opened from that floor, then cozy when you return to the menu. Approved **lust-boss** and violin **cozy-descent** bytes land in a follow-up contents-API commit — do not invent or re-encode them here. Only one BGM loop plays at a time: starting a new track hard-stops every other BGM immediately (no overlapping crossfade). SFX may overlap. BGM and SFX pause when the tab is hidden and resume from the same point when you return (if Sound is on). Mute persists in localStorage. SFX play on dig, flag, chest, blast, wreck, clear, UI, deny, and boss cues (move, eat flag, hit, death, campaign lose).
+Audio (`native/assets/audio/`): **cozy-descent** is the violin loop on the title and Easy/Medium/Hard (quiet violin only ~30–70s, soft edges); campaign-depths on campaign floors 1–4; **flag-eater-boss** loops on the floor-5 Gluttony fight; **wrath-boss** loops when the rolled boss is Wrath; **lust-boss** loops when the rolled boss is Lust. Finale tracks stay up if Collection is opened from that floor, then cozy when you return to the menu. Do not invent or re-encode these bytes. Only one BGM loop plays at a time: starting a new track hard-stops every other BGM immediately (no overlapping crossfade). SFX may overlap. BGM and SFX pause when the tab is hidden and resume from the same point when you return (if Sound is on). Mute persists. SFX play on dig, flag, chest, blast, wreck, clear, UI, deny, and boss cues (move, eat flag, hit, death, campaign lose).

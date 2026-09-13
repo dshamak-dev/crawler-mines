@@ -1,6 +1,6 @@
 # Crawler Mines — native (Expo)
 
-Phone client for the same dungeon-crawler minesweeper as the Vite web app at the repo root. **Do not move or replace the web product.** Pages still deploys from root `npm run build`.
+This is the product. GitHub Pages deploys the Expo web export from this folder (`npx expo export --platform web`, base path `/crawler-mines/`). The old root Vite app has been removed.
 
 ## Run
 
@@ -15,16 +15,15 @@ npx expo start
 | Command | What |
 | --- | --- |
 | `npx expo start` | Metro + Expo Go / dev client |
-| `npx expo start --web` | Browser smoke test (phone-sized frame on desktop) |
-| `npx expo export --platform web` | Confirms Metro can bundle shared `src/engine` |
+| `npx expo start --web` | Same client Pages deploys (local preview) |
+| `npx expo export --platform web` | Production web bundle → `native/dist` |
 | `npx expo start --ios` / `--android` | Simulator (needs Xcode / Android SDK) |
 
-Web stays at the repo root:
+Shared engine tests stay at the repo root:
 
 ```bash
 cd ..
-npm i && npm run dev    # Vite
-npm test && npm run build
+npm i && npm test
 ```
 
 ## Stack
@@ -32,16 +31,16 @@ npm test && npm run build
 - Expo SDK 57 + Expo Router (`app/` routes: title, play, collection, shop)
 - Zustand store factory from `../src/store/gameStore.ts` with a native `KeyStore`
 - Sync persist: **MMKV** on a native build; **expo-sqlite/kv-store** (Expo Go) or `localStorage` (web)
-- `expo-audio` for exclusive BGM + SFX (same `public/audio/*` bytes, copied into `assets/audio/`). `expo-av` is not in Expo Go.
-- `react-native-svg` icons ported from `src/ui/icons.tsx`
+- `expo-audio` for exclusive BGM + SFX (`assets/audio/`). `expo-av` is not in Expo Go.
+- `react-native-svg` icons
 - Gesture Handler long-press (400ms) + Reanimated board FX
 
 ## Shared engine
 
-Metro `watchFolders` points at `../src/engine` and `../src/store` so rules stay identical to web. The Vite root `node_modules` is on Metro’s block list so its React does not leak in. `@expo/metro-runtime` is a direct dependency and is also mapped in `metro.config.js` for isolated pnpm.
+Metro `watchFolders` points at `../src/engine` and `../src/store` so rules stay identical. The root `node_modules` (vitest / zustand test deps) is on Metro’s block list so its React does not leak in. `@expo/metro-runtime` is a direct dependency and is also mapped in `metro.config.js` for isolated pnpm.
 
 **Follow-up:** if Metro packaging of the parent `src/` folders becomes painful, copy `src/engine` (and the store helpers) into `native/` and unify later. Do not invent gameplay in either copy.
 
 ## Audio
 
-Files in `native/assets/audio/` are byte copies of `../public/audio/`. Do not invent or re-encode them.
+Files in `native/assets/audio/` are the approved loops and SFX. Do not invent or re-encode them.
