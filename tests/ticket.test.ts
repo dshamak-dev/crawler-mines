@@ -42,9 +42,9 @@ function withWallet(
   store: KeyStore = memoryStore(),
 ): { store: KeyStore; meta: CollectionState } {
   const meta: CollectionState = {
+    ...emptyCollection(),
     gold,
     items: { ...emptyInventory(), ...items },
-    lastGrantKey: null,
   };
   saveCollection(meta, store);
   return { store, meta: loadCollection(store) };

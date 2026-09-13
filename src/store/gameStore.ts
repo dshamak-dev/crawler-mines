@@ -29,7 +29,7 @@ import {
   RUN_KEY,
   runStash,
   sanitizePerfectFloors,
-  buyLoot,
+  buyGoods,
   consumeRitual,
   normalizeRitual,
   riteFloorConfig,
@@ -42,8 +42,13 @@ import {
   type Game,
   type GameEvent,
   type Inventory,
+  type FlagSkinId,
+  type GridSkinId,
   type ItemId,
   type KeyStore,
+  selectFlagSkin as persistFlagSkin,
+  selectGridSkin as persistGridSkin,
+  type ShopGoodId,
   type OfferingSlots,
   type Rng,
   type RitualSlots,
@@ -66,7 +71,9 @@ export interface GameStoreState {
   applyFlag: (index: number, rng?: Rng) => GameEvent[];
   applyExtract: (rng?: Rng) => GameEvent[];
   sell: (itemId: ItemId, qty?: number) => boolean;
-  buy: (itemId: ItemId, qty?: number) => boolean;
+  buy: (id: ShopGoodId, qty?: number) => boolean;
+  selectFlagSkin: (skinId: FlagSkinId) => boolean;
+  selectGridSkin: (skinId: GridSkinId) => boolean;
   startRite: (slots: RitualSlots, rng?: Rng) => boolean;
 }
 
@@ -353,8 +360,20 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
           set({ meta: next });
           return true;
         },
-        buy: (itemId, qty = 1) => {
-          const next = buyLoot(get().meta, itemId, qty, keyStore);
+        buy: (id, qty = 1) => {
+          const next = buyGoods(get().meta, id, qty, keyStore);
+          if (!next) return false;
+          set({ meta: next });
+          return true;
+        },
+        selectFlagSkin: (skinId) => {
+          const next = persistFlagSkin(get().meta, skinId, keyStore);
+          if (!next) return false;
+          set({ meta: next });
+          return true;
+        },
+        selectGridSkin: (skinId) => {
+          const next = persistGridSkin(get().meta, skinId, keyStore);
           if (!next) return false;
           set({ meta: next });
           return true;

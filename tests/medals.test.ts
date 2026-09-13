@@ -5,6 +5,7 @@ import {
   cloneGame,
   createGameFromLayout,
   dig,
+  emptyCollection,
   emptyInventory,
   emptyPerfectFloors,
   emptyStash,
@@ -282,6 +283,7 @@ describe('medal shop prices and stacks', () => {
 
     const store = memoryStore();
     const meta = {
+      ...emptyCollection(),
       gold: 1,
       items: {
         ...emptyInventory(),
@@ -289,7 +291,6 @@ describe('medal shop prices and stacks', () => {
         'silver-medal': 1,
         'gold-medal': 3,
       },
-      lastGrantKey: null,
     };
     const bronze = sellLoot(meta, 'bronze-medal', 1, store);
     expect(bronze?.gold).toBe(4);
@@ -340,7 +341,7 @@ describe('campaign gold cup', () => {
   function withWallet(gold: number, items: Partial<Inventory> = {}): KeyStore {
     const store = memoryStore();
     saveCollection(
-      { gold, items: { ...emptyInventory(), ...items }, lastGrantKey: null },
+      { ...emptyCollection(), gold, items: { ...emptyInventory(), ...items } },
       store,
     );
     return store;

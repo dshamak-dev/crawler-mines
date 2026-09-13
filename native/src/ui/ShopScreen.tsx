@@ -1,22 +1,32 @@
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
+  DEFAULT_OWNED_SKINS,
   ITEMS,
+  SKINS,
   buyGold,
   buyableEntries,
   clampBuyQty,
   clampSellQty,
+  isItemId,
+  isSkinId,
+  isSkinOwned,
   sellGold,
   sellableEntries,
   shopSelectionAfterModeChange,
   type CollectionState,
   type ItemId,
   type RitualSlots,
+  type ShopGoodId,
   type ShopMode,
 } from '../../../src/engine';
 import { colors, fonts } from '../theme';
-import { GoldIcon, ItemIcon } from './icons';
-import ItemPreviewSheet, { previewForItem, type ItemPreviewModel } from './ItemPreviewSheet';
+import { GoldIcon, ItemIcon, SkinIcon } from './icons';
+import ItemPreviewSheet, {
+  previewForItem,
+  previewForSkin,
+  type ItemPreviewModel,
+} from './ItemPreviewSheet';
 import RitualSheet from './RitualSheet';
 import { DisplayText, GhostButton, StoneButton } from './primitives';
 
@@ -32,32 +42,58 @@ export default function ShopScreen({
   meta: CollectionState;
   onBack: () => void;
   onSell: (itemId: ItemId, qty: number) => boolean;
-  onBuy: (itemId: ItemId, qty: number) => boolean;
+  onBuy: (id: ShopGoodId, qty: number) => boolean;
   onUi: () => void;
   onDeny: () => void;
   onStartRite?: (slots: RitualSlots) => boolean;
 }) {
   const [mode, setMode] = useState<ShopMode>('sell');
-  const [slotted, setSlotted] = useState<ItemId | null>(null);
+  const [slotted, setSlotted] = useState<ShopGoodId | null>(null);
   const [qty, setQty] = useState(0);
   const [preview, setPreview] = useState<ItemPreviewModel | null>(null);
   const [ritualOpen, setRitualOpen] = useState(false);
 
   const sellRows = sellableEntries(meta.items);
-  const buyRows = buyableEntries();
+  const buyRows = useMemo(() => {
+    const paid = buyableEntries();
+    const defaults = DEFAULT_OWNED_SKINS.map((id) => ({
+      kind: 'skin' as const,
+      item: SKINS[id],
+      gold: 0,
+    }));
+    return [...paid, ...defaults];
+  }, []);
   const rows = mode === 'sell' ? sellRows : buyRows;
-  const owned = slotted ? Math.max(0, meta.items[slotted] ?? 0) : 0;
-  const empty = mode === 'sell' ? !slotted || owned < 1 : !slotted;
+  const ownedItem = slotted && isItemId(slotted) ? Math.max(0, meta.items[slotted] ?? 0) : 0;
+  const skinOwned = slotted && isSkinId(slotted) ? isSkinOwned(meta, slotted) : false;
+  const skinForSale = Boolean(slotted && isSkinId(slotted) && buyGold(slotted) > 0 && !skinOwned);
+  const empty =
+    mode === 'sell'
+      ? !slotted || !isItemId(slotted) || ownedItem < 1
+      : !slotted || (isSkinId(slotted) && !skinForSale);
   const liveQty =
-    empty || !slotted ? 0 : mode === 'sell' ? clampSellQty(owned, qty) : clampBuyQty(qty);
-  const unit = !slotted ? 0 : mode === 'sell' ? sellGold(slotted) : buyGold(slotted);
+    empty || !slotted
+      ? 0
+      : mode === 'sell'
+        ? clampSellQty(ownedItem, qty)
+        : clampBuyQty(qty, isSkinId(slotted) ? 1 : 99);
+  const unit = !slotted ? 0 : mode === 'sell' && isItemId(slotted) ? sellGold(slotted) : buyGold(slotted);
   const total = empty || !slotted ? 0 : unit * liveQty;
+  const captionName = slotted
+    ? isSkinId(slotted)
+      ? SKINS[slotted].name
+      : ITEMS[slotted].name
+    : '';
 
   const caption = useMemo(() => {
-    if (empty || !slotted) return mode === 'sell' ? 'Tap an item to sell.' : 'Tap an item to buy.';
-    if (mode === 'sell') return `${ITEMS[slotted].name} · ${owned} owned`;
-    return `${ITEMS[slotted].name} · ${unit} each`;
-  }, [empty, slotted, owned, mode, unit]);
+    if (empty || !slotted) {
+      if (mode === 'sell') return 'Tap an item to sell.';
+      if (slotted && isSkinId(slotted) && skinOwned) return `${SKINS[slotted].name} · owned`;
+      return 'Tap an item to buy.';
+    }
+    if (mode === 'sell' && isItemId(slotted)) return `${ITEMS[slotted].name} · ${ownedItem} owned`;
+    return `${captionName} · ${unit} each`;
+  }, [empty, slotted, ownedItem, mode, unit, skinOwned, captionName]);
 
   const changeMode = (next: ShopMode) => {
     const after = shopSelectionAfterModeChange(mode, next, slotted, qty);
@@ -68,17 +104,25 @@ export default function ShopScreen({
     setQty(after.qty);
   };
 
-  const slotItem = (id: ItemId) => {
+  const slotGood = (id: ShopGoodId) => {
     onUi();
     setSlotted(id);
     setQty(1);
+    if (isSkinId(id)) {
+      setPreview(previewForSkin(id, isSkinOwned(meta, id), false, false));
+      return;
+    }
     setPreview(previewForItem(id, meta.items[id] ?? 0, Boolean(onStartRite)));
   };
 
   const bump = (delta: number) => {
     if (empty) return;
     onUi();
-    setQty(mode === 'sell' ? clampSellQty(owned, liveQty + delta) : clampBuyQty(liveQty + delta));
+    setQty(
+      mode === 'sell'
+        ? clampSellQty(ownedItem, liveQty + delta)
+        : clampBuyQty(liveQty + delta, slotted && isSkinId(slotted) ? 1 : 99),
+    );
   };
 
   const confirm = () => {
@@ -87,13 +131,16 @@ export default function ShopScreen({
       return;
     }
     onUi();
-    const ok = mode === 'sell' ? onSell(slotted, liveQty) : onBuy(slotted, liveQty);
+    const ok =
+      mode === 'sell' && isItemId(slotted)
+        ? onSell(slotted, liveQty)
+        : onBuy(slotted, liveQty);
     if (!ok) {
       onDeny();
       return;
     }
     if (mode === 'buy') return;
-    const remain = owned - liveQty;
+    const remain = ownedItem - liveQty;
     if (remain < 1) {
       setSlotted(null);
       setQty(0);
@@ -101,6 +148,8 @@ export default function ShopScreen({
     }
     setQty(clampSellQty(remain, liveQty));
   };
+
+  const buyLocked = mode === 'buy' && Boolean(slotted && isSkinId(slotted) && skinOwned);
 
   return (
     <View style={styles.shell}>
@@ -152,19 +201,25 @@ export default function ShopScreen({
           <ScrollView style={styles.list} contentContainerStyle={styles.grid}>
             {rows.map((row) => {
               const count = 'count' in row ? row.count : undefined;
+              const id = row.item.id;
+              const ownedSkin = isSkinId(id) && isSkinOwned(meta, id);
               return (
                 <Pressable
-                  key={row.item.id}
-                  style={[styles.cell, slotted === row.item.id && styles.cellOn]}
-                  onPress={() => slotItem(row.item.id)}
+                  key={id}
+                  style={[styles.cell, slotted === id && styles.cellOn]}
+                  onPress={() => slotGood(id)}
                   accessibilityLabel={
                     count != null
                       ? `${row.item.name}, ${count} owned`
-                      : `${row.item.name}, ${row.gold} gold`
+                      : ownedSkin
+                        ? `${row.item.name}, owned`
+                        : `${row.item.name}, ${row.gold} gold`
                   }
                 >
-                  <ItemIcon id={row.item.id} size={36} />
-                  <Text style={styles.cellQty}>{count != null ? `x${count}` : row.gold}</Text>
+                  {isSkinId(id) ? <SkinIcon id={id} size={36} /> : <ItemIcon id={id} size={36} />}
+                  <Text style={styles.cellQty}>
+                    {count != null ? `x${count}` : ownedSkin ? 'own' : row.gold}
+                  </Text>
                 </Pressable>
               );
             })}
@@ -172,7 +227,15 @@ export default function ShopScreen({
         )}
 
         <View style={[styles.slot, empty && styles.slotEmpty]}>
-          {!empty && slotted ? <ItemIcon id={slotted} size={64} /> : null}
+          {!empty && slotted ? (
+            isSkinId(slotted) ? (
+              <SkinIcon id={slotted} size={64} />
+            ) : (
+              <ItemIcon id={slotted} size={64} />
+            )
+          ) : slotted && isSkinId(slotted) ? (
+            <SkinIcon id={slotted} size={64} />
+          ) : null}
         </View>
         <Text style={styles.caption}>{caption}</Text>
 
@@ -187,8 +250,10 @@ export default function ShopScreen({
         </View>
         {!empty ? <Text style={styles.qtyLabel}>Qty</Text> : null}
 
-        <StoneButton gold={!empty} locked={empty} onPress={confirm} style={styles.sell}>
-          {empty ? (
+        <StoneButton gold={!empty && !buyLocked} locked={empty || buyLocked} onPress={confirm} style={styles.sell}>
+          {buyLocked ? (
+            'Owned'
+          ) : empty ? (
             mode === 'sell' ? (
               'Sell for —'
             ) : (

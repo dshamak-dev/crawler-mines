@@ -244,7 +244,7 @@ describe('sellLoot gold math', () => {
 });
 
 describe('buy catalog', () => {
-  it('lists only the locked shop reagents at the locked prices', () => {
+  it('lists locked shop reagents and paid skins at the locked prices', () => {
     expect(buyGold('bone-dust')).toBe(50);
     expect(buyGold('witchcraft-bag')).toBe(150);
     expect(buyGold('scroll-of-portal')).toBe(80);
@@ -255,6 +255,10 @@ describe('buy catalog', () => {
       ['bone-dust', 50],
       ['witchcraft-bag', 150],
       ['scroll-of-portal', 80],
+      ['flag-golden', 500],
+      ['flag-pirate', 500],
+      ['grid-classic', 1000],
+      ['grid-vintage', 1000],
     ]);
     for (const id of ITEM_IDS) {
       if (id === 'bone-dust' || id === 'witchcraft-bag' || id === 'scroll-of-portal') {

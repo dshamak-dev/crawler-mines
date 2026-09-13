@@ -1,19 +1,32 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
+  FLAG_SKIN_IDS,
+  GRID_SKIN_IDS,
+  SKINS,
   inventoryTotal,
+  isSkinOwned,
   isTicketKey,
   sealedRowLabel,
   sealedRunRows,
+  selectedFlagSkin,
+  selectedGridSkin,
   stackedEntries,
   type CollectionState,
+  type FlagSkinId,
   type Game,
+  type GridSkinId,
   type Inventory,
   type RitualSlots,
+  type SkinId,
 } from '../../../src/engine';
 import { colors, fonts } from '../theme';
-import { BagIcon, ChestIcon, GoldIcon, ItemIcon } from './icons';
-import ItemPreviewSheet, { previewForItem, type ItemPreviewModel } from './ItemPreviewSheet';
+import { BagIcon, ChestIcon, GoldIcon, ItemIcon, SkinIcon } from './icons';
+import ItemPreviewSheet, {
+  previewForItem,
+  previewForSkin,
+  type ItemPreviewModel,
+} from './ItemPreviewSheet';
 import RitualSheet from './RitualSheet';
 import { GhostButton, StoneButton } from './primitives';
 
@@ -27,6 +40,8 @@ export default function CollectionScreen({
   sealed = false,
   onBack,
   onStartRite,
+  onSelectFlag,
+  onSelectGrid,
   onUi,
   onDeny,
 }: {
@@ -37,6 +52,8 @@ export default function CollectionScreen({
   sealed?: boolean;
   onBack: () => void;
   onStartRite?: (slots: RitualSlots) => boolean;
+  onSelectFlag?: (skinId: FlagSkinId) => boolean;
+  onSelectGrid?: (skinId: GridSkinId) => boolean;
   onUi?: () => void;
   onDeny?: () => void;
 }) {
@@ -55,9 +72,10 @@ export default function CollectionScreen({
   return (
     <TitleCollection
       meta={meta}
-      runLoot={runLoot}
       onBack={onBack}
       onStartRite={onStartRite}
+      onSelectFlag={onSelectFlag}
+      onSelectGrid={onSelectGrid}
       onUi={onUi}
       onDeny={onDeny}
     />
@@ -66,33 +84,48 @@ export default function CollectionScreen({
 
 function TitleCollection({
   meta,
-  runLoot,
   onBack,
   onStartRite,
+  onSelectFlag,
+  onSelectGrid,
   onUi,
   onDeny,
 }: {
   meta: CollectionState;
-  runLoot: Inventory;
   onBack: () => void;
   onStartRite?: (slots: RitualSlots) => boolean;
+  onSelectFlag?: (skinId: FlagSkinId) => boolean;
+  onSelectGrid?: (skinId: GridSkinId) => boolean;
   onUi?: () => void;
   onDeny?: () => void;
 }) {
-  const [tab, setTab] = useState<'all' | 'run'>('all');
+  const [tab, setTab] = useState<'items' | 'skins'>('items');
   const [preview, setPreview] = useState<ItemPreviewModel | null>(null);
+  const [previewSkin, setPreviewSkin] = useState<SkinId | null>(null);
   const [ritualOpen, setRitualOpen] = useState(false);
-  const inv = tab === 'all' ? meta.items : runLoot;
-  const rows = stackedEntries(inv);
-  const total = inventoryTotal(inv);
-  const runCount = inventoryTotal(runLoot);
+  const rows = stackedEntries(meta.items);
+  const total = inventoryTotal(meta.items);
+  const ownedSkinCount = [...FLAG_SKIN_IDS, ...GRID_SKIN_IDS].filter((id) =>
+    isSkinOwned(meta, id),
+  ).length;
   const cue = onUi ?? (() => {});
   const deny = onDeny ?? (() => {});
-  const allowUse = tab === 'all' && Boolean(onStartRite);
+  const allowUse = tab === 'items' && Boolean(onStartRite);
+  const flagId = selectedFlagSkin(meta);
+  const gridId = selectedGridSkin(meta);
+  const pill = tab === 'items' ? `${total} held` : `${ownedSkinCount} owned`;
+
+  const openSkin = (id: SkinId) => {
+    cue();
+    const owned = isSkinOwned(meta, id);
+    const selected = SKINS[id].slot === 'flag' ? flagId === id : gridId === id;
+    setPreviewSkin(id);
+    setPreview(previewForSkin(id, owned, selected, owned));
+  };
 
   return (
     <View style={styles.shell}>
-      <Header title="Collection" pill={`${total} held`} onBack={onBack} />
+      <Header title="Collection" pill={pill} onBack={onBack} />
       <View style={styles.wallet} accessibilityLabel={`${meta.gold} coins in wallet`}>
         <GoldIcon size={28} />
         <View style={styles.walletCopy}>
@@ -102,45 +135,71 @@ function TitleCollection({
       </View>
       <View style={styles.filters}>
         <Pressable
-          style={[styles.chip, tab === 'all' && styles.chipOn]}
-          onPress={() => setTab('all')}
+          style={[styles.chip, tab === 'items' && styles.chipOn]}
+          onPress={() => setTab('items')}
+          accessibilityLabel="Items"
         >
-          <Text style={[styles.chipText, tab === 'all' && styles.chipTextOn]}>All salvage</Text>
+          <Text style={[styles.chipText, tab === 'items' && styles.chipTextOn]}>Items</Text>
         </Pressable>
         <Pressable
-          style={[styles.chip, tab === 'run' && styles.chipOn]}
-          onPress={() => setTab('run')}
+          style={[styles.chip, tab === 'skins' && styles.chipOn]}
+          onPress={() => setTab('skins')}
+          accessibilityLabel="Skins"
         >
-          <Text style={[styles.chipText, tab === 'run' && styles.chipTextOn]}>
-            This run{runCount > 0 ? ` · ${runCount}` : ''}
-          </Text>
+          <Text style={[styles.chipText, tab === 'skins' && styles.chipTextOn]}>Skins</Text>
         </Pressable>
       </View>
-      {rows.length === 0 ? (
-        <View style={styles.empty}>
-          <Text style={styles.emptyCopy}>{EMPTY_COPY}</Text>
-        </View>
+      {tab === 'items' ? (
+        rows.length === 0 ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyCopy}>{EMPTY_COPY}</Text>
+          </View>
+        ) : (
+          <ScrollView style={styles.list} contentContainerStyle={styles.listInner}>
+            {rows.map(({ item, count }) => (
+              <Pressable
+                key={item.id}
+                style={[styles.card, isTicketKey(item.id) && styles.ticket]}
+                onPress={() => {
+                  cue();
+                  setPreviewSkin(null);
+                  setPreview(previewForItem(item.id, count, allowUse));
+                }}
+                accessibilityLabel={`${item.name}, ${count} owned`}
+              >
+                <View style={styles.ico}>
+                  <ItemIcon id={item.id} size={34} />
+                </View>
+                <View style={styles.copy}>
+                  <Text style={styles.name}>{item.name}</Text>
+                  <Text style={styles.flavor}>{item.flavor}</Text>
+                </View>
+                <Text style={styles.count}>×{count}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )
       ) : (
         <ScrollView style={styles.list} contentContainerStyle={styles.listInner}>
-          {rows.map(({ item, count }) => (
-            <Pressable
-              key={item.id}
-              style={[styles.card, isTicketKey(item.id) && styles.ticket]}
-              onPress={() => {
-                cue();
-                setPreview(previewForItem(item.id, count, allowUse));
-              }}
-              accessibilityLabel={`${item.name}, ${count} owned`}
-            >
-              <View style={styles.ico}>
-                <ItemIcon id={item.id} size={34} />
-              </View>
-              <View style={styles.copy}>
-                <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.flavor}>{item.flavor}</Text>
-              </View>
-              <Text style={styles.count}>×{count}</Text>
-            </Pressable>
+          <Text style={styles.section}>Flag</Text>
+          {FLAG_SKIN_IDS.map((id) => (
+            <SkinRow
+              key={id}
+              id={id}
+              owned={isSkinOwned(meta, id)}
+              selected={flagId === id}
+              onPress={() => openSkin(id)}
+            />
+          ))}
+          <Text style={[styles.section, styles.sectionGap]}>Grid</Text>
+          {GRID_SKIN_IDS.map((id) => (
+            <SkinRow
+              key={id}
+              id={id}
+              owned={isSkinOwned(meta, id)}
+              selected={gridId === id}
+              onPress={() => openSkin(id)}
+            />
           ))}
         </ScrollView>
       )}
@@ -152,9 +211,27 @@ function TitleCollection({
           preview={preview}
           onUse={() => {
             setPreview(null);
+            setPreviewSkin(null);
             setRitualOpen(true);
           }}
-          onClose={() => setPreview(null)}
+          onSelect={() => {
+            if (!previewSkin) return;
+            const skin = SKINS[previewSkin];
+            const ok =
+              skin.slot === 'flag'
+                ? onSelectFlag?.(previewSkin as FlagSkinId)
+                : onSelectGrid?.(previewSkin as GridSkinId);
+            if (!ok) {
+              deny();
+              return;
+            }
+            setPreview(null);
+            setPreviewSkin(null);
+          }}
+          onClose={() => {
+            setPreview(null);
+            setPreviewSkin(null);
+          }}
           onUi={cue}
         />
       ) : null}
@@ -171,6 +248,44 @@ function TitleCollection({
         />
       ) : null}
     </View>
+  );
+}
+
+function SkinRow({
+  id,
+  owned,
+  selected,
+  onPress,
+}: {
+  id: SkinId;
+  owned: boolean;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const skin = SKINS[id];
+  return (
+    <Pressable
+      style={[styles.card, !owned && styles.locked]}
+      onPress={onPress}
+      accessibilityLabel={
+        selected
+          ? `${skin.name}, selected`
+          : owned
+            ? `${skin.name}, owned`
+            : `${skin.name}, locked`
+      }
+    >
+      <View style={styles.ico}>
+        <SkinIcon id={id} size={34} />
+      </View>
+      <View style={styles.copy}>
+        <Text style={styles.name}>{skin.name}</Text>
+        <Text style={styles.flavor}>{skin.flavor}</Text>
+      </View>
+      <Text style={selected ? styles.active : styles.owned}>
+        {selected ? 'Active' : owned ? 'Owned' : 'Locked'}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -318,6 +433,14 @@ const styles = StyleSheet.create({
   emptyCopy: { fontFamily: fonts.ui, color: colors.muted, fontSize: 16, textAlign: 'center', lineHeight: 22 },
   list: { flex: 1 },
   listInner: { gap: 8, paddingBottom: 8 },
+  section: {
+    fontFamily: fonts.display,
+    color: colors.gold2,
+    letterSpacing: 0.8,
+    fontSize: 14,
+    marginTop: 4,
+  },
+  sectionGap: { marginTop: 12 },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -329,6 +452,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
   },
+  locked: { opacity: 0.62 },
   ticket: { borderColor: 'rgba(201, 180, 255, 0.35)' },
   ico: {
     width: 48,
@@ -342,5 +466,7 @@ const styles = StyleSheet.create({
   name: { fontFamily: fonts.display, color: colors.ink, fontSize: 16 },
   flavor: { fontFamily: fonts.ui, color: colors.muted, fontSize: 13, marginTop: 2 },
   count: { fontFamily: fonts.display, color: colors.gold, fontSize: 17 },
+  active: { fontFamily: fonts.display, color: colors.gold2, fontSize: 13, letterSpacing: 0.6 },
+  owned: { fontFamily: fonts.display, color: colors.muted, fontSize: 12, letterSpacing: 0.4 },
   back: { justifyContent: 'center' },
 });

@@ -12,6 +12,8 @@ export default function CollectionRoute() {
   const runLoot = useGameStore((s) => s.runLoot);
   const run = useGameStore((s) => s.run);
   const startRite = useGameStore((s) => s.startRite);
+  const pickFlag = useGameStore((s) => s.selectFlagSkin);
+  const pickGrid = useGameStore((s) => s.selectGridSkin);
   const fromPlay = from === 'play' && Boolean(run);
 
   return (
@@ -32,6 +34,8 @@ export default function CollectionRoute() {
                 return ok;
               }
         }
+        onSelectFlag={fromPlay ? undefined : pickFlag}
+        onSelectGrid={fromPlay ? undefined : pickGrid}
         onUi={() => getAudio().playSfx('ui')}
         onDeny={playDeny}
       />
