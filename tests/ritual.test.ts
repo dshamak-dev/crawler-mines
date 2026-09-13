@@ -284,7 +284,7 @@ describe('ritual UI wiring', () => {
   it('opens a preview sheet on item tap, then ritual from preview Use', () => {
     expect(collection).toContain('ItemPreviewSheet');
     expect(collection).toContain('previewForItem');
-    expect(collection).toContain("tab === 'all' && Boolean(onStartRite)");
+    expect(collection).toContain("tab === 'items' && Boolean(onStartRite)");
     expect(collection).toContain('setRitualOpen(true)');
     expect(collection).not.toContain('isUsable');
     expect(preview).toContain('canUseFromPreview');

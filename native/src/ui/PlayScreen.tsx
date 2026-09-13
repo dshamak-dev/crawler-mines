@@ -9,6 +9,8 @@ import {
   chestNotices,
   isArenaFloor,
   isTicketKey,
+  selectedFlagSkin,
+  selectedGridSkin,
   stackedEntries,
   type GameEvent,
 } from '../../../src/engine';
@@ -42,7 +44,10 @@ export default function PlayScreen({
   onCollection: () => void;
   onExitRun: () => void;
 }) {
+  const meta = useGameStore((s) => s.meta);
   const run = useGameStore((s) => s.run);
+  const flagSkin = selectedFlagSkin(meta);
+  const gridSkin = selectedGridSkin(meta);
   const applyDig = useGameStore((s) => s.applyDig);
   const applyFlag = useGameStore((s) => s.applyFlag);
   const applyExtract = useGameStore((s) => s.applyExtract);
@@ -283,6 +288,8 @@ export default function PlayScreen({
             game={game}
             cellPx={cellPx}
             flagMode={flagMode}
+            flagSkin={flagSkin}
+            gridSkin={gridSkin}
             blasts={blasts}
             sparkles={sparkles}
             shaking={shaking}
@@ -318,7 +325,7 @@ export default function PlayScreen({
               setFlagMode(true);
             }}
           >
-            <FlagIcon size={22} />
+            <FlagIcon skin={flagSkin} size={22} />
             <Text style={[styles.toggleText, flagMode && styles.toggleFlagText]}>Flag</Text>
           </Pressable>
         </View>

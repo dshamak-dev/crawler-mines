@@ -1,3 +1,9 @@
+import {
+  SKIN_IDS,
+  SKINS,
+  type SkinDef,
+  type SkinId,
+} from './skins';
 import type { Difficulty, Rng } from './types';
 
 export const ITEM_IDS = [
@@ -331,30 +337,42 @@ export function sellableEntries(
     .filter((row) => row.count > 0);
 }
 
+export type ShopGoodId = ItemId | SkinId;
+
 /**
- * Title-shop buy prices. Follow-ups register rows here without reshaping the sheet:
- * #49 skins.
+ * Title-shop buy prices. Paid skins live here with the reagents (#49).
+ * Defaults stay free / always owned and are not catalog rows.
  */
-export const SHOP_BUY: Partial<Record<ItemId, number>> = {
+export const SHOP_BUY: Partial<Record<ShopGoodId, number>> = {
   'bone-dust': 50,
   'witchcraft-bag': 150,
   'scroll-of-portal': 80,
+  'flag-golden': 500,
+  'flag-pirate': 500,
+  'grid-classic': 1000,
+  'grid-vintage': 1000,
 };
 
-export type ShopBuyCatalog = Partial<Record<ItemId, number>>;
+export type ShopBuyCatalog = Partial<Record<ShopGoodId, number>>;
 export type ShopMode = 'sell' | 'buy';
 
-export function buyGold(itemId: ItemId, catalog: ShopBuyCatalog = SHOP_BUY): number {
-  const n = catalog[itemId];
+export interface ShopBuyRow {
+  kind: 'item' | 'skin';
+  item: ItemDef | SkinDef;
+  gold: number;
+}
+
+export function buyGold(id: ShopGoodId, catalog: ShopBuyCatalog = SHOP_BUY): number {
+  const n = catalog[id];
   if (typeof n !== 'number' || !Number.isFinite(n)) return 0;
   return Math.max(0, Math.floor(n));
 }
 
-export function isBuyable(itemId: ItemId, catalog: ShopBuyCatalog = SHOP_BUY): boolean {
-  return buyGold(itemId, catalog) > 0;
+export function isBuyable(id: ShopGoodId, catalog: ShopBuyCatalog = SHOP_BUY): boolean {
+  return buyGold(id, catalog) > 0;
 }
 
-/** Empty slot → 0. Otherwise clamp to 1..max (default 99). */
+/** Empty slot → 0. Otherwise clamp to 1..max (default 99). Skins cap at 1. */
 export function clampBuyQty(qty: number, max = 99): number {
   const cap = Math.max(1, Math.floor(max));
   const n = Math.floor(qty);
@@ -364,20 +382,27 @@ export function clampBuyQty(qty: number, max = 99): number {
 
 export function buyableEntries(
   catalog: ShopBuyCatalog = SHOP_BUY,
-): Array<{ item: ItemDef; gold: number }> {
-  return ITEM_IDS.filter((id) => isBuyable(id, catalog)).map((id) => ({
+): ShopBuyRow[] {
+  const items = ITEM_IDS.filter((id) => isBuyable(id, catalog)).map((id) => ({
+    kind: 'item' as const,
     item: ITEMS[id],
     gold: buyGold(id, catalog),
   }));
+  const skins = SKIN_IDS.filter((id) => isBuyable(id, catalog)).map((id) => ({
+    kind: 'skin' as const,
+    item: SKINS[id],
+    gold: buyGold(id, catalog),
+  }));
+  return [...items, ...skins];
 }
 
-/** Switching Sell↔Buy drops the slotted item and qty; same-mode is a no-op. */
+/** Switching Sell↔Buy drops the slotted good and qty; same-mode is a no-op. */
 export function shopSelectionAfterModeChange(
   current: ShopMode,
   next: ShopMode,
-  slotted: ItemId | null,
+  slotted: ShopGoodId | null,
   qty: number,
-): { mode: ShopMode; slotted: ItemId | null; qty: number } {
+): { mode: ShopMode; slotted: ShopGoodId | null; qty: number } {
   if (current === next) return { mode: current, slotted, qty };
   return { mode: next, slotted: null, qty: 0 };
 }

@@ -1,5 +1,15 @@
 import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg';
-import type { BossId, ChestTier, ItemId } from '../../../src/engine';
+import {
+  flagSkinPaint,
+  gridSkinPaint,
+  isFlagSkinId,
+  type BossId,
+  type ChestTier,
+  type FlagSkinId,
+  type GridSkinId,
+  type ItemId,
+  type SkinId,
+} from '../../../src/engine';
 
 type GlyphProps = { size?: number; color?: string };
 
@@ -104,14 +114,53 @@ export function BombIcon({ cracked = false, size = 24 }: { cracked?: boolean; si
   );
 }
 
-export function FlagIcon({ ember = false, size = 24 }: { ember?: boolean; size?: number }) {
+export function FlagIcon({
+  ember = false,
+  size = 24,
+  skin = 'flag-red',
+}: {
+  ember?: boolean;
+  size?: number;
+  skin?: FlagSkinId;
+}) {
+  const paint = flagSkinPaint(skin);
+  const cloth = ember ? '#8b2e2e' : paint.cloth;
+  const shine = ember ? '#d45a2a' : paint.shine;
   return (
     <Svg viewBox="0 0 32 32" width={size} height={size}>
-      <Path d="M10 6v20" stroke="#c9b59a" strokeWidth="2" />
-      <Path d="M11 7h14l-4 5 4 5H11V7z" fill={ember ? '#8b2e2e' : '#c23b3b'} />
-      <Path d="M11 7h10l-3 5 3 5H11" fill={ember ? '#d45a2a' : '#e25a5a'} opacity="0.85" />
+      <Path d="M10 6v20" stroke={paint.pole} strokeWidth="2" />
+      <Path d="M11 7h14l-4 5 4 5H11V7z" fill={cloth} />
+      <Path d="M11 7h10l-3 5 3 5H11" fill={shine} opacity="0.85" />
+      {paint.mark === 'skull' ? (
+        <>
+          <Circle cx="17.2" cy="10.6" r="2.15" fill="#e8dcc8" />
+          <Path
+            d="M15.4 13.8l4 3M19.4 13.8l-4 3"
+            stroke="#e8dcc8"
+            strokeWidth="1.35"
+            strokeLinecap="round"
+          />
+        </>
+      ) : null}
     </Svg>
   );
+}
+
+export function GridSkinIcon({ id, size = 24 }: { id: GridSkinId; size?: number }) {
+  const paint = gridSkinPaint(id);
+  return (
+    <Svg viewBox="0 0 32 32" width={size} height={size}>
+      <Rect x="3" y="3" width="12" height="12" rx="2" fill={paint.hidden} />
+      <Rect x="17" y="3" width="12" height="12" rx="2" fill={paint.revealed} />
+      <Rect x="3" y="17" width="12" height="12" rx="2" fill={paint.chest} />
+      <Rect x="17" y="17" width="12" height="12" rx="2" fill={paint.hidden} />
+    </Svg>
+  );
+}
+
+export function SkinIcon({ id, size = 24 }: { id: SkinId; size?: number }) {
+  if (isFlagSkinId(id)) return <FlagIcon skin={id} size={size} />;
+  return <GridSkinIcon id={id} size={size} />;
 }
 
 export function HeartIcon({ size = 24 }: GlyphProps) {

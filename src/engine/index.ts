@@ -26,7 +26,16 @@ export {
   isCampaignFinale,
   newCell,
 } from './types';
-export type { Inventory, ItemDef, ItemId, ChestTier, ShopBuyCatalog, ShopMode } from './loot';
+export type {
+  Inventory,
+  ItemDef,
+  ItemId,
+  ChestTier,
+  ShopBuyCatalog,
+  ShopBuyRow,
+  ShopGoodId,
+  ShopMode,
+} from './loot';
 export {
   ITEMS,
   ITEM_IDS,
@@ -65,15 +74,43 @@ export {
 export {
   COLLECTION_KEY,
   applyRewards,
+  buyGoods,
   buyLoot,
+  buySkin,
   collectLoot,
   defaultStore,
   emptyCollection,
   loadCollection,
   saveCollection,
+  selectFlagSkin,
+  selectGridSkin,
   sellLoot,
 } from './collection';
 export type { CollectionState, KeyStore } from './collection';
+export type { FlagSkinId, FlagSkinPaint, GridSkinId, GridSkinPaint, SkinDef, SkinId, SkinSlot } from './skins';
+export {
+  DEFAULT_FLAG_SKIN,
+  DEFAULT_GRID_SKIN,
+  DEFAULT_OWNED_SKINS,
+  FLAG_SKIN_IDS,
+  FLAG_SKIN_PAINT,
+  GRID_SKIN_IDS,
+  GRID_SKIN_PAINT,
+  SKINS,
+  SKIN_IDS,
+  defaultOwnedSkins,
+  flagSkinPaint,
+  gridSkinPaint,
+  isDefaultSkin,
+  isFlagSkinId,
+  isGridSkinId,
+  isSkinId,
+  isSkinOwned,
+  normalizeOwnedSkins,
+  selectedFlagSkin,
+  selectedGridSkin,
+  skinEntries,
+} from './skins';
 export {
   allSafeRevealed,
   chestCount,

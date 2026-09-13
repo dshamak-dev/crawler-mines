@@ -11,10 +11,14 @@ import * as Haptics from 'expo-haptics';
 import {
   BOSS_COPY,
   cellVisual,
+  gridSkinPaint,
   type BossId,
   type Cell,
+  type FlagSkinId,
   type Game,
   type GameEvent,
+  type GridSkinId,
+  type GridSkinPaint,
 } from '../../../src/engine';
 import { colors, fonts, NUMBER_COLORS } from '../theme';
 import { BOARD_GAP } from './fitBoardCell';
@@ -64,6 +68,8 @@ interface BoardProps {
   game: Game;
   cellPx: number;
   flagMode: boolean;
+  flagSkin?: FlagSkinId;
+  gridSkin?: GridSkinId;
   blasts: BlastFx[];
   sparkles: Array<{ id: number; index: number }>;
   shaking: boolean;
@@ -76,6 +82,8 @@ export default function Board({
   game,
   cellPx,
   flagMode,
+  flagSkin = 'flag-red',
+  gridSkin = 'grid-gray',
   blasts,
   sparkles,
   shaking,
@@ -136,6 +144,8 @@ export default function Board({
                     cell={cell}
                     size={cellPx}
                     flagMode={flagMode}
+                    flagSkin={flagSkin}
+                    gridPaint={gridSkinPaint(gridSkin)}
                     wave={waveOf.get(i)}
                     wreckedWave={wreckWave.get(i)}
                     reduce={reduceMotion}
@@ -179,6 +189,8 @@ const DungeonCell = memo(function DungeonCell({
   cell,
   size,
   flagMode,
+  flagSkin,
+  gridPaint,
   wave,
   wreckedWave,
   reduce,
@@ -194,6 +206,8 @@ const DungeonCell = memo(function DungeonCell({
   cell: Cell;
   size: number;
   flagMode: boolean;
+  flagSkin: FlagSkinId;
+  gridPaint: GridSkinPaint;
   wave?: number;
   wreckedWave?: number;
   reduce: boolean;
@@ -253,13 +267,13 @@ const DungeonCell = memo(function DungeonCell({
         accessibilityLabel={label}
         style={[
           styles.cell,
-          cellStyle(visual, bossHere, bossId, door),
+          cellStyle(visual, bossHere, bossId, door, gridPaint),
           { width: size, height: size },
           popStyle,
         ]}
       >
         {visual === 'flagged' || visual === 'bomb-flagged' ? (
-          <FlagIcon ember={visual === 'bomb-flagged'} size={icon} />
+          <FlagIcon ember={visual === 'bomb-flagged'} skin={flagSkin} size={icon} />
         ) : hearted ? (
           <HeartIcon size={Math.round(size * 0.78)} />
         ) : visual === 'exploded' ? (
@@ -333,13 +347,31 @@ function Burst({
   return <Animated.View pointerEvents="none" style={[styles.burst, kind === 'bomb' ? styles.burstBomb : styles.burstGold, style]} />;
 }
 
-function cellStyle(visual: string, bossHere: boolean, bossId: BossId, door: boolean) {
-  const revealed = visual === 'empty' || visual === 'number' || visual === 'chest' || visual === 'wrecked' || visual === 'exploded';
+function cellStyle(
+  visual: string,
+  bossHere: boolean,
+  bossId: BossId,
+  door: boolean,
+  paint: GridSkinPaint,
+) {
+  const revealed =
+    visual === 'empty' ||
+    visual === 'number' ||
+    visual === 'chest' ||
+    visual === 'wrecked' ||
+    visual === 'exploded';
+  const fill =
+    visual === 'chest'
+      ? paint.chest
+      : visual === 'wrecked'
+        ? paint.wrecked
+        : visual === 'exploded'
+          ? paint.exploded
+          : revealed
+            ? paint.revealed
+            : paint.hidden;
   return [
-    revealed ? styles.revealed : styles.hidden,
-    visual === 'chest' && styles.chest,
-    visual === 'wrecked' && styles.wrecked,
-    visual === 'exploded' && styles.exploded,
+    { backgroundColor: fill },
     bossHere && (bossId === 'lust' ? styles.bossLust : styles.boss),
     door && styles.door,
   ];
@@ -378,11 +410,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  hidden: { backgroundColor: '#2c2520' },
-  revealed: { backgroundColor: '#1a1512' },
-  chest: { backgroundColor: '#2a2214' },
-  wrecked: { backgroundColor: '#161210' },
-  exploded: { backgroundColor: '#2a140c' },
   boss: { backgroundColor: '#2a1830' },
   bossLust: { backgroundColor: '#2a1218' },
   door: {},

@@ -18,7 +18,7 @@ export default function ShopRoute() {
         meta={meta}
         onBack={() => router.back()}
         onSell={(itemId, qty) => sellFromShop(itemId, qty)}
-        onBuy={(itemId, qty) => buyFromShop(itemId, qty)}
+        onBuy={(id, qty) => buyFromShop(id, qty)}
         onUi={() => getAudio().playSfx('ui')}
         onDeny={playDeny}
         onStartRite={(slots) => {

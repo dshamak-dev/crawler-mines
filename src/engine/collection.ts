@@ -13,8 +13,25 @@ import {
   type Inventory,
   type ItemId,
   type ShopBuyCatalog,
+  type ShopGoodId,
   SHOP_BUY,
 } from './loot';
+import {
+  DEFAULT_FLAG_SKIN,
+  DEFAULT_GRID_SKIN,
+  defaultOwnedSkins,
+  isDefaultSkin,
+  isFlagSkinId,
+  isGridSkinId,
+  isSkinId,
+  isSkinOwned,
+  normalizeOwnedSkins,
+  selectedFlagSkin,
+  selectedGridSkin,
+  type FlagSkinId,
+  type GridSkinId,
+  type SkinId,
+} from './skins';
 
 export const COLLECTION_KEY = 'crawler-mines-collection';
 
@@ -29,10 +46,20 @@ export interface CollectionState {
   items: Inventory;
   /** Floor instance whose rewards were already banked. Blocks a second wallet/pack grant. */
   lastGrantKey: string | null;
+  ownedSkins: SkinId[];
+  selectedFlagSkin: FlagSkinId;
+  selectedGridSkin: GridSkinId;
 }
 
 export function emptyCollection(): CollectionState {
-  return { gold: 0, items: emptyInventory(), lastGrantKey: null };
+  return {
+    gold: 0,
+    items: emptyInventory(),
+    lastGrantKey: null,
+    ownedSkins: defaultOwnedSkins(),
+    selectedFlagSkin: DEFAULT_FLAG_SKIN,
+    selectedGridSkin: DEFAULT_GRID_SKIN,
+  };
 }
 
 function memoryFallback(): KeyStore {
@@ -59,6 +86,21 @@ function clampGold(value: unknown): number {
   return Math.max(0, Math.floor(value));
 }
 
+function withSkins(
+  state: Omit<CollectionState, 'ownedSkins' | 'selectedFlagSkin' | 'selectedGridSkin'> &
+    Partial<Pick<CollectionState, 'ownedSkins' | 'selectedFlagSkin' | 'selectedGridSkin'>>,
+): CollectionState {
+  const ownedSkins = normalizeOwnedSkins(state.ownedSkins);
+  return {
+    gold: clampGold(state.gold),
+    items: state.items,
+    lastGrantKey: state.lastGrantKey,
+    ownedSkins,
+    selectedFlagSkin: selectedFlagSkin({ ...state, ownedSkins }),
+    selectedGridSkin: selectedGridSkin({ ...state, ownedSkins }),
+  };
+}
+
 export function loadCollection(store: KeyStore = defaultStore()): CollectionState {
   const state = emptyCollection();
   const raw = store.getItem(COLLECTION_KEY);
@@ -69,6 +111,9 @@ export function loadCollection(store: KeyStore = defaultStore()): CollectionStat
       gold?: unknown;
       items?: Record<string, unknown>;
       lastGrantKey?: unknown;
+      ownedSkins?: unknown;
+      selectedFlagSkin?: unknown;
+      selectedGridSkin?: unknown;
     };
     if (!parsed || typeof parsed !== 'object') return state;
     state.gold = clampGold(parsed.gold);
@@ -77,13 +122,23 @@ export function loadCollection(store: KeyStore = defaultStore()): CollectionStat
         ? parsed.lastGrantKey
         : null;
     const items = parsed.items;
-    if (!items || typeof items !== 'object') return state;
-    for (const [key, value] of Object.entries(items)) {
-      if (!isItemId(key) || !isCollectible(key)) continue;
-      const n = typeof value === 'number' && Number.isFinite(value) ? Math.floor(value) : 0;
-      if (n > 0) state.items[key] = n;
+    if (items && typeof items === 'object') {
+      for (const [key, value] of Object.entries(items)) {
+        if (!isItemId(key) || !isCollectible(key)) continue;
+        const n = typeof value === 'number' && Number.isFinite(value) ? Math.floor(value) : 0;
+        if (n > 0) state.items[key] = n;
+      }
     }
-    return state;
+    return withSkins({
+      ...state,
+      ownedSkins: normalizeOwnedSkins(parsed.ownedSkins),
+      selectedFlagSkin: isFlagSkinId(parsed.selectedFlagSkin)
+        ? parsed.selectedFlagSkin
+        : DEFAULT_FLAG_SKIN,
+      selectedGridSkin: isGridSkinId(parsed.selectedGridSkin)
+        ? parsed.selectedGridSkin
+        : DEFAULT_GRID_SKIN,
+    });
   } catch {
     return emptyCollection();
   }
@@ -97,13 +152,17 @@ export function saveCollection(
   for (const id of Object.keys(items) as ItemId[]) {
     items[id] = isCollectible(id) ? Math.max(0, Math.floor(state.items[id] ?? 0)) : 0;
   }
+  const next = withSkins({ ...state, items });
   store.setItem(
     COLLECTION_KEY,
     JSON.stringify({
       v: 1,
-      gold: clampGold(state.gold),
+      gold: next.gold,
       items,
-      lastGrantKey: state.lastGrantKey,
+      lastGrantKey: next.lastGrantKey,
+      ownedSkins: next.ownedSkins,
+      selectedFlagSkin: next.selectedFlagSkin,
+      selectedGridSkin: next.selectedGridSkin,
     }),
   );
 }
@@ -124,7 +183,12 @@ export function applyRewards(
       items = addItem(items, r.itemId);
     }
   }
-  const next = { gold, items, lastGrantKey: grantKey ?? state.lastGrantKey };
+  const next = withSkins({
+    ...state,
+    gold,
+    items,
+    lastGrantKey: grantKey ?? state.lastGrantKey,
+  });
   saveCollection(next, store);
   return next;
 }
@@ -152,11 +216,11 @@ export function sellLoot(
   const owned = Math.max(0, Math.floor(state.items[itemId] ?? 0));
   const n = clampSellQty(owned, qty);
   if (n < 1) return null;
-  const next: CollectionState = {
+  const next = withSkins({
+    ...state,
     gold: clampGold(state.gold) + sellGold(itemId) * n,
     items: removeItem(state.items, itemId, n),
-    lastGrantKey: state.lastGrantKey,
-  };
+  });
   saveCollection(next, store);
   return next;
 }
@@ -179,11 +243,70 @@ export function buyLoot(
   const cost = buyGold(itemId, catalog) * n;
   const gold = clampGold(state.gold);
   if (gold < cost) return null;
-  const next: CollectionState = {
+  const next = withSkins({
+    ...state,
     gold: gold - cost,
     items: addItem(state.items, itemId, n),
-    lastGrantKey: state.lastGrantKey,
-  };
+  });
+  saveCollection(next, store);
+  return next;
+}
+
+/**
+ * Buy one paid skin. Already-owned, default, missing price, or short gold
+ * returns null and charges nothing.
+ */
+export function buySkin(
+  state: CollectionState,
+  skinId: SkinId,
+  store: KeyStore = defaultStore(),
+  catalog: ShopBuyCatalog = SHOP_BUY,
+): CollectionState | null {
+  if (!isSkinId(skinId) || isDefaultSkin(skinId) || isSkinOwned(state, skinId)) return null;
+  if (!isBuyable(skinId, catalog)) return null;
+  const cost = buyGold(skinId, catalog);
+  const gold = clampGold(state.gold);
+  if (gold < cost) return null;
+  const next = withSkins({
+    ...state,
+    gold: gold - cost,
+    ownedSkins: normalizeOwnedSkins([...(state.ownedSkins ?? []), skinId]),
+  });
+  saveCollection(next, store);
+  return next;
+}
+
+/** Item or paid skin. Skins ignore qty and buy at most one copy. */
+export function buyGoods(
+  state: CollectionState,
+  id: ShopGoodId,
+  qty: number,
+  store: KeyStore = defaultStore(),
+  catalog: ShopBuyCatalog = SHOP_BUY,
+): CollectionState | null {
+  if (isSkinId(id)) return buySkin(state, id, store, catalog);
+  if (isItemId(id)) return buyLoot(state, id, qty, store, catalog);
+  return null;
+}
+
+export function selectFlagSkin(
+  state: CollectionState,
+  skinId: FlagSkinId,
+  store: KeyStore = defaultStore(),
+): CollectionState | null {
+  if (!isFlagSkinId(skinId) || !isSkinOwned(state, skinId)) return null;
+  const next = withSkins({ ...state, selectedFlagSkin: skinId });
+  saveCollection(next, store);
+  return next;
+}
+
+export function selectGridSkin(
+  state: CollectionState,
+  skinId: GridSkinId,
+  store: KeyStore = defaultStore(),
+): CollectionState | null {
+  if (!isGridSkinId(skinId) || !isSkinOwned(state, skinId)) return null;
+  const next = withSkins({ ...state, selectedGridSkin: skinId });
   saveCollection(next, store);
   return next;
 }

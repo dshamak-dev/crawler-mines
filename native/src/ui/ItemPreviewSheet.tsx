@@ -1,11 +1,19 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { ITEMS, canUseFromPreview, type ChestTier, type ItemId } from '../../../src/engine';
+import {
+  ITEMS,
+  SKINS,
+  canUseFromPreview,
+  type ChestTier,
+  type ItemId,
+  type SkinId,
+} from '../../../src/engine';
 import { colors, fonts } from '../theme';
-import { ChestIcon, ItemIcon } from './icons';
+import { ChestIcon, ItemIcon, SkinIcon } from './icons';
 import { DisplayText, MutedText, Overlay, StoneButton, Tablet } from './primitives';
 
 export type ItemPreviewIcon =
   | { kind: 'item'; itemId: ItemId }
+  | { kind: 'skin'; skinId: SkinId }
   | { kind: 'chest'; tier: ChestTier; wrecked?: boolean }
   | { kind: 'gold-bag' };
 
@@ -15,6 +23,8 @@ export interface ItemPreviewModel {
   icon: ItemPreviewIcon;
   qty?: number;
   canUse: boolean;
+  canSelect?: boolean;
+  selected?: boolean;
 }
 
 export function previewForItem(
@@ -33,14 +43,33 @@ export function previewForItem(
   };
 }
 
+export function previewForSkin(
+  skinId: SkinId,
+  owned: boolean,
+  selected: boolean,
+  allowSelect: boolean,
+): ItemPreviewModel {
+  const skin = SKINS[skinId];
+  return {
+    title: skin.name,
+    flavor: skin.flavor,
+    icon: { kind: 'skin', skinId },
+    canUse: false,
+    canSelect: allowSelect && owned && !selected,
+    selected: allowSelect && owned && selected,
+  };
+}
+
 export default function ItemPreviewSheet({
   preview,
   onUse,
+  onSelect,
   onClose,
   onUi,
 }: {
   preview: ItemPreviewModel;
   onUse?: () => void;
+  onSelect?: () => void;
   onClose: () => void;
   onUi?: () => void;
 }) {
@@ -74,6 +103,29 @@ export default function ItemPreviewSheet({
               Use
             </StoneButton>
           ) : null}
+          {preview.canSelect ? (
+            <StoneButton
+              gold
+              onPress={() => {
+                cue();
+                onSelect?.();
+              }}
+              style={styles.centerBtn}
+              accessibilityLabel={`Select ${preview.title}`}
+            >
+              Select
+            </StoneButton>
+          ) : null}
+          {preview.selected ? (
+            <StoneButton
+              locked
+              disabled
+              style={styles.centerBtn}
+              accessibilityLabel={`${preview.title} selected`}
+            >
+              Selected
+            </StoneButton>
+          ) : null}
           <StoneButton
             onPress={() => {
               cue();
@@ -92,6 +144,7 @@ export default function ItemPreviewSheet({
 
 function PreviewGlyph({ icon }: { icon: ItemPreviewIcon }) {
   if (icon.kind === 'item') return <ItemIcon id={icon.itemId} size={72} />;
+  if (icon.kind === 'skin') return <SkinIcon id={icon.skinId} size={72} />;
   if (icon.kind === 'gold-bag') return <ItemIcon id="gold-pouch" size={72} />;
   return <ChestIcon wrecked={icon.wrecked} tier={icon.tier} size={72} />;
 }
