@@ -4,21 +4,18 @@ import { describe, expect, it } from 'vitest';
 import {
   AUDIO_KEY,
   LEGACY_SOUND_KEY,
-  audioUrl,
-  bgmUrl,
+  loadMuted,
+  saveMuted,
+} from '../native/src/audio/settings';
+import {
   bossFloorActive,
   campaignFloorActive,
   desiredBgm,
   finaleBgm,
-  GameAudio,
-  getAudio,
-  loadMuted,
-  saveMuted,
   sfxFromEvents,
-  sfxUrl,
-  stopOtherBgm,
-} from '../src/audio';
-import type { BgmId } from '../src/audio';
+} from '../native/src/audio/cues';
+import { stopOtherBgm } from '../native/src/audio/exclusive';
+import { BGM_FILES, SFX_FILES, type BgmId } from '../native/src/audio/urls';
 import type { KeyStore } from '../src/engine';
 
 function memoryStore(seed: Record<string, string> = {}): KeyStore {
@@ -34,21 +31,20 @@ function memoryStore(seed: Record<string, string> = {}): KeyStore {
   };
 }
 
-describe('audio URLs', () => {
-  it('prefixes public audio with the Vite Pages base', () => {
-    expect(audioUrl('cozy-descent.mp3')).toBe('/crawler-mines/audio/cozy-descent.mp3');
-    expect(bgmUrl('cozy')).toBe('/crawler-mines/audio/cozy-descent.mp3');
-    expect(bgmUrl('campaign')).toBe('/crawler-mines/audio/campaign-depths.mp3');
-    expect(bgmUrl('boss')).toBe('/crawler-mines/audio/flag-eater-boss.mp3');
-    expect(bgmUrl('wrath')).toBe('/crawler-mines/audio/wrath-boss.mp3');
-    expect(bgmUrl('lust')).toBe('/crawler-mines/audio/lust-boss.mp3');
+describe('audio assets', () => {
+  it('keeps every BGM and SFX file under native/assets/audio', () => {
+    expect(BGM_FILES.cozy).toBe('cozy-descent.mp3');
+    expect(BGM_FILES.campaign).toBe('campaign-depths.mp3');
+    expect(BGM_FILES.boss).toBe('flag-eater-boss.mp3');
+    expect(BGM_FILES.wrath).toBe('wrath-boss.mp3');
+    expect(BGM_FILES.lust).toBe('lust-boss.mp3');
+    expect(SFX_FILES.deny).toBe('sfx-deny.wav');
+    expect(SFX_FILES['boss-move']).toBe('sfx-boss-move.wav');
+    expect(SFX_FILES['campaign-lose']).toBe('sfx-campaign-lose.wav');
     // Presence only — do not decode mp3 bytes.
-    expect(existsSync(resolve('public/audio/cozy-descent.mp3'))).toBe(true);
-    expect(existsSync(resolve('public/audio/campaign-depths.mp3'))).toBe(true);
-    expect(existsSync(resolve('public/audio/flag-eater-boss.mp3'))).toBe(true);
-    expect(sfxUrl('deny')).toBe('/crawler-mines/audio/sfx-deny.wav');
-    expect(sfxUrl('boss-move')).toBe('/crawler-mines/audio/sfx-boss-move.wav');
-    expect(sfxUrl('campaign-lose')).toBe('/crawler-mines/audio/sfx-campaign-lose.wav');
+    for (const file of [...Object.values(BGM_FILES), ...Object.values(SFX_FILES)]) {
+      expect(existsSync(resolve('native/assets/audio', file))).toBe(true);
+    }
   });
 });
 
@@ -106,9 +102,6 @@ describe('BGM routing', () => {
     expect(desiredBgm('menu', 'campaign', null, 4, 'lust')).toBe('cozy');
     expect(desiredBgm('play', 'campaign', null, 3, 'lust')).toBe('campaign');
     expect(finaleBgm('lust')).toBe('lust');
-    expect(bgmUrl('lust')).toBe('/crawler-mines/audio/lust-boss.mp3');
-    expect(bgmUrl('boss')).toBe('/crawler-mines/audio/flag-eater-boss.mp3');
-    expect(bgmUrl('wrath')).toBe('/crawler-mines/audio/wrath-boss.mp3');
   });
 });
 
@@ -174,7 +167,7 @@ describe('exclusive BGM', () => {
   }
 
   it('hard-stops every other clip and leaves the incoming one playing', () => {
-    const tracks = {
+    const tracks: Record<BgmId, ReturnType<typeof stubTrack>> = {
       cozy: stubTrack(true),
       campaign: stubTrack(true, 0.2),
       boss: stubTrack(false),
@@ -190,79 +183,6 @@ describe('exclusive BGM', () => {
     expect(tracks.wrath.volume).toBe(0);
     expect(tracks.boss.paused).toBe(true);
     expect(tracks.lust.paused).toBe(true);
-  });
-
-  it('GameAudio pauses leftover BGM as soon as a new id starts', async () => {
-    class FakeAudio {
-      src: string;
-      loop = false;
-      volume = 0;
-      paused = true;
-      currentTime = 0;
-      muted = false;
-      preload = '';
-      constructor(src: string) {
-        this.src = src;
-      }
-      play() {
-        this.paused = false;
-        return Promise.resolve();
-      }
-      pause() {
-        this.paused = true;
-      }
-      setAttribute() {}
-    }
-
-    const g = globalThis as typeof globalThis & { Audio?: unknown; requestAnimationFrame?: unknown };
-    const prevAudio = g.Audio;
-    const prevRaf = g.requestAnimationFrame;
-    g.Audio = FakeAudio;
-    g.requestAnimationFrame = () => 0;
-
-    try {
-      const audio = new GameAudio();
-      audio.setMuted(false);
-      await audio.unlock();
-      audio.setBgm('campaign');
-      const bgm = (audio as unknown as { bgm: Record<BgmId, FakeAudio | null> }).bgm;
-      expect(bgm.campaign?.paused).toBe(false);
-      expect(bgm.cozy?.paused).toBe(true);
-      expect(bgm.cozy?.volume).toBe(0);
-      expect(bgm.boss?.paused).toBe(true);
-      expect(bgm.wrath?.paused).toBe(true);
-      expect(bgm.lust?.paused).toBe(true);
-      audio.setBgm('lust');
-      expect(bgm.lust?.paused).toBe(false);
-      expect(bgm.campaign?.paused).toBe(true);
-      expect(bgm.campaign?.volume).toBe(0);
-      expect(bgm.cozy?.paused).toBe(true);
-    } finally {
-      g.Audio = prevAudio;
-      g.requestAnimationFrame = prevRaf;
-    }
-  });
-});
-
-describe('tab visibility', () => {
-  it('suspends audio when hidden and resumes without unmuting', () => {
-    const audio = getAudio();
-    audio.setMuted(false);
-    const before = audio.isMuted();
-    audio.suspendForHidden();
-    expect(audio.isHiddenSuspended()).toBe(true);
-    expect(audio.isMuted()).toBe(before);
-    audio.resumeFromHidden();
-    expect(audio.isHiddenSuspended()).toBe(false);
-    expect(audio.isMuted()).toBe(before);
-  });
-
-  it('does not resume BGM after hidden when muted', () => {
-    const audio = getAudio();
-    audio.setMuted(true);
-    audio.suspendForHidden();
-    audio.resumeFromHidden();
-    expect(audio.isMuted()).toBe(true);
   });
 });
 

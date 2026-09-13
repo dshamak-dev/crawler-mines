@@ -25,18 +25,28 @@ jobs:
         with:
           node-version: lts/*
           cache: npm
-      - name: Install
+          cache-dependency-path: |
+            package-lock.json
+            native/package-lock.json
+      - name: Install engine tests
         run: npm ci
-      - name: Test
+      - name: Test engine
         run: npm test
-      - name: Build
-        run: npm run build
+      - name: Install Expo app
+        working-directory: native
+        run: npm ci
+      - name: Export Expo web
+        working-directory: native
+        run: npx expo export --platform web
       - name: SPA fallback
-        run: cp dist/index.html dist/404.html
+        working-directory: native
+        run: |
+          cp dist/index.html dist/404.html
+          touch dist/.nojekyll
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: native/dist
 
   deploy:
     needs: build

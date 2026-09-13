@@ -1,5 +1,7 @@
+import { BGM_ASSETS, SFX_ASSETS } from './assets';
+import { stopOtherBgm as silenceOtherBgm } from './exclusive';
 import { loadMuted, saveMuted } from './settings';
-import { BGM_ASSETS, SFX_ASSETS, type BgmId, type SfxId } from './urls';
+import type { BgmId, SfxId } from './urls';
 
 type Clip = {
   volume: number;
@@ -41,16 +43,6 @@ const SFX_IDS = Object.keys(SFX_ASSETS) as SfxId[];
 
 function emptyClips<T extends string>(ids: readonly T[]): Record<T, Clip | null> {
   return Object.fromEntries(ids.map((id) => [id, null])) as Record<T, Clip | null>;
-}
-
-function silence(clip: Clip | null): void {
-  if (!clip) return;
-  try {
-    clip.volume = 0;
-    if (!clip.paused) clip.pause();
-  } catch {
-    /* ignore */
-  }
 }
 
 type ExpoAudio = typeof import('expo-audio');
@@ -198,10 +190,7 @@ export class GameAudio {
 
   /** Pause + silence every BGM clip except `except`. Position stays. */
   stopOtherBgm(except: BgmId | null): void {
-    for (const id of BGM_IDS) {
-      if (except != null && id === except) continue;
-      silence(this.bgm[id]);
-    }
+    silenceOtherBgm(this.bgm, except);
   }
 
   private async loadAll(): Promise<void> {

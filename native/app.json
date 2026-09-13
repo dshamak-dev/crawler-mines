@@ -29,6 +29,7 @@
     },
     "web": {
       "bundler": "metro",
+      "output": "single",
       "favicon": "./assets/favicon.png",
       "backgroundColor": "#120e0c"
     },
@@ -53,7 +54,8 @@
       ]
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "baseUrl": "/crawler-mines"
     },
     "extra": {
       "router": {},
