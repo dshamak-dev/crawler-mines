@@ -10,6 +10,7 @@ export default function ShopRoute() {
   const meta = useGameStore((s) => s.meta);
   const sellFromShop = useGameStore((s) => s.sell);
   const buyFromShop = useGameStore((s) => s.buy);
+  const startRite = useGameStore((s) => s.startRite);
 
   return (
     <Shell>
@@ -20,6 +21,11 @@ export default function ShopRoute() {
         onBuy={(itemId, qty) => buyFromShop(itemId, qty)}
         onUi={() => getAudio().playSfx('ui')}
         onDeny={playDeny}
+        onStartRite={(slots) => {
+          const ok = startRite(slots);
+          if (ok) router.push('/play');
+          return ok;
+        }}
       />
     </Shell>
   );

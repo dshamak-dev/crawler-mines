@@ -270,6 +270,14 @@ export function isUsable(itemId: ItemId): boolean {
   return itemId === 'witchcraft-bag';
 }
 
+/**
+ * Preview Use. Only the bag, and only when the player owns at least one.
+ * Collection-all and Shop pass owned pack counts; this-run / sealed / browse-unowned do not.
+ */
+export function canUseFromPreview(itemId: ItemId, owned: number): boolean {
+  return isUsable(itemId) && Math.max(0, Math.floor(owned)) >= 1;
+}
+
 /** Title-shop unit prices. Pouches, ticket keys, heads, and the gold cup do not sell. */
 const SELL_GOLD: Partial<Record<ItemId, number>> = {
   'rusty-key': 4,

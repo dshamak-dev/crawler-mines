@@ -3,7 +3,6 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   inventoryTotal,
   isTicketKey,
-  isUsable,
   sealedRowLabel,
   sealedRunRows,
   stackedEntries,
@@ -14,6 +13,7 @@ import {
 } from '../../../src/engine';
 import { colors, fonts } from '../theme';
 import { BagIcon, ChestIcon, GoldIcon, ItemIcon } from './icons';
+import ItemPreviewSheet, { previewForItem, type ItemPreviewModel } from './ItemPreviewSheet';
 import RitualSheet from './RitualSheet';
 import { GhostButton, StoneButton } from './primitives';
 
@@ -41,45 +41,14 @@ export default function CollectionScreen({
   onDeny?: () => void;
 }) {
   if (sealed && game) {
-    const rows = sealedRunRows(game, runLoot, stashGold);
-    const total = rows.reduce((sum, row) => sum + row.count, 0);
     return (
-      <View style={styles.shell}>
-        <Header title="Collection" pill={`${total} sealed`} onBack={onBack} />
-        {rows.length === 0 ? (
-          <View style={styles.empty}>
-            <Text style={styles.emptyCopy}>{EMPTY_COPY}</Text>
-          </View>
-        ) : (
-          <ScrollView style={styles.list} contentContainerStyle={styles.listInner}>
-            {rows.map((row) => {
-              const { title, subtitle } = sealedRowLabel(row);
-              const key = `${row.kind}:${row.tier ?? 'gold'}:${row.wrecked ? 'wreck' : 'ok'}`;
-              return (
-                <View key={key} style={styles.card}>
-                  <View style={styles.ico}>
-                    {row.kind === 'gold-bag' ? (
-                      <ItemIcon id="gold-pouch" size={34} />
-                    ) : row.wrecked ? (
-                      <ChestIcon wrecked tier={row.tier ?? 'wooden'} size={34} />
-                    ) : (
-                      <ChestIcon tier={row.tier ?? 'wooden'} size={34} />
-                    )}
-                  </View>
-                  <View style={styles.copy}>
-                    <Text style={styles.name}>{title}</Text>
-                    <Text style={styles.flavor}>{subtitle}</Text>
-                  </View>
-                  <Text style={styles.count}>×{row.count}</Text>
-                </View>
-              );
-            })}
-          </ScrollView>
-        )}
-        <StoneButton onPress={onBack} style={styles.back}>
-          Back
-        </StoneButton>
-      </View>
+      <SealedCollection
+        game={game}
+        runLoot={runLoot}
+        stashGold={stashGold}
+        onBack={onBack}
+        onUi={onUi}
+      />
     );
   }
 
@@ -111,6 +80,7 @@ function TitleCollection({
   onDeny?: () => void;
 }) {
   const [tab, setTab] = useState<'all' | 'run'>('all');
+  const [preview, setPreview] = useState<ItemPreviewModel | null>(null);
   const [ritualOpen, setRitualOpen] = useState(false);
   const inv = tab === 'all' ? meta.items : runLoot;
   const rows = stackedEntries(inv);
@@ -118,6 +88,7 @@ function TitleCollection({
   const runCount = inventoryTotal(runLoot);
   const cue = onUi ?? (() => {});
   const deny = onDeny ?? (() => {});
+  const allowUse = tab === 'all' && Boolean(onStartRite);
 
   return (
     <View style={styles.shell}>
@@ -151,36 +122,42 @@ function TitleCollection({
         </View>
       ) : (
         <ScrollView style={styles.list} contentContainerStyle={styles.listInner}>
-          {rows.map(({ item, count }) => {
-            const usable = tab === 'all' && isUsable(item.id) && Boolean(onStartRite);
-            return (
-              <Pressable
-                key={item.id}
-                style={[styles.card, isTicketKey(item.id) && styles.ticket]}
-                onPress={() => {
-                  if (!usable) return;
-                  cue();
-                  setRitualOpen(true);
-                }}
-                accessibilityLabel={usable ? `Use ${item.name}` : undefined}
-              >
-                <View style={styles.ico}>
-                  <ItemIcon id={item.id} size={34} />
-                </View>
-                <View style={styles.copy}>
-                  <Text style={styles.name}>{item.name}</Text>
-                  <Text style={styles.flavor}>{item.flavor}</Text>
-                </View>
-                {usable ? <Text style={styles.use}>Use</Text> : null}
-                <Text style={styles.count}>×{count}</Text>
-              </Pressable>
-            );
-          })}
+          {rows.map(({ item, count }) => (
+            <Pressable
+              key={item.id}
+              style={[styles.card, isTicketKey(item.id) && styles.ticket]}
+              onPress={() => {
+                cue();
+                setPreview(previewForItem(item.id, count, allowUse));
+              }}
+              accessibilityLabel={`${item.name}, ${count} owned`}
+            >
+              <View style={styles.ico}>
+                <ItemIcon id={item.id} size={34} />
+              </View>
+              <View style={styles.copy}>
+                <Text style={styles.name}>{item.name}</Text>
+                <Text style={styles.flavor}>{item.flavor}</Text>
+              </View>
+              <Text style={styles.count}>×{count}</Text>
+            </Pressable>
+          ))}
         </ScrollView>
       )}
       <StoneButton onPress={onBack} style={styles.back}>
         Back
       </StoneButton>
+      {preview ? (
+        <ItemPreviewSheet
+          preview={preview}
+          onUse={() => {
+            setPreview(null);
+            setRitualOpen(true);
+          }}
+          onClose={() => setPreview(null)}
+          onUi={cue}
+        />
+      ) : null}
       {ritualOpen && onStartRite ? (
         <RitualSheet
           meta={meta}
@@ -192,6 +169,84 @@ function TitleCollection({
           onUi={cue}
           onDeny={deny}
         />
+      ) : null}
+    </View>
+  );
+}
+
+function SealedCollection({
+  game,
+  runLoot,
+  stashGold,
+  onBack,
+  onUi,
+}: {
+  game: Game;
+  runLoot: Inventory;
+  stashGold: number;
+  onBack: () => void;
+  onUi?: () => void;
+}) {
+  const [preview, setPreview] = useState<ItemPreviewModel | null>(null);
+  const rows = sealedRunRows(game, runLoot, stashGold);
+  const total = rows.reduce((sum, row) => sum + row.count, 0);
+  const cue = onUi ?? (() => {});
+
+  return (
+    <View style={styles.shell}>
+      <Header title="Collection" pill={`${total} sealed`} onBack={onBack} />
+      {rows.length === 0 ? (
+        <View style={styles.empty}>
+          <Text style={styles.emptyCopy}>{EMPTY_COPY}</Text>
+        </View>
+      ) : (
+        <ScrollView style={styles.list} contentContainerStyle={styles.listInner}>
+          {rows.map((row) => {
+            const { title, subtitle } = sealedRowLabel(row);
+            const key = `${row.kind}:${row.tier ?? 'gold'}:${row.wrecked ? 'wreck' : 'ok'}`;
+            return (
+              <Pressable
+                key={key}
+                style={styles.card}
+                onPress={() => {
+                  cue();
+                  setPreview({
+                    title,
+                    flavor: subtitle,
+                    icon:
+                      row.kind === 'gold-bag'
+                        ? { kind: 'gold-bag' }
+                        : { kind: 'chest', tier: row.tier ?? 'wooden', wrecked: row.wrecked },
+                    qty: row.count,
+                    canUse: false,
+                  });
+                }}
+                accessibilityLabel={`${title}, ${row.count} sealed`}
+              >
+                <View style={styles.ico}>
+                  {row.kind === 'gold-bag' ? (
+                    <ItemIcon id="gold-pouch" size={34} />
+                  ) : row.wrecked ? (
+                    <ChestIcon wrecked tier={row.tier ?? 'wooden'} size={34} />
+                  ) : (
+                    <ChestIcon tier={row.tier ?? 'wooden'} size={34} />
+                  )}
+                </View>
+                <View style={styles.copy}>
+                  <Text style={styles.name}>{title}</Text>
+                  <Text style={styles.flavor}>{subtitle}</Text>
+                </View>
+                <Text style={styles.count}>×{row.count}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      )}
+      <StoneButton onPress={onBack} style={styles.back}>
+        Back
+      </StoneButton>
+      {preview ? (
+        <ItemPreviewSheet preview={preview} onClose={() => setPreview(null)} onUi={cue} />
       ) : null}
     </View>
   );
@@ -286,7 +341,6 @@ const styles = StyleSheet.create({
   copy: { flex: 1, minWidth: 0 },
   name: { fontFamily: fonts.display, color: colors.ink, fontSize: 16 },
   flavor: { fontFamily: fonts.ui, color: colors.muted, fontSize: 13, marginTop: 2 },
-  use: { fontFamily: fonts.display, color: colors.gold2, fontSize: 13, letterSpacing: 0.6 },
   count: { fontFamily: fonts.display, color: colors.gold, fontSize: 17 },
   back: { justifyContent: 'center' },
 });

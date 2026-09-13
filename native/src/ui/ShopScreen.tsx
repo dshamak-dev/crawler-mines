@@ -11,10 +11,13 @@ import {
   shopSelectionAfterModeChange,
   type CollectionState,
   type ItemId,
+  type RitualSlots,
   type ShopMode,
 } from '../../../src/engine';
 import { colors, fonts } from '../theme';
 import { GoldIcon, ItemIcon } from './icons';
+import ItemPreviewSheet, { previewForItem, type ItemPreviewModel } from './ItemPreviewSheet';
+import RitualSheet from './RitualSheet';
 import { DisplayText, GhostButton, StoneButton } from './primitives';
 
 export default function ShopScreen({
@@ -24,6 +27,7 @@ export default function ShopScreen({
   onBuy,
   onUi,
   onDeny,
+  onStartRite,
 }: {
   meta: CollectionState;
   onBack: () => void;
@@ -31,10 +35,13 @@ export default function ShopScreen({
   onBuy: (itemId: ItemId, qty: number) => boolean;
   onUi: () => void;
   onDeny: () => void;
+  onStartRite?: (slots: RitualSlots) => boolean;
 }) {
   const [mode, setMode] = useState<ShopMode>('sell');
   const [slotted, setSlotted] = useState<ItemId | null>(null);
   const [qty, setQty] = useState(0);
+  const [preview, setPreview] = useState<ItemPreviewModel | null>(null);
+  const [ritualOpen, setRitualOpen] = useState(false);
 
   const sellRows = sellableEntries(meta.items);
   const buyRows = buyableEntries();
@@ -65,6 +72,7 @@ export default function ShopScreen({
     onUi();
     setSlotted(id);
     setQty(1);
+    setPreview(previewForItem(id, meta.items[id] ?? 0, Boolean(onStartRite)));
   };
 
   const bump = (delta: number) => {
@@ -96,6 +104,7 @@ export default function ShopScreen({
 
   return (
     <View style={styles.shell}>
+      <View style={styles.stage}>
       <View style={styles.tablet}>
         <View style={styles.head}>
           <GhostButton
@@ -195,12 +204,37 @@ export default function ShopScreen({
           )}
         </StoneButton>
       </View>
+      </View>
+      {preview ? (
+        <ItemPreviewSheet
+          preview={preview}
+          onUse={() => {
+            setPreview(null);
+            setRitualOpen(true);
+          }}
+          onClose={() => setPreview(null)}
+          onUi={onUi}
+        />
+      ) : null}
+      {ritualOpen && onStartRite ? (
+        <RitualSheet
+          meta={meta}
+          onUse={(slots) => onStartRite(slots)}
+          onClose={() => {
+            onUi();
+            setRitualOpen(false);
+          }}
+          onUi={onUi}
+          onDeny={onDeny}
+        />
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  shell: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  shell: { flex: 1, position: 'relative' },
+  stage: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   tablet: {
     width: '100%',
     maxWidth: 340,

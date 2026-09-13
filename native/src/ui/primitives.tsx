@@ -176,11 +176,13 @@ export const stone = StyleSheet.create({
   },
   overlay: {
     ...StyleSheet.absoluteFill,
+    width: '100%',
+    height: '100%',
     backgroundColor: 'rgba(8, 6, 5, 0.72)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
-    zIndex: 8,
+    zIndex: 40,
   },
   tablet: {
     width: '100%',
