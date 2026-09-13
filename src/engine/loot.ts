@@ -1,6 +1,7 @@
 import {
   SKIN_IDS,
   SKINS,
+  isSkinOwned,
   type SkinDef,
   type SkinId,
 } from './skins';
@@ -342,6 +343,7 @@ export type ShopGoodId = ItemId | SkinId;
 /**
  * Title-shop buy prices. Paid skins live here with the reagents (#49).
  * Defaults stay free / always owned and are not catalog rows.
+ * `buyableEntries(catalog, owned)` also drops already-owned paid skins.
  */
 export const SHOP_BUY: Partial<Record<ShopGoodId, number>> = {
   'bone-dust': 50,
@@ -382,13 +384,16 @@ export function clampBuyQty(qty: number, max = 99): number {
 
 export function buyableEntries(
   catalog: ShopBuyCatalog = SHOP_BUY,
+  owned?: { ownedSkins?: readonly string[] } | null,
 ): ShopBuyRow[] {
   const items = ITEM_IDS.filter((id) => isBuyable(id, catalog)).map((id) => ({
     kind: 'item' as const,
     item: ITEMS[id],
     gold: buyGold(id, catalog),
   }));
-  const skins = SKIN_IDS.filter((id) => isBuyable(id, catalog)).map((id) => ({
+  const skins = SKIN_IDS.filter(
+    (id) => isBuyable(id, catalog) && !isSkinOwned(owned, id),
+  ).map((id) => ({
     kind: 'skin' as const,
     item: SKINS[id],
     gold: buyGold(id, catalog),

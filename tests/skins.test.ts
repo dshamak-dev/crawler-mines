@@ -78,6 +78,9 @@ describe('#49 skin catalog', () => {
       ['grid-classic', 1000],
       ['grid-vintage', 1000],
     ]);
+    const fresh = emptyCollection();
+    expect(buyableEntries(SHOP_BUY, fresh).some((row) => row.item.id === 'flag-red')).toBe(false);
+    expect(buyableEntries(SHOP_BUY, fresh).some((row) => row.item.id === 'grid-gray')).toBe(false);
   });
 
   it('keeps independent flag and grid paint tokens', () => {
@@ -106,6 +109,9 @@ describe('#49 buy and select skins', () => {
     expect(buySkin(loaded, 'flag-golden', store)).toBeNull();
     expect(loadCollection(store).gold).toBe(1000);
     expect(buySkin(loaded, 'flag-red', store)).toBeNull();
+    expect(buyableEntries(SHOP_BUY, bought).map((row) => row.item.id)).not.toContain('flag-golden');
+    expect(buyableEntries(SHOP_BUY, bought).map((row) => row.item.id)).toContain('flag-pirate');
+    expect(buyableEntries(SHOP_BUY, bought).map((row) => row.item.id)).not.toContain('flag-red');
   });
 
   it('selects owned skins independently and persists both slots', () => {
@@ -217,6 +223,10 @@ describe('#49 collection and shop wiring', () => {
     expect(shop).toContain('false, false');
     expect(shop).toContain('SkinIcon');
     expect(shop).toContain('Owned');
+    expect(shop).toContain('buyableEntries(SHOP_BUY, meta)');
+    expect(shop).not.toContain('DEFAULT_OWNED_SKINS');
+    expect(shop).toContain('onLongPress');
+    expect(shop).toContain('openPreview');
   });
 
   it('paints the board from the selected flag and grid skins', () => {

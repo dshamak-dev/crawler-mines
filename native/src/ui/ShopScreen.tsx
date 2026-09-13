@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
-  DEFAULT_OWNED_SKINS,
   ITEMS,
+  SHOP_BUY,
   SKINS,
   buyGold,
   buyableEntries,
@@ -54,15 +54,7 @@ export default function ShopScreen({
   const [ritualOpen, setRitualOpen] = useState(false);
 
   const sellRows = sellableEntries(meta.items);
-  const buyRows = useMemo(() => {
-    const paid = buyableEntries();
-    const defaults = DEFAULT_OWNED_SKINS.map((id) => ({
-      kind: 'skin' as const,
-      item: SKINS[id],
-      gold: 0,
-    }));
-    return [...paid, ...defaults];
-  }, []);
+  const buyRows = useMemo(() => buyableEntries(SHOP_BUY, meta), [meta]);
   const rows = mode === 'sell' ? sellRows : buyRows;
   const ownedItem = slotted && isItemId(slotted) ? Math.max(0, meta.items[slotted] ?? 0) : 0;
   const skinOwned = slotted && isSkinId(slotted) ? isSkinOwned(meta, slotted) : false;
@@ -108,6 +100,10 @@ export default function ShopScreen({
     onUi();
     setSlotted(id);
     setQty(1);
+  };
+
+  const openPreview = (id: ShopGoodId) => {
+    onUi();
     if (isSkinId(id)) {
       setPreview(previewForSkin(id, isSkinOwned(meta, id), false, false));
       return;
@@ -139,7 +135,13 @@ export default function ShopScreen({
       onDeny();
       return;
     }
-    if (mode === 'buy') return;
+    if (mode === 'buy') {
+      if (isSkinId(slotted)) {
+        setSlotted(null);
+        setQty(0);
+      }
+      return;
+    }
     const remain = ownedItem - liveQty;
     if (remain < 1) {
       setSlotted(null);
@@ -208,6 +210,12 @@ export default function ShopScreen({
                   key={id}
                   style={[styles.cell, slotted === id && styles.cellOn]}
                   onPress={() => slotGood(id)}
+                  onLongPress={() => {
+                    setSlotted(id);
+                    setQty(1);
+                    openPreview(id);
+                  }}
+                  delayLongPress={400}
                   accessibilityLabel={
                     count != null
                       ? `${row.item.name}, ${count} owned`
@@ -226,17 +234,22 @@ export default function ShopScreen({
           </ScrollView>
         )}
 
-        <View style={[styles.slot, empty && styles.slotEmpty]}>
-          {!empty && slotted ? (
+        <Pressable
+          style={[styles.slot, empty && styles.slotEmpty]}
+          disabled={!slotted}
+          onPress={() => {
+            if (slotted) openPreview(slotted);
+          }}
+          accessibilityLabel={slotted ? `${captionName} preview` : undefined}
+        >
+          {slotted ? (
             isSkinId(slotted) ? (
               <SkinIcon id={slotted} size={64} />
             ) : (
               <ItemIcon id={slotted} size={64} />
             )
-          ) : slotted && isSkinId(slotted) ? (
-            <SkinIcon id={slotted} size={64} />
           ) : null}
-        </View>
+        </Pressable>
         <Text style={styles.caption}>{caption}</Text>
 
         <View style={styles.qty}>
