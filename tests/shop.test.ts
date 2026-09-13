@@ -293,6 +293,44 @@ describe('buy catalog', () => {
       qty: 3,
     });
   });
+
+  it('hides default and owned skins from the Buy catalog', () => {
+    const ids = (rows: ReturnType<typeof buyableEntries>) => rows.map((row) => row.item.id);
+    const fresh = emptyCollection();
+    expect(ids(buyableEntries())).toEqual([
+      'bone-dust',
+      'witchcraft-bag',
+      'scroll-of-portal',
+      'flag-golden',
+      'flag-pirate',
+      'grid-classic',
+      'grid-vintage',
+    ]);
+    expect(ids(buyableEntries(SHOP_BUY, fresh))).toEqual([
+      'bone-dust',
+      'witchcraft-bag',
+      'scroll-of-portal',
+      'flag-golden',
+      'flag-pirate',
+      'grid-classic',
+      'grid-vintage',
+    ]);
+    expect(ids(buyableEntries(SHOP_BUY, fresh))).not.toContain('flag-red');
+    expect(ids(buyableEntries(SHOP_BUY, fresh))).not.toContain('grid-gray');
+    const owned = {
+      ...fresh,
+      ownedSkins: [...fresh.ownedSkins, 'flag-golden' as const, 'grid-classic' as const],
+    };
+    expect(ids(buyableEntries(SHOP_BUY, owned))).toEqual([
+      'bone-dust',
+      'witchcraft-bag',
+      'scroll-of-portal',
+      'flag-pirate',
+      'grid-vintage',
+    ]);
+    expect(ids(buyableEntries(SHOP_BUY, owned))).not.toContain('flag-golden');
+    expect(ids(buyableEntries(SHOP_BUY, owned))).not.toContain('grid-classic');
+  });
 });
 
 describe('buyLoot gold math', () => {
@@ -440,18 +478,30 @@ describe('title shop wiring', () => {
     expect(vitestCfg).toContain("exclude: ['**/node_modules/**', 'native/**']");
   });
 
-  it('opens the shared item preview from Buy and Sell rows', () => {
+  it('opens the shared item preview from a long-press row or the selected slot', () => {
     expect(shop).toContain('ItemPreviewSheet');
     expect(shop).toContain('previewForItem');
+    expect(shop).toContain('previewForSkin');
+    expect(shop).toContain('openPreview');
+    expect(shop).toContain('onLongPress');
+    expect(shop).toContain('onPress={() => slotGood(id)}');
+    expect(shop).toContain('${captionName} preview');
     expect(shop).toContain('RitualSheet');
     expect(shop).toContain('onStartRite');
     expect(shop).toContain('setRitualOpen(true)');
+    const slotStart = shop.indexOf('const slotGood');
+    const slotEnd = shop.indexOf('};', slotStart);
+    expect(shop.slice(slotStart, slotEnd)).not.toContain('setPreview');
+    expect(shop.slice(slotStart, slotEnd)).not.toContain('previewFor');
     expect(route).toContain('startRite');
     expect(route).toContain('onStartRite');
     const preview = readFileSync(resolve(__dirname, '../native/src/ui/ItemPreviewSheet.tsx'), 'utf8');
     expect(preview).toContain('canUseFromPreview');
     expect(preview).toContain('Use');
     expect(preview).toContain('Close');
+    const board = readFileSync(resolve(__dirname, '../native/src/ui/Board.tsx'), 'utf8');
+    expect(board).toContain('Gesture.LongPress()');
+    expect(board).toContain('onFlag(index)');
   });
 
   it('gives bone dust and the witchcraft bag their own stone-gold glyphs', () => {
