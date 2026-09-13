@@ -1,0 +1,65 @@
+{
+  "expo": {
+    "name": "Crawler Mines",
+    "slug": "crawler-mines",
+    "scheme": "crawler-mines",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#120e0c",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "dev.dshamak.crawlermines"
+    },
+    "android": {
+      "package": "dev.dshamak.crawlermines",
+      "adaptiveIcon": {
+        "backgroundColor": "#120e0c",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png",
+      "backgroundColor": "#120e0c"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#120e0c",
+          "image": "./assets/icon.png"
+        }
+      ],
+      "expo-font",
+      "expo-sqlite",
+      "expo-asset",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "91b08489-1dd4-43c3-8976-15520c4cdc91"
+      }
+    }
+  }
+}

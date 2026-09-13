@@ -1,0 +1,51 @@
+export const BGM_FILES = {
+  cozy: 'cozy-descent.mp3',
+  campaign: 'campaign-depths.mp3',
+  boss: 'flag-eater-boss.mp3',
+  wrath: 'wrath-boss.mp3',
+  lust: 'lust-boss.mp3',
+} as const;
+
+export const SFX_FILES = {
+  dig: 'sfx-dig.wav',
+  flag: 'sfx-flag.wav',
+  chest: 'sfx-chest.wav',
+  blast: 'sfx-blast.wav',
+  wreck: 'sfx-wreck.wav',
+  clear: 'sfx-clear.wav',
+  ui: 'sfx-ui.wav',
+  deny: 'sfx-deny.wav',
+  'boss-move': 'sfx-boss-move.wav',
+  'boss-eat-flag': 'sfx-boss-eat-flag.wav',
+  'boss-hit': 'sfx-boss-hit.wav',
+  'boss-death': 'sfx-boss-death.wav',
+  'campaign-lose': 'sfx-campaign-lose.wav',
+} as const;
+
+export type BgmId = keyof typeof BGM_FILES;
+export type SfxId = keyof typeof SFX_FILES;
+
+/** Same bytes as web `public/audio/*` — copied, not re-encoded. */
+export const BGM_ASSETS: Record<BgmId, number> = {
+  cozy: require('../../assets/audio/cozy-descent.mp3'),
+  campaign: require('../../assets/audio/campaign-depths.mp3'),
+  boss: require('../../assets/audio/flag-eater-boss.mp3'),
+  wrath: require('../../assets/audio/wrath-boss.mp3'),
+  lust: require('../../assets/audio/lust-boss.mp3'),
+};
+
+export const SFX_ASSETS: Record<SfxId, number> = {
+  dig: require('../../assets/audio/sfx-dig.wav'),
+  flag: require('../../assets/audio/sfx-flag.wav'),
+  chest: require('../../assets/audio/sfx-chest.wav'),
+  blast: require('../../assets/audio/sfx-blast.wav'),
+  wreck: require('../../assets/audio/sfx-wreck.wav'),
+  clear: require('../../assets/audio/sfx-clear.wav'),
+  ui: require('../../assets/audio/sfx-ui.wav'),
+  deny: require('../../assets/audio/sfx-deny.wav'),
+  'boss-move': require('../../assets/audio/sfx-boss-move.wav'),
+  'boss-eat-flag': require('../../assets/audio/sfx-boss-eat-flag.wav'),
+  'boss-hit': require('../../assets/audio/sfx-boss-hit.wav'),
+  'boss-death': require('../../assets/audio/sfx-boss-death.wav'),
+  'campaign-lose': require('../../assets/audio/sfx-campaign-lose.wav'),
+};
