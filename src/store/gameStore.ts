@@ -30,6 +30,10 @@ import {
   runStash,
   sanitizePerfectFloors,
   buyLoot,
+  consumeRitual,
+  normalizeRitual,
+  riteFloorConfig,
+  ritualLockedBossId,
   sellLoot,
   spendEntry,
   stashToRewards,
@@ -42,6 +46,7 @@ import {
   type KeyStore,
   type OfferingSlots,
   type Rng,
+  type RitualSlots,
   type Run,
 } from '../engine';
 
@@ -62,6 +67,7 @@ export interface GameStoreState {
   applyExtract: (rng?: Rng) => GameEvent[];
   sell: (itemId: ItemId, qty?: number) => boolean;
   buy: (itemId: ItemId, qty?: number) => boolean;
+  startRite: (slots: RitualSlots, rng?: Rng) => boolean;
 }
 
 export type GameStore = UseBoundStore<StoreApi<GameStoreState>>;
@@ -96,6 +102,22 @@ function freshRun(
     bossRevealPending: false,
     perfectFloors: emptyPerfectFloors(),
     lockedBossId: lockedBossId ?? null,
+  };
+}
+
+function freshRiteRun(rng: Rng, lockedBossId: NonNullable<Run['lockedBossId']>): Run {
+  const game = createGame(riteFloorConfig(), rng, 'campaign', lockedBossId);
+  return {
+    mode: 'campaign',
+    floor: CAMPAIGN_FLOORS.length - 1,
+    game,
+    grantKey: newGrantKey(),
+    campaignStash: emptyStash(),
+    bonusKey: null,
+    bossRevealPending: Boolean(game.boss),
+    perfectFloors: emptyPerfectFloors(),
+    lockedBossId,
+    rite: true,
   };
 }
 
@@ -168,7 +190,7 @@ function settleCampaign(
     if (bonusKey) {
       stash = { gold: stash.gold, items: addItem(stash.items, bonusKey) };
     }
-    if (allDescentPerfect(perfectFloors)) {
+    if (!run.rite && allDescentPerfect(perfectFloors)) {
       stash = { gold: stash.gold, items: addItem(stash.items, 'gold-cup') };
     }
     nextLoot = { ...stash.items };
@@ -238,7 +260,9 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
             return;
           }
           const locked = run.lockedBossId ?? null;
-          const game = createGame(configFor(run.mode, run.floor), rng, run.mode, locked);
+          const game = run.rite
+            ? createGame(riteFloorConfig(), rng, 'campaign', locked)
+            : createGame(configFor(run.mode, run.floor), rng, run.mode, locked);
           const perfectFloors = sanitizePerfectFloors(run.perfectFloors);
           if (run.mode === 'campaign' && run.floor >= 0 && run.floor < perfectFloors.length) {
             perfectFloors[run.floor] = false;
@@ -333,6 +357,18 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
           const next = buyLoot(get().meta, itemId, qty, keyStore);
           if (!next) return false;
           set({ meta: next });
+          return true;
+        },
+        startRite: (slots, rng = Math.random) => {
+          const next = consumeRitual(get().meta, slots, keyStore);
+          if (!next) return false;
+          const locked = ritualLockedBossId(normalizeRitual(slots));
+          if (!locked) return false;
+          set({
+            meta: next,
+            run: freshRiteRun(rng, locked),
+            runLoot: emptyInventory(),
+          });
           return true;
         },
       }),

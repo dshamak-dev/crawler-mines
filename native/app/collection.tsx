@@ -1,4 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { playDeny } from '../src/audio';
+import { getAudio } from '../src/audio/player';
 import { useGameStore } from '../src/store';
 import CollectionScreen from '../src/ui/CollectionScreen';
 import Shell from '../src/ui/Shell';
@@ -9,6 +11,7 @@ export default function CollectionRoute() {
   const meta = useGameStore((s) => s.meta);
   const runLoot = useGameStore((s) => s.runLoot);
   const run = useGameStore((s) => s.run);
+  const startRite = useGameStore((s) => s.startRite);
   const fromPlay = from === 'play' && Boolean(run);
 
   return (
@@ -20,6 +23,17 @@ export default function CollectionRoute() {
         game={fromPlay && run ? run.game : undefined}
         stashGold={run?.campaignStash?.gold ?? 0}
         onBack={() => router.back()}
+        onStartRite={
+          fromPlay
+            ? undefined
+            : (slots) => {
+                const ok = startRite(slots);
+                if (ok) router.push('/play');
+                return ok;
+              }
+        }
+        onUi={() => getAudio().playSfx('ui')}
+        onDeny={playDeny}
       />
     </Shell>
   );

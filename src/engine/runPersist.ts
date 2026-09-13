@@ -41,6 +41,8 @@ export interface Run {
   perfectFloors?: boolean[];
   /** Resolved floor-5 boss at campaign enter (from heads); resume and retry keep it. */
   lockedBossId?: BossId | null;
+  /** One-floor witchcraft-bag rite (#46). Persist and resume like a campaign finale. */
+  rite?: boolean;
 }
 
 export type FloorOutcome = 'cleared' | 'stashed' | 'victory' | 'lost';
@@ -123,6 +125,7 @@ export function floorReport(run: Run): FloorReport {
 }
 
 export function resumeLabel(run: Run): string {
+  if (run.rite) return 'Boss rite';
   if (run.mode === 'campaign') {
     return `Floor ${run.floor + 1}/${CAMPAIGN_FLOORS.length}`;
   }
@@ -285,6 +288,7 @@ export function sanitizeRun(raw: unknown): Run | null {
     bossRevealPending: false,
     perfectFloors: sanitizePerfectFloors(r.perfectFloors),
     lockedBossId: isBossId(r.lockedBossId) ? r.lockedBossId : null,
+    rite: r.rite === true,
   };
 }
 

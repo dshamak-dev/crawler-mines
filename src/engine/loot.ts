@@ -17,6 +17,7 @@ export const ITEM_IDS = [
   'gold-cup',
   'bone-dust',
   'witchcraft-bag',
+  'scroll-of-portal',
 ] as const;
 
 export type ItemId = (typeof ITEM_IDS)[number];
@@ -170,6 +171,13 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     flavor: 'A stitched pouch that wants three offerings.',
     grantsGold: false,
   },
+  /** Shop-only reagent. Not usable alone — #46 ritual only. */
+  'scroll-of-portal': {
+    id: 'scroll-of-portal',
+    name: 'Scroll of portal',
+    flavor: 'Cave-ink directions. Useless until a bag opens them.',
+    grantsGold: false,
+  },
 };
 
 const BASE_LOOT_TABLE: ReadonlyArray<{ itemId: ItemId; weight: number }> = [
@@ -252,9 +260,14 @@ export function isTicketKey(itemId: ItemId): boolean {
   return itemId === 'hard-key' || itemId === 'campaign-key';
 }
 
-/** Shop-only reagents. Never on chest tables. Bag Use is #46; portal scroll is #47. */
+/** Shop-only reagents. Never on chest tables. Bag Use is #46. */
 export function isShopOnly(itemId: ItemId): boolean {
-  return itemId === 'bone-dust' || itemId === 'witchcraft-bag';
+  return itemId === 'bone-dust' || itemId === 'witchcraft-bag' || itemId === 'scroll-of-portal';
+}
+
+/** Collection Use. Scroll of portal is reagent-only; bag opens the #46 ritual. */
+export function isUsable(itemId: ItemId): boolean {
+  return itemId === 'witchcraft-bag';
 }
 
 /** Title-shop unit prices. Pouches, ticket keys, heads, and the gold cup do not sell. */
@@ -267,6 +280,7 @@ const SELL_GOLD: Partial<Record<ItemId, number>> = {
   'silver-medal': 14,
   'gold-medal': 20,
   'bone-dust': 15,
+  'scroll-of-portal': 20,
 };
 
 export function sellGold(itemId: ItemId): number {
@@ -311,12 +325,12 @@ export function sellableEntries(
 
 /**
  * Title-shop buy prices. Follow-ups register rows here without reshaping the sheet:
- * #45 bone-dust / witchcraft-bag, #47 scroll-of-portal, #49 skins.
+ * #49 skins.
  */
 export const SHOP_BUY: Partial<Record<ItemId, number>> = {
   'bone-dust': 50,
   'witchcraft-bag': 150,
-  // 'scroll-of-portal': n, // #47
+  'scroll-of-portal': 80,
 };
 
 export type ShopBuyCatalog = Partial<Record<ItemId, number>>;

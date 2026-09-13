@@ -105,8 +105,14 @@ export const CAMPAIGN_FLOORS: FloorConfig[] = [
   { width: 8, height: 9, mines: 11, chests: 6, chestValue: 12 },
   { width: 9, height: 11, mines: 16, chests: 8, chestValue: 15 },
   { width: 9, height: 12, mines: 22, chests: 11, chestValue: 18 },
+  // #52: set chests to 0 so the campaign finale inherits arena door-wreck lose.
   { width: 12, height: 16, mines: 42, chests: 16, chestValue: 25, bossLives: BOSS_MAX_LIVES },
 ];
+
+/** Arena (#46 rite now; #52 campaign finale later): boss floor with no chests. */
+export function isArenaFloor(game: Game): boolean {
+  return game.boss != null && game.chests === 0;
+}
 
 export function isCampaignFinale(mode: Difficulty, floor: number): boolean {
   return mode === 'campaign' && floor >= CAMPAIGN_FLOORS.length - 1;
