@@ -58,6 +58,8 @@ describe('Dmitry polish wiring', () => {
     expect(nav).toContain('useNavStackSync');
     expect(nav).toContain('useSafeBack');
     expect(nav).toContain('router.canGoBack()');
+    expect(nav).toContain('router.replace(href)');
+    expect(nav).toContain('!isWeb && router.canGoBack()');
     expect(collection).toContain('useSafeBack');
     expect(shop).toContain('useSafeBack');
     expect(collection).not.toContain('router.back()');

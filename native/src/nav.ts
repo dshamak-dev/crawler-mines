@@ -34,11 +34,14 @@ export function useNavStackSync() {
 export function useSafeBack() {
   const router = useRouter();
   return () => {
-    if (router.canGoBack()) {
+    const href = routerHref(backTarget(loadNavStack(keyStore)));
+    // After a web refresh Expo's stack is empty even when History exists.
+    // Replace the persisted parent so in-app Back still walks toward home.
+    // Native keeps router.back() so the real push stack is unchanged.
+    if (!isWeb && router.canGoBack()) {
       router.back();
       return;
     }
-    const href = routerHref(backTarget(loadNavStack(keyStore)));
     router.replace(href);
   };
 }
