@@ -67,9 +67,14 @@ describe('loot table', () => {
   it('never rolls medals, the gold cup, or shop-only reagents from chests', () => {
     for (const mode of ['easy', 'medium', 'hard', 'campaign'] as const) {
       const table = lootTableFor(mode);
-      expect(table.some((row) => row.itemId === 'bone-dust' || row.itemId === 'witchcraft-bag')).toBe(
-        false,
-      );
+      expect(
+        table.some(
+          (row) =>
+            row.itemId === 'bone-dust' ||
+            row.itemId === 'witchcraft-bag' ||
+            row.itemId === 'scroll-of-portal',
+        ),
+      ).toBe(false);
       const rng = mulberry32(21);
       for (let i = 0; i < 3000; i++) {
         const id = rollLoot(rng, mode);
@@ -79,7 +84,8 @@ describe('loot table', () => {
             id === 'gold-medal' ||
             id === 'gold-cup' ||
             id === 'bone-dust' ||
-            id === 'witchcraft-bag',
+            id === 'witchcraft-bag' ||
+            id === 'scroll-of-portal',
         ).toBe(false);
       }
     }
@@ -321,9 +327,11 @@ describe('meta collection persistence', () => {
     const loaded = loadCollection(store);
     expect(loaded.items['bone-dust']).toBe(2);
     expect(loaded.items['witchcraft-bag']).toBe(1);
-    expect(stackedEntries(loaded.items).map((row) => row.item.id)).toEqual([
+    meta = collectLoot(meta, 'scroll-of-portal', store);
+    expect(stackedEntries(loadCollection(store).items).map((row) => row.item.id)).toEqual([
       'bone-dust',
       'witchcraft-bag',
+      'scroll-of-portal',
     ]);
   });
 

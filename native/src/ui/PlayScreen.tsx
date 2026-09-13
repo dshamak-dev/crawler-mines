@@ -202,7 +202,12 @@ export default function PlayScreen({
   if (!run) return null;
 
   const { game, mode, floor } = run;
-  const floorLabel = mode === 'campaign' ? `Floor ${floor + 1}/${CAMPAIGN_FLOORS.length}` : mode;
+  const floorLabel = run.rite
+    ? 'Boss rite'
+    : mode === 'campaign'
+      ? `Floor ${floor + 1}/${CAMPAIGN_FLOORS.length}`
+      : mode;
+  const showChestHud = game.chests > 0;
   const salvage = report ? stackedEntries(report.loot) : [];
   const boss = game.boss;
   const bossName = boss ? BOSS_COPY[boss.id].name : 'Boss';
@@ -228,20 +233,24 @@ export default function PlayScreen({
           <MenuIcon size={20} />
         </GhostButton>
         <View style={styles.stats}>
-          <View style={[styles.stat, styles.found]}>
-            <Text style={[styles.statLabel, styles.foundLabel]}>Found</Text>
-            <View style={styles.statRow}>
-              <ChestIcon tier="wooden" size={16} />
-              <Text style={styles.statN}>{game.chestsOpened}</Text>
-            </View>
-          </View>
-          <View style={[styles.stat, styles.wreck]}>
-            <Text style={[styles.statLabel, styles.wreckLabel]}>Broken</Text>
-            <View style={styles.statRow}>
-              <ChestIcon wrecked tier="wooden" size={16} />
-              <Text style={styles.statN}>{game.chestsDestroyed}</Text>
-            </View>
-          </View>
+          {showChestHud ? (
+            <>
+              <View style={[styles.stat, styles.found]}>
+                <Text style={[styles.statLabel, styles.foundLabel]}>Found</Text>
+                <View style={styles.statRow}>
+                  <ChestIcon tier="wooden" size={16} />
+                  <Text style={styles.statN}>{game.chestsOpened}</Text>
+                </View>
+              </View>
+              <View style={[styles.stat, styles.wreck]}>
+                <Text style={[styles.statLabel, styles.wreckLabel]}>Broken</Text>
+                <View style={styles.statRow}>
+                  <ChestIcon wrecked tier="wooden" size={16} />
+                  <Text style={styles.statN}>{game.chestsDestroyed}</Text>
+                </View>
+              </View>
+            </>
+          ) : null}
           {boss ? (
             <View style={[styles.stat, styles.bossStat]}>
               <Text style={[styles.statLabel, styles.bossLabel]}>{bossName}</Text>

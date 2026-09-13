@@ -96,6 +96,7 @@ describe('#35 socketable denylist', () => {
       'gold-cup',
       'bone-dust',
       'witchcraft-bag',
+      'scroll-of-portal',
     ];
     for (const id of denied) expect(isSocketable(id)).toBe(false);
     const meta = { ...emptyCollection(), items: { ...emptyInventory(), ...PACK } };

@@ -1,7 +1,7 @@
 import { allSafeRevealed, ensureFirstClickSafe, isWon, neighbors } from './board';
 import { capLustHearts, hitBossFromBlasts, stepBoss, stripHeartsFromBlasts } from './boss';
 import { addItem, type ChestTier, type ItemId } from './loot';
-import type { Cell, ChestReward, Difficulty, Game, GameEvent, Rng } from './types';
+import { isArenaFloor, type Cell, type ChestReward, type Difficulty, type Game, type GameEvent, type Rng } from './types';
 
 /** Easy/Medium/Hard medals. Campaign never awards one. */
 export function medalForMode(mode: Difficulty): ItemId | null {
@@ -77,10 +77,28 @@ export function explodeChain(game: Game, startIndex: number): GameEvent[] {
     events.push({ type: 'explode', index, wrecked, wave });
   }
 
+  if (wreckArenaDoor(game, events)) {
+    game.status = 'lost';
+    game.turn = 'player';
+    events.push({ type: 'lost' });
+    return events;
+  }
+
   const blasts = events.filter((e) => e.type === 'explode').map((e) => e.index);
   stripHeartsFromBlasts(game, blasts);
   events.push(...hitBossFromBlasts(game, blasts));
   return events;
+}
+
+/** #52 arena: a blast in the door's 8-ring wrecks it and loses immediately. */
+function wreckArenaDoor(game: Game, events: readonly GameEvent[]): boolean {
+  if (!isArenaFloor(game) || game.doorIndex == null) return false;
+  const door = game.doorIndex;
+  const ring = new Set(neighbors(game.width, game.height, door));
+  const hit = events.some((e) => e.type === 'explode' && ring.has(e.index));
+  if (!hit) return false;
+  game.cells[door].wrecked = true;
+  return true;
 }
 
 export function toggleFlag(game: Game, index: number): boolean {
@@ -113,6 +131,7 @@ function finishBossTurn(game: Game, bossEvents: GameEvent[], mode?: Difficulty):
       events.push(e);
     }
   }
+  if (game.status !== 'playing') return events;
   if (game.boss && game.boss.lives <= 0) {
     capLustHearts(game);
     game.turn = 'player';
@@ -277,6 +296,7 @@ export function dig(game: Game, index: number, rng: Rng, mode?: Difficulty): Gam
 
   const boss = game.boss;
   if (game.doorIndex === index && cell.state === 'revealed') {
+    if (cell.wrecked) return [{ type: 'deny' }];
     if (!boss || boss.lives > 0) return [{ type: 'deny' }];
     if (!allSafeRevealed(game)) return [{ type: 'extract-prompt' }];
     return extract(game, mode);
@@ -312,7 +332,7 @@ export function extract(game: Game, mode?: Difficulty): GameEvent[] {
   const boss = game.boss;
   if (!boss || boss.lives > 0) return [];
   const door = game.doorIndex;
-  if (door == null || game.cells[door].state !== 'revealed') return [];
+  if (door == null || game.cells[door].state !== 'revealed' || game.cells[door].wrecked) return [];
   game.status = 'cleared';
   game.turn = 'player';
   return [{ type: 'cleared', rewards: grantIntactLoot(game, mode) }];

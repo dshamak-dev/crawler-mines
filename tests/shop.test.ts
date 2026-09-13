@@ -16,6 +16,7 @@ import {
   isSellable,
   isShopOnly,
   isTicketKey,
+  isUsable,
   stackedEntries,
   loadCollection,
   sellGold,
@@ -62,6 +63,7 @@ describe('sell catalog', () => {
     expect(sellGold('silver-medal')).toBe(14);
     expect(sellGold('gold-medal')).toBe(20);
     expect(sellGold('bone-dust')).toBe(15);
+    expect(sellGold('scroll-of-portal')).toBe(20);
     const sellable = new Set([
       'rusty-key',
       'torch-charm',
@@ -71,6 +73,7 @@ describe('sell catalog', () => {
       'silver-medal',
       'gold-medal',
       'bone-dust',
+      'scroll-of-portal',
     ]);
     for (const id of ITEM_IDS) {
       if (sellable.has(id)) {
@@ -121,6 +124,7 @@ describe('sell catalog', () => {
       'gold-medal': 1,
       'bone-dust': 2,
       'witchcraft-bag': 3,
+      'scroll-of-portal': 2,
     });
     expect(rows.map((row) => row.item.id)).toEqual([
       'rusty-key',
@@ -131,6 +135,7 @@ describe('sell catalog', () => {
       'silver-medal',
       'gold-medal',
       'bone-dust',
+      'scroll-of-portal',
     ]);
   });
 
@@ -147,6 +152,9 @@ describe('sell catalog', () => {
     expect(isCollectible('gold-cup')).toBe(true);
     expect(isCollectible('bone-dust')).toBe(true);
     expect(isCollectible('witchcraft-bag')).toBe(true);
+    expect(isCollectible('scroll-of-portal')).toBe(true);
+    expect(isUsable('witchcraft-bag')).toBe(true);
+    expect(isUsable('scroll-of-portal')).toBe(false);
   });
 });
 
@@ -232,17 +240,20 @@ describe('sellLoot gold math', () => {
 });
 
 describe('buy catalog', () => {
-  it('lists only the locked #45 shop reagents at the locked prices', () => {
+  it('lists only the locked shop reagents at the locked prices', () => {
     expect(buyGold('bone-dust')).toBe(50);
     expect(buyGold('witchcraft-bag')).toBe(150);
+    expect(buyGold('scroll-of-portal')).toBe(80);
     expect(SHOP_BUY['bone-dust']).toBe(50);
     expect(SHOP_BUY['witchcraft-bag']).toBe(150);
+    expect(SHOP_BUY['scroll-of-portal']).toBe(80);
     expect(buyableEntries().map((row) => [row.item.id, row.gold])).toEqual([
       ['bone-dust', 50],
       ['witchcraft-bag', 150],
+      ['scroll-of-portal', 80],
     ]);
     for (const id of ITEM_IDS) {
-      if (id === 'bone-dust' || id === 'witchcraft-bag') {
+      if (id === 'bone-dust' || id === 'witchcraft-bag' || id === 'scroll-of-portal') {
         expect(isBuyable(id)).toBe(true);
         expect(isShopOnly(id)).toBe(true);
       } else {
@@ -253,6 +264,7 @@ describe('buy catalog', () => {
       }
     }
     expect(isSellable('bone-dust')).toBe(true);
+    expect(isSellable('scroll-of-portal')).toBe(true);
     expect(isSellable('witchcraft-bag')).toBe(false);
   });
 
@@ -323,6 +335,10 @@ describe('buyLoot gold math', () => {
     const sold = sellLoot(loadCollection(store), 'bone-dust', 1, store);
     expect(sold!.gold).toBe(15);
     expect(sold!.items['bone-dust']).toBe(1);
+    const scroll = buyLoot(packed({ gem: 1 }, 80), 'scroll-of-portal', 1, store);
+    expect(scroll!.gold).toBe(0);
+    expect(scroll!.items['scroll-of-portal']).toBe(1);
+    expect(sellGold('scroll-of-portal')).toBe(20);
     expect(
       stackedEntries(sold!.items).map((row) => row.item.id),
     ).toEqual(['gem', 'bone-dust', 'witchcraft-bag']);
@@ -420,7 +436,9 @@ describe('title shop wiring', () => {
     const icons = readFileSync(resolve(__dirname, '../native/src/ui/icons.tsx'), 'utf8');
     expect(icons).toContain("id === 'bone-dust'");
     expect(icons).toContain("id === 'witchcraft-bag'");
+    expect(icons).toContain("id === 'scroll-of-portal'");
     expect(icons).toContain('function BoneDustGlyph');
     expect(icons).toContain('function WitchcraftBagGlyph');
+    expect(icons).toContain('function ScrollGlyph');
   });
 });

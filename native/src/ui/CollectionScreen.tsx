@@ -3,15 +3,18 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   inventoryTotal,
   isTicketKey,
+  isUsable,
   sealedRowLabel,
   sealedRunRows,
   stackedEntries,
   type CollectionState,
   type Game,
   type Inventory,
+  type RitualSlots,
 } from '../../../src/engine';
 import { colors, fonts } from '../theme';
 import { BagIcon, ChestIcon, GoldIcon, ItemIcon } from './icons';
+import RitualSheet from './RitualSheet';
 import { GhostButton, StoneButton } from './primitives';
 
 const EMPTY_COPY = 'Chests stay sealed until you clear the floor. Bombs can still smash them.';
@@ -23,6 +26,9 @@ export default function CollectionScreen({
   stashGold = 0,
   sealed = false,
   onBack,
+  onStartRite,
+  onUi,
+  onDeny,
 }: {
   meta: CollectionState;
   runLoot: Inventory;
@@ -30,6 +36,9 @@ export default function CollectionScreen({
   stashGold?: number;
   sealed?: boolean;
   onBack: () => void;
+  onStartRite?: (slots: RitualSlots) => boolean;
+  onUi?: () => void;
+  onDeny?: () => void;
 }) {
   if (sealed && game) {
     const rows = sealedRunRows(game, runLoot, stashGold);
@@ -74,23 +83,41 @@ export default function CollectionScreen({
     );
   }
 
-  return <TitleCollection meta={meta} runLoot={runLoot} onBack={onBack} />;
+  return (
+    <TitleCollection
+      meta={meta}
+      runLoot={runLoot}
+      onBack={onBack}
+      onStartRite={onStartRite}
+      onUi={onUi}
+      onDeny={onDeny}
+    />
+  );
 }
 
 function TitleCollection({
   meta,
   runLoot,
   onBack,
+  onStartRite,
+  onUi,
+  onDeny,
 }: {
   meta: CollectionState;
   runLoot: Inventory;
   onBack: () => void;
+  onStartRite?: (slots: RitualSlots) => boolean;
+  onUi?: () => void;
+  onDeny?: () => void;
 }) {
   const [tab, setTab] = useState<'all' | 'run'>('all');
+  const [ritualOpen, setRitualOpen] = useState(false);
   const inv = tab === 'all' ? meta.items : runLoot;
   const rows = stackedEntries(inv);
   const total = inventoryTotal(inv);
   const runCount = inventoryTotal(runLoot);
+  const cue = onUi ?? (() => {});
+  const deny = onDeny ?? (() => {});
 
   return (
     <View style={styles.shell}>
@@ -124,23 +151,48 @@ function TitleCollection({
         </View>
       ) : (
         <ScrollView style={styles.list} contentContainerStyle={styles.listInner}>
-          {rows.map(({ item, count }) => (
-            <View key={item.id} style={[styles.card, isTicketKey(item.id) && styles.ticket]}>
-              <View style={styles.ico}>
-                <ItemIcon id={item.id} size={34} />
-              </View>
-              <View style={styles.copy}>
-                <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.flavor}>{item.flavor}</Text>
-              </View>
-              <Text style={styles.count}>×{count}</Text>
-            </View>
-          ))}
+          {rows.map(({ item, count }) => {
+            const usable = tab === 'all' && isUsable(item.id) && Boolean(onStartRite);
+            return (
+              <Pressable
+                key={item.id}
+                style={[styles.card, isTicketKey(item.id) && styles.ticket]}
+                onPress={() => {
+                  if (!usable) return;
+                  cue();
+                  setRitualOpen(true);
+                }}
+                accessibilityLabel={usable ? `Use ${item.name}` : undefined}
+              >
+                <View style={styles.ico}>
+                  <ItemIcon id={item.id} size={34} />
+                </View>
+                <View style={styles.copy}>
+                  <Text style={styles.name}>{item.name}</Text>
+                  <Text style={styles.flavor}>{item.flavor}</Text>
+                </View>
+                {usable ? <Text style={styles.use}>Use</Text> : null}
+                <Text style={styles.count}>×{count}</Text>
+              </Pressable>
+            );
+          })}
         </ScrollView>
       )}
       <StoneButton onPress={onBack} style={styles.back}>
         Back
       </StoneButton>
+      {ritualOpen && onStartRite ? (
+        <RitualSheet
+          meta={meta}
+          onUse={(slots) => onStartRite(slots)}
+          onClose={() => {
+            cue();
+            setRitualOpen(false);
+          }}
+          onUi={cue}
+          onDeny={deny}
+        />
+      ) : null}
     </View>
   );
 }
@@ -234,6 +286,7 @@ const styles = StyleSheet.create({
   copy: { flex: 1, minWidth: 0 },
   name: { fontFamily: fonts.display, color: colors.ink, fontSize: 16 },
   flavor: { fontFamily: fonts.ui, color: colors.muted, fontSize: 13, marginTop: 2 },
+  use: { fontFamily: fonts.display, color: colors.gold2, fontSize: 13, letterSpacing: 0.6 },
   count: { fontFamily: fonts.display, color: colors.gold, fontSize: 17 },
   back: { justifyContent: 'center' },
 });

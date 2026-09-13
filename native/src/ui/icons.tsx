@@ -396,6 +396,20 @@ function BoneDustGlyph({ size = 24 }: GlyphProps) {
   );
 }
 
+function ScrollGlyph({ size = 24 }: GlyphProps) {
+  return (
+    <Svg viewBox="0 0 32 32" width={size} height={size}>
+      <Path d="M7.4 8.2h17.2c1.2 0 2.2 1 2.2 2.2v13.2c0 1.2-1 2.2-2.2 2.2H7.4c-1.2 0-2.2-1-2.2-2.2V10.4c0-1.2 1-2.2 2.2-2.2z" fill="#c9b59a" />
+      <Path d="M6.4 10h19.2v13.2c0 .6-.5 1.1-1.1 1.1H7.5c-.6 0-1.1-.5-1.1-1.1V10z" fill="#e8dcc8" />
+      <Path d="M5.2 7.6h4.4v17.6H5.2c-1.1 0-2-.9-2-2V9.6c0-1.1.9-2 2-2z" fill="#8a6a40" />
+      <Path d="M22.4 7.6h4.4c1.1 0 2 .9 2 2v13.6c0 1.1-.9 2-2 2h-4.4V7.6z" fill="#6b5340" />
+      <Path d="M11.2 13.2h9.6M11.2 16.4h8.2M11.2 19.6h6.8" stroke="#5a4534" strokeWidth="1.15" strokeLinecap="round" />
+      <Circle cx="22.6" cy="21.2" r="2.1" fill="#2a1840" />
+      <Path d="M22.6 19.6l.5 1.1 1.2.1-.9.8.3 1.1-1.1-.6-1.1.6.3-1.1-.9-.8 1.2-.1z" fill="#e0b44a" />
+    </Svg>
+  );
+}
+
 function WitchcraftBagGlyph({ size = 24 }: GlyphProps) {
   return (
     <Svg viewBox="0 0 32 32" width={size} height={size}>
@@ -463,5 +477,6 @@ export function ItemIcon({ id, size = 24 }: { id: ItemId; size?: number }) {
   if (id === 'gold-cup') return <GoldCupGlyph size={size} />;
   if (id === 'bone-dust') return <BoneDustGlyph size={size} />;
   if (id === 'witchcraft-bag') return <WitchcraftBagGlyph size={size} />;
+  if (id === 'scroll-of-portal') return <ScrollGlyph size={size} />;
   return <ShardGlyph size={size} />;
 }

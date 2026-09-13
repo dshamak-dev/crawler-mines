@@ -22,6 +22,7 @@ export {
   DIFFICULTIES,
   cellVisual,
   configFor,
+  isArenaFloor,
   isCampaignFinale,
   newCell,
 } from './types';
@@ -48,6 +49,7 @@ export {
   isSellable,
   isShopOnly,
   isTicketKey,
+  isUsable,
   removeItem,
   sellableEntries,
   sellGold,
@@ -153,6 +155,23 @@ export {
   socketedList,
 } from './offerings';
 export type { OfferingPickerRow, OfferingQuote, OfferingSlots, SocketableId } from './offerings';
+export {
+  RITUAL_COPY,
+  RITUAL_REAGENT_IDS,
+  RITUAL_SLOT_COUNT,
+  canSocketRitual,
+  consumeRitual,
+  emptyRitual,
+  isRitualReagent,
+  normalizeRitual,
+  remainingRitualOwned,
+  riteFloorConfig,
+  ritualCaption,
+  ritualCombo,
+  ritualLockedBossId,
+  ritualPickerRows,
+} from './ritual';
+export type { RitualPickerRow, RitualReagentId, RitualSlots } from './ritual';
 export {
   CAMPAIGN_COST,
   HARD_COST,
