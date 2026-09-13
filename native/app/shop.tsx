@@ -9,6 +9,7 @@ export default function ShopRoute() {
   const router = useRouter();
   const meta = useGameStore((s) => s.meta);
   const sellFromShop = useGameStore((s) => s.sell);
+  const buyFromShop = useGameStore((s) => s.buy);
 
   return (
     <Shell>
@@ -16,6 +17,7 @@ export default function ShopRoute() {
         meta={meta}
         onBack={() => router.back()}
         onSell={(itemId, qty) => sellFromShop(itemId, qty)}
+        onBuy={(itemId, qty) => buyFromShop(itemId, qty)}
         onUi={() => getAudio().playSfx('ui')}
         onDeny={playDeny}
       />

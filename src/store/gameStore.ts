@@ -29,6 +29,7 @@ import {
   RUN_KEY,
   runStash,
   sanitizePerfectFloors,
+  buyLoot,
   sellLoot,
   spendEntry,
   stashToRewards,
@@ -60,6 +61,7 @@ export interface GameStoreState {
   applyFlag: (index: number, rng?: Rng) => GameEvent[];
   applyExtract: (rng?: Rng) => GameEvent[];
   sell: (itemId: ItemId, qty?: number) => boolean;
+  buy: (itemId: ItemId, qty?: number) => boolean;
 }
 
 export type GameStore = UseBoundStore<StoreApi<GameStoreState>>;
@@ -323,6 +325,12 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
         },
         sell: (itemId, qty = 1) => {
           const next = sellLoot(get().meta, itemId, qty, keyStore);
+          if (!next) return false;
+          set({ meta: next });
+          return true;
+        },
+        buy: (itemId, qty = 1) => {
+          const next = buyLoot(get().meta, itemId, qty, keyStore);
           if (!next) return false;
           set({ meta: next });
           return true;

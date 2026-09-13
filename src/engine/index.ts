@@ -25,17 +25,22 @@ export {
   isCampaignFinale,
   newCell,
 } from './types';
-export type { Inventory, ItemDef, ItemId, ChestTier } from './loot';
+export type { Inventory, ItemDef, ItemId, ChestTier, ShopBuyCatalog, ShopMode } from './loot';
 export {
   ITEMS,
   ITEM_IDS,
   CHEST_TIERS,
   TIER_COPY,
+  SHOP_BUY,
   addItem,
+  buyGold,
+  buyableEntries,
+  clampBuyQty,
   emptyInventory,
   rollPouchGold,
   goldForLoot,
   inventoryTotal,
+  isBuyable,
   isChestTier,
   isCollectible,
   isItemId,
@@ -46,6 +51,7 @@ export {
   sellableEntries,
   sellGold,
   clampSellQty,
+  shopSelectionAfterModeChange,
   rollLoot,
   lootTableFor,
   campaignKeyDropRate,
@@ -55,6 +61,7 @@ export {
 export {
   COLLECTION_KEY,
   applyRewards,
+  buyLoot,
   collectLoot,
   defaultStore,
   emptyCollection,
@@ -174,3 +181,24 @@ export {
   sanitizeRun,
 } from './runPersist';
 export type { FloorOutcome, FloorReport, PersistedRunSlice, Run } from './runPersist';
+export type { AppScreen, BgmId, DifficultyMode, SfxId } from './audio';
+export {
+  AUDIO_KEY,
+  BGM_FILES,
+  LEGACY_SOUND_KEY,
+  SFX_FILES,
+  bossFloorActive,
+  campaignFloorActive,
+  desiredBgm,
+  finaleBgm,
+  loadMuted,
+  saveMuted,
+  sfxFromEvents,
+} from './audio';
+export {
+  BOARD_GAP,
+  PLAY_SIDE_PAD,
+  boardPixelSize,
+  clampBoardSlot,
+  fitBoardCellPx,
+} from './fitBoardCell';

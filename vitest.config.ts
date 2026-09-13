@@ -1,19 +1,17 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-  // Tests import native/ audio cues and fitBoardCell. Do not walk into
-  // native/tsconfig.json (extends expo/tsconfig.base, not installed at root).
-  esbuild: {
-    tsconfigRaw: {
-      compilerOptions: {
-        target: 'ES2022',
-        module: 'ESNext',
-        moduleResolution: 'bundler',
-      },
-    },
-  },
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    // Root `npm test` is engine/store only. Never transform `native/` —
+    // Pages CI runs this before `cd native && npm ci`, so expo/tsconfig.base
+    // is not installed.
+    exclude: ['**/node_modules/**', 'native/**'],
+    server: {
+      fs: {
+        deny: ['**/native/**'],
+      },
+    },
   },
 });

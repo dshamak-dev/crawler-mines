@@ -1,24 +1,13 @@
-import type { KeyStore } from '../../../src/engine';
+import { loadMuted as loadMutedFrom, saveMuted as saveMutedFrom } from '../../../src/engine';
 import { keyStore as defaultNativeStore } from '../storage';
+import type { KeyStore } from '../../../src/engine';
 
-export const AUDIO_KEY = 'crawler-mines-audio';
-export const LEGACY_SOUND_KEY = 'crawler-mines-sound';
+export { AUDIO_KEY, LEGACY_SOUND_KEY } from '../../../src/engine';
 
 export function loadMuted(store: KeyStore = defaultNativeStore): boolean {
-  const raw = store.getItem(AUDIO_KEY);
-  if (!raw) {
-    const legacy = store.getItem(LEGACY_SOUND_KEY);
-    return legacy === '0';
-  }
-  try {
-    const parsed = JSON.parse(raw) as { muted?: unknown };
-    if (parsed && typeof parsed === 'object') return parsed.muted === true;
-  } catch {
-    /* plain "1" / "true" from an older write */
-  }
-  return raw === '1' || raw === 'true';
+  return loadMutedFrom(store);
 }
 
 export function saveMuted(muted: boolean, store: KeyStore = defaultNativeStore): void {
-  store.setItem(AUDIO_KEY, JSON.stringify({ v: 1, muted }));
+  saveMutedFrom(muted, store);
 }

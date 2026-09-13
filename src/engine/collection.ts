@@ -1,7 +1,10 @@
 import {
   addItem,
+  buyGold,
+  clampBuyQty,
   clampSellQty,
   emptyInventory,
+  isBuyable,
   isCollectible,
   isItemId,
   isSellable,
@@ -9,6 +12,8 @@ import {
   sellGold,
   type Inventory,
   type ItemId,
+  type ShopBuyCatalog,
+  SHOP_BUY,
 } from './loot';
 
 export const COLLECTION_KEY = 'crawler-mines-collection';
@@ -150,6 +155,33 @@ export function sellLoot(
   const next: CollectionState = {
     gold: clampGold(state.gold) + sellGold(itemId) * n,
     items: removeItem(state.items, itemId, n),
+    lastGrantKey: state.lastGrantKey,
+  };
+  saveCollection(next, store);
+  return next;
+}
+
+/**
+ * Buy `qty` of a catalog item for gold. Persists immediately.
+ * Short gold, missing catalog price, or a non-collectible id returns null
+ * and charges nothing.
+ */
+export function buyLoot(
+  state: CollectionState,
+  itemId: ItemId,
+  qty: number,
+  store: KeyStore = defaultStore(),
+  catalog: ShopBuyCatalog = SHOP_BUY,
+): CollectionState | null {
+  if (!isBuyable(itemId, catalog) || !isCollectible(itemId)) return null;
+  const n = clampBuyQty(qty);
+  if (n < 1) return null;
+  const cost = buyGold(itemId, catalog) * n;
+  const gold = clampGold(state.gold);
+  if (gold < cost) return null;
+  const next: CollectionState = {
+    gold: gold - cost,
+    items: addItem(state.items, itemId, n),
     lastGrantKey: state.lastGrantKey,
   };
   saveCollection(next, store);
