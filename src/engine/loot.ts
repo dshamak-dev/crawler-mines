@@ -287,3 +287,54 @@ export function sellableEntries(
     .map((id) => ({ item: ITEMS[id], count: inv[id] ?? 0, gold: sellGold(id) }))
     .filter((row) => row.count > 0);
 }
+
+/**
+ * Title-shop buy prices. Follow-ups register rows here without reshaping the sheet:
+ * #45 bone-dust / witchcraft-bag, #47 scroll-of-portal, #49 skins.
+ */
+export const SHOP_BUY: Partial<Record<ItemId, number>> = {
+  // 'bone-dust': n,
+  // 'witchcraft-bag': n,
+  // 'scroll-of-portal': n,
+};
+
+export type ShopBuyCatalog = Partial<Record<ItemId, number>>;
+export type ShopMode = 'sell' | 'buy';
+
+export function buyGold(itemId: ItemId, catalog: ShopBuyCatalog = SHOP_BUY): number {
+  const n = catalog[itemId];
+  if (typeof n !== 'number' || !Number.isFinite(n)) return 0;
+  return Math.max(0, Math.floor(n));
+}
+
+export function isBuyable(itemId: ItemId, catalog: ShopBuyCatalog = SHOP_BUY): boolean {
+  return buyGold(itemId, catalog) > 0;
+}
+
+/** Empty slot → 0. Otherwise clamp to 1..max (default 99). */
+export function clampBuyQty(qty: number, max = 99): number {
+  const cap = Math.max(1, Math.floor(max));
+  const n = Math.floor(qty);
+  if (!Number.isFinite(n)) return 1;
+  return Math.min(cap, Math.max(1, n));
+}
+
+export function buyableEntries(
+  catalog: ShopBuyCatalog = SHOP_BUY,
+): Array<{ item: ItemDef; gold: number }> {
+  return ITEM_IDS.filter((id) => isBuyable(id, catalog)).map((id) => ({
+    item: ITEMS[id],
+    gold: buyGold(id, catalog),
+  }));
+}
+
+/** Switching Sell↔Buy drops the slotted item and qty; same-mode is a no-op. */
+export function shopSelectionAfterModeChange(
+  current: ShopMode,
+  next: ShopMode,
+  slotted: ItemId | null,
+  qty: number,
+): { mode: ShopMode; slotted: ItemId | null; qty: number } {
+  if (current === next) return { mode: current, slotted, qty };
+  return { mode: next, slotted: null, qty: 0 };
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boardPixelSize, clampBoardSlot, fitBoardCellPx } from '../native/src/ui/fitBoardCell';
+import { boardPixelSize, clampBoardSlot, fitBoardCellPx } from '../src/engine';
 
 describe('fitBoardCellPx', () => {
   it('fits campaign floor 4 (9×12) and floor 5 (12×16) inside a short phone slot', () => {

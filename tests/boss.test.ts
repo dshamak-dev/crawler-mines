@@ -34,7 +34,7 @@ import {
   type Inventory,
   type KeyStore,
 } from '../src/engine';
-import { desiredBgm } from '../native/src/audio/cues';
+import { desiredBgm } from '../src/engine';
 import { createGameStore } from '../src/store/gameStore';
 
 function idx(game: { width: number }, x: number, y: number): number {

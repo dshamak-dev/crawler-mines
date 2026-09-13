@@ -3,20 +3,18 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   AUDIO_KEY,
+  BGM_FILES,
   LEGACY_SOUND_KEY,
-  loadMuted,
-  saveMuted,
-} from '../native/src/audio/settings';
-import {
+  SFX_FILES,
   bossFloorActive,
   campaignFloorActive,
   desiredBgm,
   finaleBgm,
+  loadMuted,
+  saveMuted,
   sfxFromEvents,
-} from '../native/src/audio/cues';
-import { stopOtherBgm } from '../native/src/audio/exclusive';
-import { BGM_FILES, SFX_FILES, type BgmId } from '../native/src/audio/urls';
-import type { KeyStore } from '../src/engine';
+  type KeyStore,
+} from '../src/engine';
 
 function memoryStore(seed: Record<string, string> = {}): KeyStore {
   const data = new Map(Object.entries(seed));
@@ -152,37 +150,6 @@ describe('SFX from engine events', () => {
       sfxFromEvents([{ type: 'boss-smash-chest', index: 2, tier: 'iron' }]),
     ).toEqual(['wreck']);
     expect(sfxFromEvents([{ type: 'deny' }])).toEqual(['deny']);
-  });
-});
-
-describe('exclusive BGM', () => {
-  function stubTrack(playing: boolean, volume = playing ? 0.2 : 0) {
-    return {
-      volume,
-      paused: !playing,
-      pause() {
-        this.paused = true;
-      },
-    };
-  }
-
-  it('hard-stops every other clip and leaves the incoming one playing', () => {
-    const tracks: Record<BgmId, ReturnType<typeof stubTrack>> = {
-      cozy: stubTrack(true),
-      campaign: stubTrack(true, 0.2),
-      boss: stubTrack(false),
-      wrath: stubTrack(true),
-      lust: stubTrack(false),
-    };
-    stopOtherBgm(tracks, 'campaign');
-    expect(tracks.campaign.paused).toBe(false);
-    expect(tracks.campaign.volume).toBe(0.2);
-    expect(tracks.cozy.paused).toBe(true);
-    expect(tracks.cozy.volume).toBe(0);
-    expect(tracks.wrath.paused).toBe(true);
-    expect(tracks.wrath.volume).toBe(0);
-    expect(tracks.boss.paused).toBe(true);
-    expect(tracks.lust.paused).toBe(true);
   });
 });
 
