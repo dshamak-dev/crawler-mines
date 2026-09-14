@@ -143,6 +143,7 @@ export function createGame(
     lastPlayerAction: null,
     doorIndex,
     heartOrder: [],
+    torchHint: null,
   };
 }
 
@@ -214,6 +215,7 @@ export function createGameFromLayout(
     lastPlayerAction: null,
     doorIndex,
     heartOrder: [],
+    torchHint: null,
   };
 }
 
@@ -224,6 +226,9 @@ export function cloneGame(game: Game): Game {
     inventory: { ...game.inventory },
     boss: game.boss ? { ...game.boss } : null,
     heartOrder: [...(game.heartOrder ?? [])],
+    torchHint: game.torchHint
+      ? { indices: [...game.torchHint.indices], until: game.torchHint.until }
+      : null,
   };
 }
 

@@ -7,6 +7,7 @@ export type {
   CellVisual,
   ChestReward,
   Difficulty,
+  TorchHint,
   FloorConfig,
   Game,
   GameEvent,
@@ -26,6 +27,15 @@ export {
   isCampaignFinale,
   newCell,
 } from './types';
+export {
+  TORCH_HINT_COUNT,
+  TORCH_HINT_MS,
+  activeTorchHintIndices,
+  applyTorchCharm,
+  closedMineIndices,
+  isClosedMine,
+  pickClosedMines,
+} from './torch';
 export type {
   Inventory,
   ItemDef,
@@ -87,6 +97,7 @@ export {
   selectFlagSkin,
   selectGridSkin,
   sellLoot,
+  useTorchCharm,
 } from './collection';
 export type { CollectionState, KeyStore } from './collection';
 export type {

@@ -45,6 +45,7 @@ export default function CollectionScreen({
   onSelectGrid,
   onUi,
   onDeny,
+  onUseTorch,
 }: {
   meta: CollectionState;
   runLoot: Inventory;
@@ -57,6 +58,7 @@ export default function CollectionScreen({
   onSelectGrid?: (skinId: GridSkinId) => boolean;
   onUi?: () => void;
   onDeny?: () => void;
+  onUseTorch?: () => boolean;
 }) {
   if (sealed && game) {
     return (
@@ -67,6 +69,8 @@ export default function CollectionScreen({
         kit={meta.items}
         onBack={onBack}
         onUi={onUi}
+        onDeny={onDeny}
+        onUseTorch={onUseTorch}
       />
     );
   }
@@ -298,6 +302,8 @@ function SealedCollection({
   kit,
   onBack,
   onUi,
+  onDeny,
+  onUseTorch,
 }: {
   game: Game;
   runLoot: Inventory;
@@ -305,6 +311,8 @@ function SealedCollection({
   kit: Inventory;
   onBack: () => void;
   onUi?: () => void;
+  onDeny?: () => void;
+  onUseTorch?: () => boolean;
 }) {
   const [preview, setPreview] = useState<ItemPreviewModel | null>(null);
   const kitRows = runKitEntries(kit);
@@ -313,8 +321,10 @@ function SealedCollection({
   const sealedTotal = sealedRows.reduce((sum, row) => sum + row.count, 0);
   const total = kitTotal + sealedTotal;
   const cue = onUi ?? (() => {});
+  const deny = onDeny ?? (() => {});
   const empty = kitRows.length === 0 && sealedRows.length === 0;
   const pill = kitTotal > 0 ? `${total} held` : `${sealedTotal} sealed`;
+  const allowUse = Boolean(onUseTorch);
 
   return (
     <View style={styles.shell}>
@@ -331,7 +341,7 @@ function SealedCollection({
               style={[styles.card, isTicketKey(item.id) && styles.ticket]}
               onPress={() => {
                 cue();
-                setPreview(previewForItem(item.id, count, false));
+                setPreview(previewForItem(item.id, count, allowUse, true));
               }}
               accessibilityLabel={`${item.name}, ${count} in kit`}
             >
@@ -390,7 +400,20 @@ function SealedCollection({
         Back
       </StoneButton>
       {preview ? (
-        <ItemPreviewSheet preview={preview} onClose={() => setPreview(null)} onUi={cue} />
+        <ItemPreviewSheet
+          preview={preview}
+          onUse={() => {
+            const ok = onUseTorch?.() ?? false;
+            if (!ok) {
+              deny();
+              return;
+            }
+            setPreview(null);
+            onBack();
+          }}
+          onClose={() => setPreview(null)}
+          onUi={cue}
+        />
       ) : null}
     </View>
   );

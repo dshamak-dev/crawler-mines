@@ -23,6 +23,7 @@ import {
   type Difficulty,
   type Game,
   type GameStatus,
+  type TorchHint,
   type Turn,
 } from './types';
 
@@ -200,6 +201,22 @@ function sanitizeHeartOrder(raw: unknown, cellCount: number): number[] {
   return out;
 }
 
+function sanitizeTorchHint(raw: unknown, cellCount: number): TorchHint | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const h = raw as Record<string, unknown>;
+  if (typeof h.until !== 'number' || !Number.isFinite(h.until)) return null;
+  if (!Array.isArray(h.indices)) return null;
+  const indices: number[] = [];
+  const seen = new Set<number>();
+  for (const v of h.indices) {
+    if (!isInt(v) || v < 0 || v >= cellCount || seen.has(v)) continue;
+    seen.add(v);
+    indices.push(v);
+  }
+  if (indices.length === 0) return null;
+  return { indices, until: h.until };
+}
+
 function sanitizeGame(raw: unknown): Game | null {
   if (!raw || typeof raw !== 'object') return null;
   const g = raw as Record<string, unknown>;
@@ -258,6 +275,7 @@ function sanitizeGame(raw: unknown): Game | null {
     lastPlayerAction,
     doorIndex,
     heartOrder: sanitizeHeartOrder(g.heartOrder, cells.length),
+    torchHint: sanitizeTorchHint(g.torchHint, cells.length),
   };
   syncHeartOrder(game);
   capLustHearts(game);

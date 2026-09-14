@@ -40,6 +40,7 @@ export default function CollectionRoute() {
         onSelectGrid={fromPlay ? undefined : pickGrid}
         onUi={() => getAudio().playSfx('ui')}
         onDeny={playDeny}
+        onUseTorch={fromPlay ? () => useGameStore.getState().useTorch() : undefined}
       />
     </Shell>
   );

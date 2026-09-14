@@ -155,10 +155,14 @@ describe('sell catalog', () => {
     expect(isCollectible('witchcraft-bag')).toBe(true);
     expect(isCollectible('scroll-of-portal')).toBe(true);
     expect(isUsable('witchcraft-bag')).toBe(true);
+    expect(isUsable('torch-charm')).toBe(true);
     expect(isUsable('scroll-of-portal')).toBe(false);
     expect(canUseFromPreview('witchcraft-bag', 1)).toBe(true);
     expect(canUseFromPreview('witchcraft-bag', 0)).toBe(false);
     expect(canUseFromPreview('bone-dust', 2)).toBe(false);
+    expect(canUseFromPreview('torch-charm', 1)).toBe(false);
+    expect(canUseFromPreview('torch-charm', 1, true)).toBe(true);
+    expect(canUseFromPreview('gem', 3, true)).toBe(false);
   });
 });
 
