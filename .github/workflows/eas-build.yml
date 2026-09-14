@@ -23,10 +23,6 @@ on:
         required: true
         type: boolean
         default: true
-      api_url:
-        description: Public API URL (empty uses PUBLIC_ORIGIN/api)
-        required: false
-        default: ''
   workflow_call:
     inputs:
       profile:
@@ -41,11 +37,6 @@ on:
         description: Build Android
         required: true
         type: boolean
-      api_url:
-        description: Public API URL (empty uses PUBLIC_ORIGIN/api)
-        required: false
-        type: string
-        default: ''
 
 permissions:
   contents: read
@@ -69,39 +60,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
+        with:
+          package_json_file: native/package.json
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: pnpm
+          cache-dependency-path: native/pnpm-lock.yaml
 
       - name: Setup Expo and EAS
-        uses: expo/expo-github-action@v8
+        uses: expo/expo-github-action@v9
         with:
           eas-version: latest
+          packager: pnpm
           token: ${{ secrets.EAS_TOKEN }}
 
       - name: Install dependencies
+        working-directory: native
         run: pnpm install --frozen-lockfile
 
-      - name: Bake public API URL
-        if: ${{ inputs.profile != 'development' }}
-        env:
-          EAS_PROFILE: ${{ inputs.profile }}
-          API_URL: ${{ inputs.api_url }}
-          PUBLIC_ORIGIN: ${{ secrets.PUBLIC_ORIGIN }}
-        run: |
-          set -euo pipefail
-          URL="$(node scripts/eas-public-api-url.js)"
-          EXPO_PUBLIC_API_URL="$URL" node scripts/eas-public-api-url.js --write-eas apps/native/eas.json
-
       - name: Build iOS on EAS
-        working-directory: apps/native
+        working-directory: native
         run: eas build --platform ios --profile ${{ inputs.profile }} --non-interactive
 
   build-android:
@@ -111,37 +96,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
+        with:
+          package_json_file: native/package.json
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: pnpm
+          cache-dependency-path: native/pnpm-lock.yaml
 
       - name: Setup Expo and EAS
-        uses: expo/expo-github-action@v8
+        uses: expo/expo-github-action@v9
         with:
           eas-version: latest
+          packager: pnpm
           token: ${{ secrets.EAS_TOKEN }}
 
       - name: Install dependencies
+        working-directory: native
         run: pnpm install --frozen-lockfile
 
-      - name: Bake public API URL
-        if: ${{ inputs.profile != 'development' }}
-        env:
-          EAS_PROFILE: ${{ inputs.profile }}
-          API_URL: ${{ inputs.api_url }}
-          PUBLIC_ORIGIN: ${{ secrets.PUBLIC_ORIGIN }}
-        run: |
-          set -euo pipefail
-          URL="$(node scripts/eas-public-api-url.js)"
-          EXPO_PUBLIC_API_URL="$URL" node scripts/eas-public-api-url.js --write-eas apps/native/eas.json
-
       - name: Build Android on EAS
-        working-directory: apps/native
+        working-directory: native
         run: eas build --platform android --profile ${{ inputs.profile }} --non-interactive
