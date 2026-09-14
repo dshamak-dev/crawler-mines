@@ -44,6 +44,11 @@ export interface Run {
   lockedBossId?: BossId | null;
   /** One-floor witchcraft-bag rite (#46). Persist and resume like a campaign finale. */
   rite?: boolean;
+  /**
+   * Offered mid-run items (today: torch charms). Count is how many were
+   * socketed at enter — not the leftover bank stack. Empty on Easy/Medium.
+   */
+  kit?: Inventory;
 }
 
 export type FloorOutcome = 'cleared' | 'stashed' | 'victory' | 'lost';
@@ -80,6 +85,11 @@ export function newGrantKey(): string {
 
 export function runStash(run: Run): CampaignStash {
   return run.campaignStash ?? emptyStash();
+}
+
+/** This-run kit. Missing/legacy snapshots hydrate as empty. */
+export function runKitOf(run: Pick<Run, 'kit'> | null | undefined): Inventory {
+  return run?.kit ?? emptyInventory();
 }
 
 /** Campaign floors 1–4. Floor 5 / the boss does not need to be perfect. */
@@ -308,6 +318,7 @@ export function sanitizeRun(raw: unknown): Run | null {
     perfectFloors: sanitizePerfectFloors(r.perfectFloors),
     lockedBossId: isBossId(r.lockedBossId) ? r.lockedBossId : null,
     rite: r.rite === true,
+    kit: sanitizeInventory(r.kit),
   };
 }
 

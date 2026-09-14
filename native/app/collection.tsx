@@ -25,6 +25,7 @@ export default function CollectionRoute() {
         runLoot={runLoot}
         sealed={fromPlay}
         game={fromPlay && run ? run.game : undefined}
+        kit={fromPlay ? run?.kit : undefined}
         stashGold={run?.campaignStash?.gold ?? 0}
         onBack={onBack}
         onStartRite={

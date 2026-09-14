@@ -278,8 +278,8 @@ export function isUsable(itemId: ItemId): boolean {
 }
 
 /**
- * Pack items that stay available mid-run (this-run collection). Sealed chest
- * loot is not kit. Torch charms stay on the kit so in-run Use (#62) can spend them.
+ * Items that can sit on the this-run kit after a Hard/Campaign offering.
+ * Unoffered bank stacks never count. Sealed chest loot is not kit.
  */
 export function isRunKit(itemId: ItemId): boolean {
   return itemId === 'torch-charm';

@@ -4,6 +4,7 @@ import {
   FLAG_SKIN_IDS,
   GRID_SKIN_IDS,
   SKINS,
+  emptyInventory,
   inventoryTotal,
   isSkinOwned,
   isTicketKey,
@@ -36,6 +37,7 @@ const EMPTY_COPY = 'Chests stay sealed until you clear the floor. Bombs can stil
 export default function CollectionScreen({
   meta,
   runLoot,
+  kit,
   game,
   stashGold = 0,
   sealed = false,
@@ -49,6 +51,8 @@ export default function CollectionScreen({
 }: {
   meta: CollectionState;
   runLoot: Inventory;
+  /** Offered this-run kit. Never the leftover bank pack. */
+  kit?: Inventory;
   game?: Game;
   stashGold?: number;
   sealed?: boolean;
@@ -66,7 +70,7 @@ export default function CollectionScreen({
         game={game}
         runLoot={runLoot}
         stashGold={stashGold}
-        kit={meta.items}
+        kit={kit}
         onBack={onBack}
         onUi={onUi}
         onDeny={onDeny}
@@ -299,7 +303,7 @@ function SealedCollection({
   game,
   runLoot,
   stashGold,
-  kit,
+  kit = emptyInventory(),
   onBack,
   onUi,
   onDeny,
@@ -308,7 +312,7 @@ function SealedCollection({
   game: Game;
   runLoot: Inventory;
   stashGold: number;
-  kit: Inventory;
+  kit?: Inventory;
   onBack: () => void;
   onUi?: () => void;
   onDeny?: () => void;
