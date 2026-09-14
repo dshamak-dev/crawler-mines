@@ -9,10 +9,15 @@ import {
   chestNotices,
   isArenaFloor,
   isTicketKey,
+  loadSeenTips,
+  markTipSeen,
+  pickTip,
+  playTipWorld,
   selectedFlagSkin,
   selectedGridSkin,
   stackedEntries,
   type GameEvent,
+  type TipId,
 } from '../../../src/engine';
 import { sfxFromEvents } from '../audio';
 import { getAudio } from '../audio/player';
@@ -25,8 +30,7 @@ import { BagIcon, BossIcon, ChestIcon, FlagIcon, GoldIcon, ItemIcon, MenuIcon, S
 import LootQueue, { type LootToastItem } from './LootToast';
 import MuteButton from './MuteButton';
 import { DisplayText, GhostButton, MutedText, Overlay, StoneButton, Tablet } from './primitives';
-
-const TUTORIAL_KEY = 'crawler-mines-tutorial';
+import TipSheet from './TipSheet';
 
 function reportFor(run: Run): FloorReport | null {
   if (run.game.status === 'cleared' || run.game.status === 'lost') return floorReport(run);
@@ -56,10 +60,8 @@ export default function PlayScreen({
   const dismissBossReveal = useGameStore((s) => s.dismissBossReveal);
 
   const [flagMode, setFlagMode] = useState(false);
-  const [tutorial, setTutorial] = useState(() => {
-    if (!run) return false;
-    return keyStore.getItem(TUTORIAL_KEY) !== '1';
-  });
+  const [seenTips, setSeenTips] = useState(() => loadSeenTips(keyStore));
+  const [holdPlayTip, setHoldPlayTip] = useState(false);
   const [report, setReport] = useState<FloorReport | null>(() => (run ? reportFor(run) : null));
   const [blasts, setBlasts] = useState<BlastFx[]>([]);
   const [sparkles, setSparkles] = useState<Array<{ id: number; index: number }>>([]);
@@ -133,6 +135,7 @@ export default function PlayScreen({
       const events = applyDig(index);
       const cur = useGameStore.getState().run;
       if (!cur || events.length === 0) return;
+      setHoldPlayTip(false);
       if (events.some((e) => e.type === 'extract-prompt')) setExtractPrompt(true);
       for (const id of sfxFromEvents(events)) getAudio().playSfx(id);
       queueChestToasts(events, cur.game.cells);
@@ -155,6 +158,7 @@ export default function PlayScreen({
       const cell = useGameStore.getState().run?.game.cells[index];
       if (!cell || cell.state === 'revealed') return;
       const events = applyFlag(index);
+      setHoldPlayTip(false);
       getAudio().playSfx('flag');
       for (const id of sfxFromEvents(events)) getAudio().playSfx(id);
     },
@@ -170,6 +174,7 @@ export default function PlayScreen({
     setFlagMode(false);
     setExtractPrompt(false);
     setMenuOpen(false);
+    setHoldPlayTip(false);
   };
 
   const nextFloor = () => {
@@ -184,9 +189,9 @@ export default function PlayScreen({
     clearFx();
   };
 
-  const dismissTutorial = () => {
-    keyStore.setItem(TUTORIAL_KEY, '1');
-    setTutorial(false);
+  const dismissPlayTip = (id: TipId) => {
+    setSeenTips(markTipSeen(keyStore, id));
+    setHoldPlayTip(true);
   };
 
   const boardW = run?.game.width ?? 8;
@@ -231,6 +236,18 @@ export default function PlayScreen({
         ? 'Stash dumped into your wallet.'
         : 'Pouched gold, now in your wallet.';
   const revealBoss = Boolean(run.bossRevealPending && boss && boss.lives > 0 && !report);
+  const playTip =
+    !revealBoss && !menuOpen && !extractPrompt && !report
+      ? pickTip(
+          seenTips,
+          playTipWorld({
+            holdPlay: holdPlayTip,
+            arena,
+            chests: game.chests,
+            torchCount: meta.items['torch-charm'] ?? 0,
+          }),
+        )
+      : null;
 
   return (
     <View style={styles.shell}>
@@ -396,25 +413,7 @@ export default function PlayScreen({
         </Overlay>
       ) : null}
 
-      {tutorial && !revealBoss && !menuOpen ? (
-        <Overlay onBackdrop={dismissTutorial}>
-          <Tablet>
-            <DisplayText>First descent</DisplayText>
-            <MutedText style={styles.pad}>Bombs don&apos;t kill you. They kill the loot next to them.</MutedText>
-            <MutedText style={styles.pad}>Clear every safe tile. Blasts chain — a bomb sets off its neighbors.</MutedText>
-            <StoneButton
-              gold
-              onPress={() => {
-                cueUi();
-                dismissTutorial();
-              }}
-              style={styles.center}
-            >
-              I understand
-            </StoneButton>
-          </Tablet>
-        </Overlay>
-      ) : null}
+      {playTip ? <TipSheet tip={playTip} onDismiss={() => dismissPlayTip(playTip.id)} onUi={cueUi} /> : null}
 
       {revealBoss && boss ? (
         <Overlay
