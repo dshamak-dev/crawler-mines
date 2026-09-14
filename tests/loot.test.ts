@@ -148,6 +148,12 @@ describe('chest loot identity', () => {
     const chests = game.cells.filter((c) => c.kind === 'chest');
     expect(chests).toHaveLength(DIFFICULTIES.easy.chests);
     for (const c of chests) {
+      if (c.tier === 'secret') {
+        expect(c.loot).toBeNull();
+        expect(c.lootExtra).toBeNull();
+        expect(c.gold).toBe(0);
+        continue;
+      }
       expect(c.loot).not.toBeNull();
       expect(ITEM_IDS).toContain(c.loot);
       expect(c.tier).toBe(tierForLoot(c.loot as ItemId));

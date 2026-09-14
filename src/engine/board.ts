@@ -1,4 +1,12 @@
-import { emptyInventory, goldForLoot, rollLoot, tierForLoot, type ChestTier, type ItemId } from './loot';
+import {
+  emptyInventory,
+  goldForLoot,
+  rollLoot,
+  SECRET_CHEST_SPAWN_RATE,
+  tierForLoot,
+  type ChestTier,
+  type ItemId,
+} from './loot';
 import { bossMaxLives, rollBossId } from './boss';
 import {
   type BossId,
@@ -97,6 +105,14 @@ export function createGame(
   const cells: Cell[] = Array.from({ length: total }, () => newCell());
   const chestIdx = pickUnique(chests, total, new Set(), rng);
   for (const i of chestIdx) {
+    if (rng() < SECRET_CHEST_SPAWN_RATE) {
+      cells[i].kind = 'chest';
+      cells[i].loot = null;
+      cells[i].lootExtra = null;
+      cells[i].tier = 'secret';
+      cells[i].gold = 0;
+      continue;
+    }
     const loot = rollLoot(rng, mode);
     cells[i].kind = 'chest';
     cells[i].loot = loot;
@@ -147,7 +163,7 @@ export function createGame(
   };
 }
 
-/** Build a board from a layout for tests. `.` empty, `*` mine, `$` chest, `B` boss spawn. */
+/** Build a board from a layout for tests. `.` empty, `*` mine, `$` chest, `S` secret chest, `B` boss spawn. */
 export function createGameFromLayout(
   rows: string[],
   chestValue = 10,
@@ -175,6 +191,17 @@ export function createGameFromLayout(
             loot,
             tier: tier ?? tierForLoot(loot),
             gold: goldForLoot(loot, chestValue),
+          }),
+        );
+        chests++;
+      } else if (ch === 'S') {
+        cells.push(
+          newCell({
+            kind: 'chest',
+            loot: null,
+            lootExtra: null,
+            tier: 'secret',
+            gold: 0,
           }),
         );
         chests++;
@@ -357,15 +384,18 @@ export function ensureFirstClickSafe(game: Game, index: number, rng: Rng): void 
     cell.kind = 'chest';
     cell.gold = destCell.gold;
     cell.loot = destCell.loot;
+    cell.lootExtra = destCell.lootExtra;
     cell.tier = destCell.tier;
     destCell.kind = 'mine';
     destCell.gold = 0;
     destCell.loot = null;
+    destCell.lootExtra = null;
     destCell.tier = null;
   } else {
     cell.kind = 'empty';
     cell.gold = 0;
     cell.loot = null;
+    cell.lootExtra = null;
     cell.tier = null;
     destCell.kind = 'mine';
   }
