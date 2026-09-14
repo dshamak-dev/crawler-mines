@@ -1,0 +1,147 @@
+# EAS Build — dispatch or product orchestrator
+name: EAS Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: EAS build profile
+        required: true
+        type: choice
+        options:
+          - preview
+          - development
+          - production
+        default: preview
+      ios:
+        description: Build iOS
+        required: true
+        type: boolean
+        default: false
+      android:
+        description: Build Android
+        required: true
+        type: boolean
+        default: true
+      api_url:
+        description: Public API URL (empty uses PUBLIC_ORIGIN/api)
+        required: false
+        default: ''
+  workflow_call:
+    inputs:
+      profile:
+        description: EAS build profile
+        required: true
+        type: string
+      ios:
+        description: Build iOS
+        required: true
+        type: boolean
+      android:
+        description: Build Android
+        required: true
+        type: boolean
+      api_url:
+        description: Public API URL (empty uses PUBLIC_ORIGIN/api)
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate inputs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require at least one platform
+        run: |
+          if [ "${{ inputs.ios }}" != "true" ] && [ "${{ inputs.android }}" != "true" ]; then
+            echo "::error::Select at least one of ios or android"
+            exit 1
+          fi
+
+  build-ios:
+    name: Build iOS (${{ inputs.profile }})
+    needs: validate
+    if: ${{ inputs.ios == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EAS_TOKEN }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Bake public API URL
+        if: ${{ inputs.profile != 'development' }}
+        env:
+          EAS_PROFILE: ${{ inputs.profile }}
+          API_URL: ${{ inputs.api_url }}
+          PUBLIC_ORIGIN: ${{ secrets.PUBLIC_ORIGIN }}
+        run: |
+          set -euo pipefail
+          URL="$(node scripts/eas-public-api-url.js)"
+          EXPO_PUBLIC_API_URL="$URL" node scripts/eas-public-api-url.js --write-eas apps/native/eas.json
+
+      - name: Build iOS on EAS
+        working-directory: apps/native
+        run: eas build --platform ios --profile ${{ inputs.profile }} --non-interactive
+
+  build-android:
+    name: Build Android (${{ inputs.profile }})
+    needs: validate
+    if: ${{ inputs.android == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EAS_TOKEN }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Bake public API URL
+        if: ${{ inputs.profile != 'development' }}
+        env:
+          EAS_PROFILE: ${{ inputs.profile }}
+          API_URL: ${{ inputs.api_url }}
+          PUBLIC_ORIGIN: ${{ secrets.PUBLIC_ORIGIN }}
+        run: |
+          set -euo pipefail
+          URL="$(node scripts/eas-public-api-url.js)"
+          EXPO_PUBLIC_API_URL="$URL" node scripts/eas-public-api-url.js --write-eas apps/native/eas.json
+
+      - name: Build Android on EAS
+        working-directory: apps/native
+        run: eas build --platform android --profile ${{ inputs.profile }} --non-interactive

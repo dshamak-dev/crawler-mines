@@ -15,10 +15,8 @@
     "android": {
       "package": "dev.dshamak.crawlermines",
       "adaptiveIcon": {
-        "backgroundColor": "#120e0c",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#120e0c"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
