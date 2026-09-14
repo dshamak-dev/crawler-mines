@@ -32,6 +32,8 @@ import {
   type GridSkinId,
   type SkinId,
 } from './skins';
+import { applyTorchCharm } from './torch';
+import type { Game, Rng } from './types';
 
 export const COLLECTION_KEY = 'crawler-mines-collection';
 
@@ -221,6 +223,25 @@ export function sellLoot(
     gold: clampGold(state.gold) + sellGold(itemId) * n,
     items: removeItem(state.items, itemId, n),
   });
+  saveCollection(next, store);
+  return next;
+}
+
+/**
+ * Consume one torch charm to hint closed mines on the live board.
+ * Persists the pack immediately. No-op (null) when there is no torch or
+ * no closed mine left — board state stays unchanged.
+ */
+export function useTorchCharm(
+  state: CollectionState,
+  game: Game,
+  rng: Rng,
+  store: KeyStore = defaultStore(),
+  now = Date.now(),
+): CollectionState | null {
+  const items = applyTorchCharm(state.items, game, rng, now);
+  if (!items) return null;
+  const next = withSkins({ ...state, items });
   saveCollection(next, store);
   return next;
 }

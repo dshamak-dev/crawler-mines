@@ -69,6 +69,13 @@ export interface Game {
   doorIndex: number | null;
   /** Lust heart plant order, oldest first. Empty when no hearts. */
   heartOrder: number[];
+  /** Visual-only torch hint. Does not change cell state. Null when idle. */
+  torchHint: TorchHint | null;
+}
+
+export interface TorchHint {
+  indices: number[];
+  until: number;
 }
 
 export interface ChestReward {

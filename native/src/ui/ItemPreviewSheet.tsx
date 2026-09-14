@@ -31,6 +31,7 @@ export function previewForItem(
   itemId: ItemId,
   owned: number,
   allowUse: boolean,
+  inRun = false,
 ): ItemPreviewModel {
   const item = ITEMS[itemId];
   const have = Math.max(0, Math.floor(owned));
@@ -39,7 +40,7 @@ export function previewForItem(
     flavor: item.flavor,
     icon: { kind: 'item', itemId },
     qty: have > 0 ? have : undefined,
-    canUse: allowUse && canUseFromPreview(itemId, have),
+    canUse: allowUse && canUseFromPreview(itemId, have, inRun),
   };
 }
 

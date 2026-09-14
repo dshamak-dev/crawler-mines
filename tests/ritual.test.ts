@@ -87,19 +87,24 @@ describe('ritual combo', () => {
     expect(ritualCombo(['bone-dust', 'bone-dust', 'wrath-head']).ok).toBe(false);
   });
 
-  it('marks only the witchcraft bag as usable from Collection', () => {
+  it('marks the bag usable from title Collection and the torch from this-run', () => {
     expect(isUsable('witchcraft-bag')).toBe(true);
+    expect(isUsable('torch-charm')).toBe(true);
     expect(isUsable('scroll-of-portal')).toBe(false);
     expect(isUsable('bone-dust')).toBe(false);
     expect(isUsable('gluttony-head')).toBe(false);
+    expect(isUsable('gem')).toBe(false);
     expect(canUseFromPreview('witchcraft-bag', 1)).toBe(true);
     expect(canUseFromPreview('witchcraft-bag', 2)).toBe(true);
     expect(canUseFromPreview('witchcraft-bag', 0)).toBe(false);
     expect(canUseFromPreview('witchcraft-bag', -1)).toBe(false);
+    expect(canUseFromPreview('witchcraft-bag', 1, true)).toBe(false);
     expect(canUseFromPreview('bone-dust', 4)).toBe(false);
     expect(canUseFromPreview('scroll-of-portal', 1)).toBe(false);
     expect(canUseFromPreview('gluttony-head', 1)).toBe(false);
     expect(canUseFromPreview('gem', 9)).toBe(false);
+    expect(canUseFromPreview('torch-charm', 1)).toBe(false);
+    expect(canUseFromPreview('torch-charm', 1, true)).toBe(true);
   });
 });
 

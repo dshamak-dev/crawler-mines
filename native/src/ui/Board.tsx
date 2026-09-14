@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -10,6 +10,7 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 import {
   BOSS_COPY,
+  activeTorchHintIndices,
   cellVisual,
   gridNumberColor,
   gridSkinPaint,
@@ -113,6 +114,19 @@ export default function Board({
     return map;
   }, [blasts]);
 
+  const [hintTick, setHintTick] = useState(0);
+  const hinted = useMemo(
+    () => new Set(activeTorchHintIndices(game)),
+    [game, hintTick],
+  );
+
+  useEffect(() => {
+    const remain = (game.torchHint?.until ?? 0) - Date.now();
+    if (remain <= 0) return;
+    const timer = setTimeout(() => setHintTick((n) => n + 1), remain);
+    return () => clearTimeout(timer);
+  }, [game.torchHint]);
+
   const shakeX = useSharedValue(0);
   const shakeStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: shakeX.value }],
@@ -155,6 +169,7 @@ export default function Board({
                     bossId={game.boss?.id ?? 'gluttony'}
                     bossDead={game.boss != null && game.boss.lives <= 0}
                     hearted={cell.hearted === true}
+                    hinted={hinted.has(i)}
                     door={
                       game.doorIndex === i && (cell.state === 'revealed' || cell.wrecked)
                     }
@@ -200,6 +215,7 @@ const DungeonCell = memo(function DungeonCell({
   bossId,
   bossDead,
   hearted,
+  hinted,
   door,
   onDig,
   onFlag,
@@ -217,12 +233,14 @@ const DungeonCell = memo(function DungeonCell({
   bossId: BossId;
   bossDead: boolean;
   hearted: boolean;
+  hinted: boolean;
   door: boolean;
   onDig: (i: number) => void;
   onFlag: (i: number) => void;
 }) {
   const visual = cellVisual(cell);
   const icon = Math.round(size * 0.72);
+  const mineHint = hinted && visual !== 'exploded';
 
   const longPress = Gesture.LongPress()
     .minDuration(LONG_MS)
@@ -263,7 +281,9 @@ const DungeonCell = memo(function DungeonCell({
     ? `${bossDead ? `Fallen ${bossName}` : bossName}${hearted ? ', heart covering the number' : ''}`
     : hearted
       ? `Heart covering ${cell.adjacentMines} adjacent bombs`
-      : door && cell.wrecked
+      : mineHint
+        ? 'Mine hint'
+        : door && cell.wrecked
         ? 'Wrecked exit door'
         : door
           ? 'Exit door'
@@ -276,12 +296,14 @@ const DungeonCell = memo(function DungeonCell({
         accessibilityLabel={label}
         style={[
           styles.cell,
-          cellStyle(visual, bossHere, bossId, door, gridPaint),
+          cellStyle(visual, bossHere, bossId, door, gridPaint, mineHint),
           { width: size, height: size },
           popStyle,
         ]}
       >
-        {visual === 'flagged' || visual === 'bomb-flagged' ? (
+        {mineHint ? (
+          <BombIcon size={icon} />
+        ) : visual === 'flagged' || visual === 'bomb-flagged' ? (
           <FlagIcon ember={visual === 'bomb-flagged'} skin={flagSkin} size={icon} />
         ) : hearted ? (
           <HeartIcon size={Math.round(size * 0.78)} />
@@ -364,6 +386,7 @@ function cellStyle(
   bossId: BossId,
   door: boolean,
   paint: GridSkinPaint,
+  hinted = false,
 ) {
   const revealed =
     visual === 'empty' ||
@@ -372,7 +395,9 @@ function cellStyle(
     visual === 'wrecked' ||
     visual === 'exploded';
   const fill =
-    visual === 'chest'
+    hinted
+      ? paint.exploded
+      : visual === 'chest'
       ? paint.chest
       : visual === 'wrecked'
         ? paint.wrecked
@@ -385,6 +410,7 @@ function cellStyle(
     { backgroundColor: fill },
     bossHere && (bossId === 'lust' ? styles.bossLust : styles.boss),
     door && styles.door,
+    hinted && styles.mineHint,
   ];
 }
 
@@ -424,6 +450,10 @@ const styles = StyleSheet.create({
   boss: { backgroundColor: '#2a1830' },
   bossLust: { backgroundColor: '#2a1218' },
   door: {},
+  mineHint: {
+    borderWidth: 2,
+    borderColor: colors.gold2,
+  },
   rune: { fontFamily: fonts.display, fontWeight: '700' },
   bossGlyph: {
     position: 'absolute',

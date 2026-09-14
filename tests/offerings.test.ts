@@ -541,7 +541,7 @@ describe('#65 Hard offering UI', () => {
     expect(title).toContain('offeringPickerRows(meta, slots, fillingSlot, mode)');
     expect(collection).toContain('runKitEntries');
     expect(collection).toContain('kit={meta.items}');
-    expect(collection).toContain('previewForItem(item.id, count, false)');
+    expect(collection).toContain('previewForItem(item.id, count, allowUse, true)');
     expect(collection).not.toContain('This run');
     const readme = readFileSync(resolve('README.md'), 'utf8');
     expect(readme).toMatch(/Hard key/);

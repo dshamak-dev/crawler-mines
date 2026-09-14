@@ -272,14 +272,14 @@ export function isShopOnly(itemId: ItemId): boolean {
   return itemId === 'bone-dust' || itemId === 'witchcraft-bag' || itemId === 'scroll-of-portal';
 }
 
-/** Collection Use. Scroll of portal is reagent-only; bag opens the #46 ritual. */
+/** Collection Use. Bag opens the #46 ritual; torch is in-run mine hint (#62). Gem is sell-only. */
 export function isUsable(itemId: ItemId): boolean {
-  return itemId === 'witchcraft-bag';
+  return itemId === 'witchcraft-bag' || itemId === 'torch-charm';
 }
 
 /**
  * Pack items that stay available mid-run (this-run collection). Sealed chest
- * loot is not kit. Torch Use is #62 — still listed so the run pack can show it.
+ * loot is not kit. Torch charms stay on the kit so in-run Use (#62) can spend them.
  */
 export function isRunKit(itemId: ItemId): boolean {
   return itemId === 'torch-charm';
@@ -292,11 +292,14 @@ export function runKitEntries(
 }
 
 /**
- * Preview Use. Only the bag, and only when the player owns at least one.
- * Collection-all and Shop pass owned pack counts; this-run / sealed / browse-unowned do not.
+ * Preview Use. Bag from title/shop Collection; torch from this-run kit.
+ * Gems stay sell-only. Owned count must be at least one.
  */
-export function canUseFromPreview(itemId: ItemId, owned: number): boolean {
-  return isUsable(itemId) && Math.max(0, Math.floor(owned)) >= 1;
+export function canUseFromPreview(itemId: ItemId, owned: number, inRun = false): boolean {
+  if (Math.max(0, Math.floor(owned)) < 1) return false;
+  if (itemId === 'witchcraft-bag') return !inRun;
+  if (itemId === 'torch-charm') return inRun;
+  return false;
 }
 
 /** Title-shop unit prices. Pouches, ticket keys, heads, and the gold cup do not sell. */

@@ -38,6 +38,7 @@ import {
   sellLoot,
   spendEntry,
   stashToRewards,
+  useTorchCharm,
   type CollectionState,
   type Difficulty,
   type Game,
@@ -76,6 +77,7 @@ export interface GameStoreState {
   selectFlagSkin: (skinId: FlagSkinId) => boolean;
   selectGridSkin: (skinId: GridSkinId) => boolean;
   startRite: (slots: RitualSlots, rng?: Rng) => boolean;
+  useTorch: (rng?: Rng) => boolean;
 }
 
 export type GameStore = UseBoundStore<StoreApi<GameStoreState>>;
@@ -390,6 +392,19 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
             meta: next,
             run: freshRiteRun(rng, locked),
             runLoot: emptyInventory(),
+          });
+          return true;
+        },
+        useTorch: (rng = Math.random) => {
+          const { run, meta } = get();
+          if (!run || run.game.status !== 'playing') return false;
+          if (run.bossRevealPending) return false;
+          const game = cloneGame(run.game);
+          const next = useTorchCharm(meta, game, rng, keyStore);
+          if (!next) return false;
+          set({
+            meta: next,
+            run: { ...run, game },
           });
           return true;
         },
