@@ -161,8 +161,9 @@ export default function PlayScreen({
       setHoldPlayTip(false);
       getAudio().playSfx('flag');
       for (const id of sfxFromEvents(events)) getAudio().playSfx(id);
+      finishIfEnded(events);
     },
-    [applyFlag],
+    [applyFlag, finishIfEnded],
   );
 
   const clearFx = () => {

@@ -273,6 +273,10 @@ export function chestsRemaining(game: Game): number {
   ).length;
 }
 
+/**
+ * Every non-mine is revealed. Mines may stay hidden, flagged, or torch-hinted.
+ * A locked secret chest still counts once it has been unearthed.
+ */
 export function allSafeRevealed(game: Game): boolean {
   return game.cells.every((c) => c.kind === 'mine' || c.state === 'revealed');
 }

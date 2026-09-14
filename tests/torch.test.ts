@@ -8,9 +8,11 @@ import {
   activeTorchHintIndices,
   applyTorchCharm,
   canUseFromPreview,
+  cellVisual,
   closedMineIndices,
   createGameFromLayout,
   emptyInventory,
+  flag,
   isUsable,
   loadCollection,
   loadRun,
@@ -142,6 +144,20 @@ describe('#62 torch Use', () => {
     game.cells[1].state = 'flagged';
     const picked = pickClosedMines(game, mulberry32(4), 2);
     expect(new Set(picked)).toEqual(new Set([0, 1]));
+  });
+
+  it('flags a torch-hinted mine and keeps it hinted', () => {
+    const game = createGameFromLayout(['*.*', '...']);
+    const now = 500;
+    expect(applyTorchCharm({ ...emptyInventory(), 'torch-charm': 1 }, game, mulberry32(3), now)).not.toBeNull();
+    const hinted = game.torchHint!.indices[0];
+    expect(game.cells[hinted].state).toBe('hidden');
+    expect(cellVisual(game.cells[hinted])).toBe('hidden');
+    const events = flag(game, hinted);
+    expect(game.cells[hinted].state).toBe('flagged');
+    expect(cellVisual(game.cells[hinted])).toBe('bomb-flagged');
+    expect(activeTorchHintIndices(game, now + 1)).toContain(hinted);
+    expect(events.some((e) => e.type === 'cleared' || e.type === 'lost')).toBe(false);
   });
 
   it('consumes from a kit inventory and does not mutate the input stack', () => {
@@ -285,6 +301,24 @@ describe('#62 store Use', () => {
     expect(s.getState().useTorch(mulberry32(3))).toBe(true);
     expect(runKitOf(s.getState().run)['torch-charm']).toBe(0);
   });
+
+  it('applyFlag emits cleared when every safe cell is already open', () => {
+    const store = memoryStore();
+    const s = createGameStore(store);
+    const board = createGameFromLayout(['.$', '*.']);
+    for (const c of board.cells) {
+      if (c.kind !== 'mine') c.state = 'revealed';
+    }
+    s.setState({
+      run: { mode: 'easy', floor: 0, game: board, grantKey: 'flag-clear' },
+      runLoot: emptyInventory(),
+    });
+    const mine = board.cells.findIndex((c) => c.kind === 'mine');
+    const events = s.getState().applyFlag(mine);
+    expect(events.some((e) => e.type === 'cleared')).toBe(true);
+    expect(s.getState().run!.game.status).toBe('cleared');
+    expect(s.getState().run!.game.cells[mine].state).toBe('flagged');
+  });
 });
 
 describe('#62 UI wiring', () => {
@@ -307,5 +341,32 @@ describe('#62 UI wiring', () => {
     expect(board).toContain('Mine hint');
     expect(board).toContain('mineHint');
     expect(board).toContain('styles.mineHint');
+  });
+
+  it('shows a flag on a torch-hinted mine and keeps the hint ring', () => {
+    const cellFn = board.slice(board.indexOf('const DungeonCell'), board.indexOf('function Burst'));
+    const flagGlyph = cellFn.indexOf('{flagged ? (');
+    const hintBomb = cellFn.indexOf('mineHint ? (');
+    expect(flagGlyph).toBeGreaterThan(-1);
+    expect(hintBomb).toBeGreaterThan(flagGlyph);
+    expect(cellFn).toContain("<FlagIcon ember={visual === 'bomb-flagged'}");
+    expect(cellFn).toContain('onFlag(index)');
+    expect(cellFn).toContain('if (flagMode) onFlag(index)');
+    expect(cellFn).toContain('Gesture.LongPress()');
+    expect(cellFn).toContain('Flagged mine hint');
+    expect(cellFn).toContain('styles.mineHint');
+    const cellView = cellFn.slice(cellFn.indexOf('<Animated.View'), cellFn.indexOf('</Animated.View>'));
+    expect(cellView).not.toContain('pointerEvents');
+    expect(board).toContain('hinted && styles.mineHint');
+  });
+
+  it('surfaces floor-cleared or lost from onFlag the same way as dig', () => {
+    const play = readFileSync(resolve(__dirname, '../native/src/ui/PlayScreen.tsx'), 'utf8');
+    const onFlag = play.slice(play.indexOf('const onFlag'), play.indexOf('const clearFx'));
+    expect(onFlag).toContain('finishIfEnded(events)');
+    expect(onFlag).toContain("playSfx('flag')");
+    expect(onFlag.indexOf("playSfx('flag')")).toBeLessThan(onFlag.indexOf('finishIfEnded(events)'));
+    const onDig = play.slice(play.indexOf('const onDig'), play.indexOf('const onExtract'));
+    expect(onDig).toContain('finishIfEnded(events)');
   });
 });
