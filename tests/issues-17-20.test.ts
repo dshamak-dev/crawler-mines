@@ -128,7 +128,7 @@ describe('#17 play HUD and hamburger menu wiring', () => {
   const collectionRoute = readFileSync(resolve(__dirname, '../native/app/collection.tsx'), 'utf8');
 
   it('removes mute and collection buttons from the play HUD', () => {
-    const hudStart = playSource.indexOf('<View style={styles.hud}>');
+    const hudStart = playSource.indexOf('style={styles.hud}');
     const hudEnd = playSource.indexOf('styles.boardSlot');
     const hud = playSource.slice(hudStart, hudEnd);
     expect(hud).not.toContain('MuteButton');

@@ -4,6 +4,9 @@ import { TIER_COPY, type ChestTier } from '../../../src/engine';
 import { colors, fonts } from '../theme';
 import { ChestIcon } from './icons';
 
+export const LOOT_TOAST_MS = 2000;
+export const LOOT_TOAST_REDUCE_MOTION_MS = 900;
+
 export interface LootToastItem {
   id: number;
   kind: 'found' | 'broken';
@@ -14,27 +17,29 @@ export default function LootQueue({
   queue,
   onDismiss,
   reduceMotion,
+  top = 8,
 }: {
   queue: LootToastItem[];
   onDismiss: (id: number) => void;
   reduceMotion: boolean;
+  /** Offset below the HUD / safe-padded shell top. */
+  top?: number;
 }) {
   const current = queue[0];
-  const last = queue.length === 1;
 
   useEffect(() => {
     if (!current) return;
-    const ms = reduceMotion ? 900 : last ? 2400 : 1400;
+    const ms = reduceMotion ? LOOT_TOAST_REDUCE_MOTION_MS : LOOT_TOAST_MS;
     const t = setTimeout(() => onDismiss(current.id), ms);
     return () => clearTimeout(t);
-  }, [current, last, onDismiss, reduceMotion]);
+  }, [current, onDismiss, reduceMotion]);
 
   if (!current) return null;
   const copy = TIER_COPY[current.tier];
   const smashed = current.kind === 'broken';
 
   return (
-    <View style={styles.slot} pointerEvents="box-none">
+    <View style={[styles.slot, { top }]} pointerEvents="box-none">
       <Pressable
         style={[styles.toast, smashed && styles.broken]}
         onPress={() => onDismiss(current.id)}
@@ -58,7 +63,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 12,
     right: 12,
-    bottom: 86,
     zIndex: 6,
     alignItems: 'center',
   },

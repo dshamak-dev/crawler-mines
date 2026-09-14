@@ -67,6 +67,7 @@ export default function PlayScreen({
   const [lootQueue, setLootQueue] = useState<LootToastItem[]>([]);
   const [extractPrompt, setExtractPrompt] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [hudH, setHudH] = useState(36);
   const insets = useSafeAreaInsets();
   const win = useWindowDimensions();
   const [slot, setSlot] = useState({ w: 0, h: 0 });
@@ -233,7 +234,13 @@ export default function PlayScreen({
 
   return (
     <View style={styles.shell}>
-      <View style={styles.hud}>
+      <View
+        style={styles.hud}
+        onLayout={(e) => {
+          const h = e.nativeEvent.layout.height;
+          setHudH((prev) => (prev === h ? prev : h));
+        }}
+      >
         <GhostButton
           onPress={() => {
             cueUi();
@@ -304,6 +311,7 @@ export default function PlayScreen({
         queue={lootQueue}
         onDismiss={(id) => setLootQueue((prev) => prev.filter((t) => t.id !== id))}
         reduceMotion={reduceMotion}
+        top={hudH + 8}
       />
 
       <View style={styles.dock}>
