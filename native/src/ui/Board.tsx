@@ -276,18 +276,23 @@ const DungeonCell = memo(function DungeonCell({
     );
   }, [reduce, wave, pop]);
 
+  const flagged = visual === 'flagged' || visual === 'bomb-flagged';
   const bossName = BOSS_COPY[bossId].name;
   const label = bossHere
     ? `${bossDead ? `Fallen ${bossName}` : bossName}${hearted ? ', heart covering the number' : ''}`
     : hearted
       ? `Heart covering ${cell.adjacentMines} adjacent bombs`
-      : mineHint
-        ? 'Mine hint'
-        : door && cell.wrecked
-        ? 'Wrecked exit door'
-        : door
-          ? 'Exit door'
-          : ariaFor(visual, cell.adjacentMines, cell.tier);
+      : flagged && mineHint
+        ? 'Flagged mine hint'
+        : flagged
+          ? ariaFor(visual, cell.adjacentMines, cell.tier)
+          : mineHint
+            ? 'Mine hint'
+            : door && cell.wrecked
+              ? 'Wrecked exit door'
+              : door
+                ? 'Exit door'
+                : ariaFor(visual, cell.adjacentMines, cell.tier);
 
   return (
     <GestureDetector gesture={gesture}>
@@ -301,10 +306,10 @@ const DungeonCell = memo(function DungeonCell({
           popStyle,
         ]}
       >
-        {mineHint ? (
-          <BombIcon size={icon} />
-        ) : visual === 'flagged' || visual === 'bomb-flagged' ? (
+        {flagged ? (
           <FlagIcon ember={visual === 'bomb-flagged'} skin={flagSkin} size={icon} />
+        ) : mineHint ? (
+          <BombIcon size={icon} />
         ) : hearted ? (
           <HeartIcon size={Math.round(size * 0.78)} />
         ) : visual === 'exploded' ? (
@@ -395,7 +400,7 @@ function cellStyle(
     visual === 'wrecked' ||
     visual === 'exploded';
   const fill =
-    hinted
+    hinted && visual !== 'flagged' && visual !== 'bomb-flagged'
       ? paint.exploded
       : visual === 'chest'
       ? paint.chest

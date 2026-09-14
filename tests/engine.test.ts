@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   CAMPAIGN_FLOORS,
   DIFFICULTIES,
+  allSafeRevealed,
   chestsRemaining,
   createGame,
   createGameFromLayout,
   dig,
   explodeChain,
+  flag,
   isWon,
   mineCount,
   mulberry32,
@@ -331,6 +333,70 @@ describe('win check and scoring', () => {
     dig(game, 0, mulberry32(1));
     expect(game.cells[1].wrecked).toBe(true);
     expect(isWon(game)).toBe(true);
+    expect(game.status).toBe('cleared');
+  });
+
+  it('emits cleared when a later flag runs after every safe cell is already open', () => {
+    const game = createGameFromLayout(['.$', '*.']);
+    const mine = game.cells.findIndex((c) => c.kind === 'mine');
+    for (const c of game.cells) {
+      if (c.kind !== 'mine') c.state = 'revealed';
+    }
+    expect(game.status).toBe('playing');
+    expect(allSafeRevealed(game)).toBe(true);
+    expect(isWon(game)).toBe(true);
+    const events = flag(game, mine);
+    expect(events.some((e) => e.type === 'cleared')).toBe(true);
+    expect(game.status).toBe('cleared');
+    expect(game.cells[mine].state).toBe('flagged');
+  });
+
+  it('still wins with a live torch hint on a closed mine', () => {
+    const game = createGameFromLayout(['.$', '*.']);
+    const mine = game.cells.findIndex((c) => c.kind === 'mine');
+    game.torchHint = { indices: [mine], until: Date.now() + 3_000 };
+    revealAllSafe(game);
+    expect(allSafeRevealed(game)).toBe(true);
+    expect(isWon(game)).toBe(true);
+    expect(game.status).toBe('cleared');
+  });
+
+  it('still wins when a secret chest is unearthed but still locked', () => {
+    const game = createGameFromLayout(['.S', '*.']);
+    const secret = game.cells.find((c) => c.tier === 'secret');
+    expect(secret?.loot).toBeNull();
+    revealAllSafe(game);
+    expect(allSafeRevealed(game)).toBe(true);
+    expect(isWon(game)).toBe(true);
+    expect(game.status).toBe('cleared');
+    expect(secret?.state).toBe('revealed');
+    expect(secret?.loot).toBeNull();
+  });
+
+  it('loses on a living boss floor when a flag settles the last safes-open check', () => {
+    const game = createGameFromLayout(['.B.', '.*.', '...']);
+    const mine = game.cells.findIndex((c) => c.kind === 'mine');
+    for (const c of game.cells) {
+      if (c.kind !== 'mine') c.state = 'revealed';
+    }
+    expect(isWon(game)).toBe(false);
+    expect(allSafeRevealed(game)).toBe(true);
+    const events = flag(game, mine);
+    expect(events.some((e) => e.type === 'lost')).toBe(true);
+    expect(game.status).toBe('lost');
+  });
+
+  it('extracts on a dead-boss floor when a flag settles the last safes-open check', () => {
+    const game = createGameFromLayout(['.B..', '.*..', '....', '....']);
+    game.boss!.lives = 0;
+    const mine = game.cells.findIndex((c) => c.kind === 'mine');
+    for (const c of game.cells) {
+      if (c.kind !== 'mine') c.state = 'revealed';
+    }
+    expect(game.doorIndex).not.toBeNull();
+    expect(game.cells[game.doorIndex!].state).toBe('revealed');
+    const events = flag(game, mine);
+    expect(events.some((e) => e.type === 'cleared')).toBe(true);
     expect(game.status).toBe('cleared');
   });
 });
