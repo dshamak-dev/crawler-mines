@@ -32,6 +32,7 @@ import {
   runStash,
   sanitizePerfectFloors,
   buyGoods,
+  SHOP_BUY,
   consumeRitual,
   normalizeRitual,
   riteFloorConfig,
@@ -40,6 +41,12 @@ import {
   spendEntry,
   stashToRewards,
   applyTorchCharm,
+  grantSecretChests,
+  isLockedSecretChest,
+  removeItem,
+  saveCollection,
+  stampSecretLoot,
+  unlockRemainingSecretChests,
   type CollectionState,
   type Difficulty,
   type Game,
@@ -74,7 +81,7 @@ export interface GameStoreState {
   applyFlag: (index: number, rng?: Rng) => GameEvent[];
   applyExtract: (rng?: Rng) => GameEvent[];
   sell: (itemId: ItemId, qty?: number) => boolean;
-  buy: (id: ShopGoodId, qty?: number) => boolean;
+  buy: (id: ShopGoodId, qty?: number, rng?: Rng) => boolean;
   selectFlagSkin: (skinId: FlagSkinId) => boolean;
   selectGridSkin: (skinId: GridSkinId) => boolean;
   startRite: (slots: RitualSlots, rng?: Rng) => boolean;
@@ -216,6 +223,36 @@ function settleCampaign(
   return { meta: nextMeta, runLoot: nextLoot, campaignStash: stash, bonusKey, perfectFloors };
 }
 
+function spendRustyKeys(meta: CollectionState, n: number, keyStore: KeyStore): CollectionState {
+  if (n < 1) return meta;
+  const next = {
+    ...meta,
+    items: removeItem(meta.items, 'rusty-key', n),
+  };
+  saveCollection(next, keyStore);
+  return next;
+}
+
+function settleAction(
+  run: Run,
+  game: Game,
+  events: GameEvent[],
+  meta: CollectionState,
+  runLoot: Inventory,
+  rng: Rng,
+  keyStore: KeyStore,
+) {
+  const cleared = events.find((e) => e.type === 'cleared');
+  let nextMeta = meta;
+  if (cleared && cleared.type === 'cleared') {
+    const keys = Math.max(0, Math.floor(nextMeta.items['rusty-key'] ?? 0));
+    const consumed = unlockRemainingSecretChests(game, keys, rng);
+    if (consumed > 0) nextMeta = spendRustyKeys(nextMeta, consumed, keyStore);
+    cleared.rewards.push(...grantSecretChests(game));
+  }
+  return settleCampaign(run, game, events, nextMeta, runLoot, rng, keyStore);
+}
+
 export function createGameStore(keyStore: KeyStore = defaultStore()) {
   const loaded = loadRun(keyStore);
   const loadedMeta = loadCollection(keyStore);
@@ -306,8 +343,18 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
           if (!run || run.game.status !== 'playing') return [];
           if (run.bossRevealPending) return [];
           const game = cloneGame(run.game);
+          const locked = game.cells[index];
+          if (locked && isLockedSecretChest(locked)) {
+            if ((meta.items['rusty-key'] ?? 0) < 1) return [{ type: 'deny' }];
+            stampSecretLoot(locked, rng);
+            set({
+              run: { ...run, game },
+              meta: spendRustyKeys(meta, 1, keyStore),
+            });
+            return [{ type: 'secret-open', index }];
+          }
           const events = dig(game, index, rng, run.mode);
-          const settled = settleCampaign(run, game, events, meta, runLoot, rng, keyStore);
+          const settled = settleAction(run, game, events, meta, runLoot, rng, keyStore);
           set({
             run: {
               ...run,
@@ -330,7 +377,7 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
           if (events.length === 0 && game.cells[index]?.state === run.game.cells[index]?.state) {
             return [];
           }
-          const settled = settleCampaign(run, game, events, meta, runLoot, rng, keyStore);
+          const settled = settleAction(run, game, events, meta, runLoot, rng, keyStore);
           set({
             run: {
               ...run,
@@ -350,7 +397,7 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
           if (run.bossRevealPending) return [];
           const game = cloneGame(run.game);
           const events = extract(game, run.mode);
-          const settled = settleCampaign(run, game, events, meta, runLoot, rng, keyStore);
+          const settled = settleAction(run, game, events, meta, runLoot, rng, keyStore);
           set({
             run: {
               ...run,
@@ -370,8 +417,8 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
           set({ meta: next });
           return true;
         },
-        buy: (id, qty = 1) => {
-          const next = buyGoods(get().meta, id, qty, keyStore);
+        buy: (id, qty = 1, rng = Math.random) => {
+          const next = buyGoods(get().meta, id, qty, keyStore, SHOP_BUY, rng);
           if (!next) return false;
           set({ meta: next });
           return true;

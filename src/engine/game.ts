@@ -248,6 +248,7 @@ export function grantIntactLoot(game: Game, mode?: Difficulty): ChestReward[] {
   for (let i = 0; i < game.cells.length; i++) {
     const c = game.cells[i];
     if (c.kind !== 'chest' || c.wrecked || c.state !== 'revealed' || !c.loot) continue;
+    if (c.tier === 'secret') continue;
     game.gold += c.gold;
     if (c.loot !== 'gold-pouch') {
       game.inventory = addItem(game.inventory, c.loot);

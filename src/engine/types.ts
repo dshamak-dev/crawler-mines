@@ -31,6 +31,8 @@ export interface Cell {
   tier: ChestTier | null;
   /** Rolled at generation; granted only after a successful clear. */
   loot: ItemId | null;
+  /** Second secret-chest drop. Null on normal chests and unopened secrets. */
+  lootExtra: ItemId | null;
   /** Lust heart overlay. Hides a revealed number until a neighboring blast strips it. */
   hearted: boolean;
 }
@@ -88,6 +90,7 @@ export type GameEvent =
   | { type: 'reveal'; indices: number[] }
   | { type: 'explode'; index: number; wrecked: number[]; wave: number }
   | { type: 'chest'; index: number; tier: ChestTier }
+  | { type: 'secret-open'; index: number }
   | { type: 'cleared'; rewards: ChestReward[] }
   | { type: 'lost' }
   | { type: 'boss-move'; index: number }
@@ -139,6 +142,7 @@ export function newCell(partial: Partial<Cell> = {}): Cell {
     gold: 0,
     tier: null,
     loot: null,
+    lootExtra: null,
     hearted: false,
     ...partial,
   };

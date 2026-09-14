@@ -186,6 +186,11 @@ function sanitizeCell(raw: unknown): Cell | null {
   const loot =
     c.loot === null || c.loot === undefined ? null : isItemId(c.loot) ? c.loot : null;
   if (c.loot != null && loot === null) return null;
+  let lootExtra: ItemId | null = null;
+  if (c.lootExtra !== null && c.lootExtra !== undefined) {
+    if (!isItemId(c.lootExtra)) return null;
+    lootExtra = c.lootExtra;
+  }
   return {
     kind: c.kind as Cell['kind'],
     state: c.state as Cell['state'],
@@ -195,6 +200,7 @@ function sanitizeCell(raw: unknown): Cell | null {
     gold: Math.floor(c.gold),
     tier,
     loot,
+    lootExtra,
     hearted: c.hearted === true,
   };
 }

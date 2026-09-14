@@ -49,6 +49,14 @@ const TIER_PAINT: Record<
     shine: '#c9b4ff',
     wreck: '#3a2850',
   },
+  secret: {
+    body: '#2c221c',
+    lid: '#4a3226',
+    band: '#8a4a22',
+    latch: '#d4923a',
+    shine: '#e8b060',
+    wreck: '#241810',
+  },
 };
 
 export function ChestIcon({
@@ -93,7 +101,11 @@ export function ChestIcon({
       <Path d="M5 14c0-6 4.5-9 11-9s11 3 11 9" fill={p.lid} />
       <Rect x="5" y="13" width="22" height="4" fill={p.band} />
       <Rect x="14.2" y="12" width="3.6" height="8" rx="1" fill={p.latch} />
-      <Circle cx="16" cy="20" r="1.6" fill="#6b4a12" />
+      {tier === 'secret' ? (
+        <Circle cx="16" cy="20.2" r="2.05" fill="#1a1210" />
+      ) : (
+        <Circle cx="16" cy="20" r="1.6" fill="#6b4a12" />
+      )}
       <Path d="M7 17h18" stroke={p.shine} strokeWidth="0.7" opacity="0.7" />
     </Svg>
   );
