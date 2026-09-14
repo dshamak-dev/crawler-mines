@@ -76,7 +76,7 @@ describe('entry quotes', () => {
     expect(confirmLabel(quoteEntry('campaign', meta))).toBe('Spend 100 gold');
   });
 
-  it('prefers a matching Hard key over gold; Campaign keys stay unsocketed', () => {
+  it('prefers a matching Hard key over gold only when socketed; Campaign keys stay unsocketed', () => {
     const hard = {
       ...emptyCollection(),
       gold: 90,
@@ -88,6 +88,12 @@ describe('entry quotes', () => {
       items: { ...emptyInventory(), 'campaign-key': 2 },
     };
     expect(quoteEntry('hard', hard)).toMatchObject({
+      kind: 'gold',
+      keyId: 'hard-key',
+      keyCount: 1,
+      gold: 90,
+    });
+    expect(quoteEntry('hard', hard, ['hard-key', null])).toMatchObject({
       kind: 'key',
       keyId: 'hard-key',
       keyCount: 1,
@@ -98,7 +104,7 @@ describe('entry quotes', () => {
       cost: CAMPAIGN_COST,
       keyId: null,
     });
-    expect(confirmLabel(quoteEntry('hard', hard))).toBe('Use Hard key');
+    expect(confirmLabel(quoteEntry('hard', hard, ['hard-key', null]))).toBe('Use Hard key');
     expect(confirmLabel(quoteEntry('campaign', campaign))).toBe('Spend 100 gold');
     expect(quoteEntry('hard', campaign).kind).toBe('gold');
   });
@@ -107,7 +113,7 @@ describe('entry quotes', () => {
     const meta = { ...emptyCollection(), gold: 29 };
     expect(quoteEntry('hard', meta).kind).toBe('blocked');
     expect(quoteEntry('campaign', { ...meta, gold: 99 }).kind).toBe('blocked');
-    expect(confirmCopy(quoteEntry('hard', meta))).toMatch(/30 gold or a Hard key/);
+    expect(confirmCopy(quoteEntry('hard', meta))).toMatch(/30 gold or socket a Hard key/);
   });
 
   it('quoting does not spend — cancel is a no-op', () => {
@@ -145,7 +151,7 @@ describe('spendEntry', () => {
 
   it('consumes one Hard key and does not charge gold', () => {
     const { store, meta } = withWallet(80, { 'hard-key': 2, 'campaign-key': 1 });
-    const hard = spendEntry(meta, 'hard', store);
+    const hard = spendEntry(meta, 'hard', store, ['hard-key', null]);
     expect(hard?.gold).toBe(80);
     expect(hard?.items['hard-key']).toBe(1);
     const camp = spendEntry(loadCollection(store), 'campaign', store, ['campaign-key', null]);
@@ -185,10 +191,10 @@ describe('paid start via the game store', () => {
     expect(loadCollection(store).gold).toBe(20);
   });
 
-  it('uses a Hard key instead of gold when both are present', () => {
+  it('uses a Hard key instead of gold when the key is socketed', () => {
     const { store } = withWallet(90, { 'hard-key': 1 });
     const s = createGameStore(store);
-    expect(s.getState().start('hard', mulberry32(5))).toBe(true);
+    expect(s.getState().start('hard', mulberry32(5), ['hard-key', null])).toBe(true);
     expect(s.getState().meta.gold).toBe(90);
     expect(s.getState().meta.items['hard-key']).toBe(0);
     expect(loadCollection(store).gold).toBe(90);
@@ -240,7 +246,7 @@ describe('paid start via the game store', () => {
   it('reload after a paid enter does not charge again', () => {
     const { store } = withWallet(40, { 'hard-key': 1 });
     const s1 = createGameStore(store);
-    expect(s1.getState().start('hard', mulberry32(11))).toBe(true);
+    expect(s1.getState().start('hard', mulberry32(11), ['hard-key', null])).toBe(true);
     expect(s1.getState().meta.gold).toBe(40);
     expect(s1.getState().meta.items['hard-key']).toBe(0);
     const grantKey = s1.getState().run?.grantKey;

@@ -1,9 +1,9 @@
 import { BOSS_COPY, bossIdFromHead } from './boss';
 import type { CollectionState } from './collection';
 import { ITEMS, type ItemId } from './loot';
-import { BOSS_IDS, type BossId, type Rng } from './types';
+import { BOSS_IDS, type BossId, type Difficulty, type Rng } from './types';
 
-export type OfferingQuote = { kind: string; cost: number };
+export type OfferingQuote = { kind: string; cost: number; mode?: Difficulty };
 
 export const SOCKETABLE_IDS = [
   'torch-charm',
@@ -15,7 +15,9 @@ export const SOCKETABLE_IDS = [
   'campaign-key',
 ] as const;
 
-export type SocketableId = (typeof SOCKETABLE_IDS)[number];
+export const HARD_SOCKETABLE_IDS = ['torch-charm', 'gem', 'relic-shard', 'hard-key'] as const;
+
+export type SocketableId = (typeof SOCKETABLE_IDS)[number] | (typeof HARD_SOCKETABLE_IDS)[number];
 
 export const OFFERING_SLOT_COUNT = 2;
 
@@ -23,6 +25,19 @@ export type OfferingSlots = [ItemId | null, ItemId | null];
 
 export const CAMPAIGN_OFFERING_COPY =
   'Socket up to two offerings. A key here is a free dive. A boss head locks the finale.';
+
+export const HARD_OFFERING_COPY =
+  'Socket up to two offerings. A Hard key here is a free dive. No boss heads.';
+
+export function modeUsesOfferings(mode: Difficulty): boolean {
+  return mode === 'hard' || mode === 'campaign';
+}
+
+export function socketableIdsFor(mode: Difficulty): readonly SocketableId[] {
+  if (mode === 'hard') return HARD_SOCKETABLE_IDS;
+  if (mode === 'campaign') return SOCKETABLE_IDS;
+  return [];
+}
 
 const HEAD_IDS = ['gluttony-head', 'wrath-head', 'lust-head'] as const;
 
@@ -32,6 +47,10 @@ export function emptyOfferings(): OfferingSlots {
 
 export function isSocketable(id: unknown): id is SocketableId {
   return typeof id === 'string' && (SOCKETABLE_IDS as readonly string[]).includes(id);
+}
+
+export function isSocketableFor(id: unknown, mode: Difficulty): id is SocketableId {
+  return typeof id === 'string' && (socketableIdsFor(mode) as readonly string[]).includes(id);
 }
 
 export function isBossHead(id: ItemId | null | undefined): id is (typeof HEAD_IDS)[number] {
@@ -87,26 +106,31 @@ export function hasSocketedCampaignKey(slots: OfferingSlots): boolean {
   return slots[0] === 'campaign-key' || slots[1] === 'campaign-key';
 }
 
+export function hasSocketedHardKey(slots: OfferingSlots): boolean {
+  return slots[0] === 'hard-key' || slots[1] === 'hard-key';
+}
+
 function ownedCount(meta: CollectionState | undefined, id: ItemId): number {
   if (!meta) return Infinity;
   return Math.max(0, Math.floor(meta.items[id] ?? 0));
 }
 
 /**
- * Keep at most two socketable ids. Two heads (same or different) are allowed.
- * When `meta` is passed, drop ids the pack cannot cover (counting duplicates
- * across slots).
+ * Keep at most two socketable ids. Two heads (same or different) are allowed
+ * on Campaign. Hard drops heads and Campaign keys. When `meta` is passed, drop
+ * ids the pack cannot cover (counting duplicates across slots).
  */
 export function normalizeOfferings(
   raw: readonly (ItemId | null | undefined)[] | null | undefined,
   meta?: CollectionState,
+  mode: Difficulty = 'campaign',
 ): OfferingSlots {
   const out: OfferingSlots = [null, null];
   if (!raw) return out;
   const used: Partial<Record<ItemId, number>> = {};
   for (let i = 0; i < OFFERING_SLOT_COUNT; i++) {
     const id = raw[i];
-    if (!isSocketable(id)) continue;
+    if (!isSocketableFor(id, mode)) continue;
     const already = used[id] ?? 0;
     if (already >= ownedCount(meta, id)) continue;
     out[i] = id;
@@ -141,9 +165,10 @@ export function offeringPickerRows(
   meta: CollectionState,
   slots: OfferingSlots,
   fillingSlot: 0 | 1,
+  mode: Difficulty = 'campaign',
 ): OfferingPickerRow[] {
   const rows: OfferingPickerRow[] = [];
-  for (const id of SOCKETABLE_IDS) {
+  for (const id of socketableIdsFor(mode)) {
     const count = remainingOwned(id, meta, slots, fillingSlot);
     if (count < 1) continue;
     rows.push({
@@ -161,9 +186,10 @@ export function canSocket(
   meta: CollectionState,
   slots: OfferingSlots,
   fillingSlot: 0 | 1,
+  mode: Difficulty = 'campaign',
 ): boolean {
-  if (!isSocketable(id)) return false;
-  const row = offeringPickerRows(meta, slots, fillingSlot).find((r) => r.id === id);
+  if (!isSocketableFor(id, mode)) return false;
+  const row = offeringPickerRows(meta, slots, fillingSlot, mode).find((r) => r.id === id);
   return Boolean(row && !row.disabled);
 }
 
@@ -177,9 +203,12 @@ export function offeringCaptionParts(
   slots: OfferingSlots,
   quote: OfferingQuote,
 ): Array<{ text: string; gold: boolean }> {
-  const parts: Array<{ text: string; gold: boolean }> = [{ text: 'Floor 5', gold: false }];
-  const boss = socketedBossId(slots);
-  if (boss) parts.push({ text: BOSS_COPY[boss].name, gold: true });
+  const parts: Array<{ text: string; gold: boolean }> = [];
+  if (quote.mode !== 'hard') {
+    parts.push({ text: 'Floor 5', gold: false });
+    const boss = socketedBossId(slots);
+    if (boss) parts.push({ text: BOSS_COPY[boss].name, gold: true });
+  }
   if (quote.kind === 'key') {
     parts.push({ text: 'Dive free', gold: true });
   } else {

@@ -278,6 +278,20 @@ export function isUsable(itemId: ItemId): boolean {
 }
 
 /**
+ * Pack items that stay available mid-run (this-run collection). Sealed chest
+ * loot is not kit. Torch Use is #62 — still listed so the run pack can show it.
+ */
+export function isRunKit(itemId: ItemId): boolean {
+  return itemId === 'torch-charm';
+}
+
+export function runKitEntries(
+  inv: Inventory,
+): Array<{ item: ItemDef; count: number }> {
+  return stackedEntries(inv).filter((row) => isRunKit(row.item.id));
+}
+
+/**
  * Preview Use. Only the bag, and only when the player owns at least one.
  * Collection-all and Shop pass owned pack counts; this-run / sealed / browse-unowned do not.
  */
