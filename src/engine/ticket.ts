@@ -115,8 +115,11 @@ export function confirmCopy(quote: EntryQuote): string {
 }
 
 /**
- * Deduct gold and/or burn socketed Hard/Campaign offerings. Call only after confirm.
- * Cancel never reaches here. Returns null when blocked (wallet and pack unchanged).
+ * Deduct gold and/or take socketed Hard/Campaign offerings from the bank.
+ * Mid-run kit items (torch charms) leave the pack here; start() moves them
+ * onto the run kit. Keys, heads, gems, and shards still burn on enter.
+ * Call only after confirm. Cancel never reaches here. Returns null when
+ * blocked (wallet and pack unchanged).
  */
 export function spendEntry(
   meta: CollectionState,

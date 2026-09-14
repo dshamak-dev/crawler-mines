@@ -1,6 +1,6 @@
 import { BOSS_COPY, bossIdFromHead } from './boss';
 import type { CollectionState } from './collection';
-import { ITEMS, type ItemId } from './loot';
+import { addItem, emptyInventory, isRunKit, ITEMS, type Inventory, type ItemId } from './loot';
 import { BOSS_IDS, type BossId, type Difficulty, type Rng } from './types';
 
 export type OfferingQuote = { kind: string; cost: number; mode?: Difficulty };
@@ -141,6 +141,22 @@ export function normalizeOfferings(
 
 export function socketedList(slots: OfferingSlots): ItemId[] {
   return slots.filter((id): id is ItemId => id != null);
+}
+
+/**
+ * Mid-run kit taken from sockets. Torch charms move in (one per well);
+ * keys/heads/gems/shards do not — those still burn on enter.
+ */
+export function kitFromOfferings(
+  slots: OfferingSlots | readonly (ItemId | null | undefined)[] | null | undefined,
+): Inventory {
+  let kit = emptyInventory();
+  if (!slots) return kit;
+  for (const id of slots) {
+    if (!id || !isRunKit(id)) continue;
+    kit = addItem(kit, id);
+  }
+  return kit;
 }
 
 export function remainingOwned(

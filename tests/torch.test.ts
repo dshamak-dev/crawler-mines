@@ -10,15 +10,13 @@ import {
   canUseFromPreview,
   closedMineIndices,
   createGameFromLayout,
-  emptyCollection,
   emptyInventory,
   isUsable,
   loadCollection,
   loadRun,
   mulberry32,
   pickClosedMines,
-  useTorchCharm,
-  type ItemId,
+  runKitOf,
   type KeyStore,
 } from '../src/engine';
 import { createGameStore } from '../src/store/gameStore';
@@ -34,15 +32,6 @@ function memoryStore(seed: Record<string, string> = {}): KeyStore {
       data.delete(key);
     },
   };
-}
-
-function packed(items: Partial<Record<ItemId, number>>, gold = 0) {
-  const meta = emptyCollection();
-  meta.gold = gold;
-  for (const [id, n] of Object.entries(items) as Array<[ItemId, number]>) {
-    meta.items[id] = n;
-  }
-  return meta;
 }
 
 function snapshotCells(game: ReturnType<typeof createGameFromLayout>) {
@@ -155,30 +144,55 @@ describe('#62 torch Use', () => {
     expect(new Set(picked)).toEqual(new Set([0, 1]));
   });
 
-  it('persists a consumed torch on the pack', () => {
+  it('consumes from a kit inventory and does not mutate the input stack', () => {
     const store = memoryStore();
     const game = createGameFromLayout(['*.*', '...']);
-    const next = useTorchCharm(packed({ 'torch-charm': 2, gem: 1 }, 7), game, mulberry32(5), store, 30);
+    const kit = { ...emptyInventory(), 'torch-charm': 2, gem: 1 };
+    const next = applyTorchCharm(kit, game, mulberry32(5), 30);
     expect(next).not.toBeNull();
-    expect(next!.items['torch-charm']).toBe(1);
-    expect(next!.items.gem).toBe(1);
-    expect(loadCollection(store).items['torch-charm']).toBe(1);
+    expect(next!['torch-charm']).toBe(1);
+    expect(next!.gem).toBe(1);
+    expect(kit['torch-charm']).toBe(2);
+    expect(store.getItem(COLLECTION_KEY)).toBeNull();
   });
 });
 
 describe('#62 store Use', () => {
-  it('consumes from Easy kit and leaves gems alone', () => {
+  it('does not spend bank torches on Easy or Medium', () => {
     const store = memoryStore({
       [COLLECTION_KEY]: JSON.stringify({
         v: 1,
         gold: 0,
-        items: { 'torch-charm': 2, gem: 4 },
+        items: { 'torch-charm': 30, gem: 4 },
       }),
     });
     const s = createGameStore(store);
     expect(s.getState().start('easy', mulberry32(9))).toBe(true);
+    expect(runKitOf(s.getState().run)['torch-charm']).toBe(0);
+    expect(s.getState().useTorch(mulberry32(9))).toBe(false);
+    expect(s.getState().meta.items['torch-charm']).toBe(30);
+    expect(s.getState().meta.items.gem).toBe(4);
+    s.getState().abandon();
+    expect(s.getState().start('medium', mulberry32(8))).toBe(true);
+    expect(s.getState().useTorch(mulberry32(8))).toBe(false);
+    expect(s.getState().meta.items['torch-charm']).toBe(30);
+  });
+
+  it('Hard: 30 bank + offer 1 → Use consumes kit, not the bank', () => {
+    const store = memoryStore({
+      [COLLECTION_KEY]: JSON.stringify({
+        v: 1,
+        gold: 30,
+        items: { 'torch-charm': 30, gem: 4 },
+      }),
+    });
+    const s = createGameStore(store);
+    expect(s.getState().start('hard', mulberry32(9), ['torch-charm', null])).toBe(true);
+    expect(s.getState().meta.items['torch-charm']).toBe(29);
+    expect(runKitOf(s.getState().run)['torch-charm']).toBe(1);
     expect(s.getState().useTorch(mulberry32(9))).toBe(true);
-    expect(s.getState().meta.items['torch-charm']).toBe(1);
+    expect(runKitOf(s.getState().run)['torch-charm']).toBe(0);
+    expect(s.getState().meta.items['torch-charm']).toBe(29);
     expect(s.getState().meta.items.gem).toBe(4);
     const game = s.getState().run!.game;
     expect(activeTorchHintIndices(game, Date.now() + 10)).toHaveLength(2);
@@ -186,22 +200,39 @@ describe('#62 store Use', () => {
       expect(game.cells[i].kind).toBe('mine');
       expect(game.cells[i].state).not.toBe('revealed');
     }
-    expect(s.getState().useTorch(mulberry32(1))).toBe(true);
-    expect(s.getState().meta.items['torch-charm']).toBe(0);
     expect(s.getState().useTorch(mulberry32(1))).toBe(false);
-    expect(loadCollection(store).items['torch-charm']).toBe(0);
+    expect(s.getState().meta.items['torch-charm']).toBe(29);
+    expect(loadCollection(store).items['torch-charm']).toBe(29);
   });
 
-  it('denies on a cleared board with no closed mines', () => {
+  it('Campaign offered torch Use consumes kit and cannot spend remaining bank charms', () => {
     const store = memoryStore({
       [COLLECTION_KEY]: JSON.stringify({
         v: 1,
-        gold: 0,
+        gold: 100,
+        items: { 'torch-charm': 30 },
+      }),
+    });
+    const s = createGameStore(store);
+    expect(s.getState().start('campaign', mulberry32(4), ['torch-charm', null])).toBe(true);
+    expect(s.getState().meta.items['torch-charm']).toBe(29);
+    expect(runKitOf(s.getState().run)['torch-charm']).toBe(1);
+    expect(s.getState().useTorch(mulberry32(4))).toBe(true);
+    expect(runKitOf(s.getState().run)['torch-charm']).toBe(0);
+    expect(s.getState().useTorch(mulberry32(5))).toBe(false);
+    expect(s.getState().meta.items['torch-charm']).toBe(29);
+  });
+
+  it('denies on a cleared board with no closed mines and keeps the kit torch', () => {
+    const store = memoryStore({
+      [COLLECTION_KEY]: JSON.stringify({
+        v: 1,
+        gold: 30,
         items: { 'torch-charm': 1 },
       }),
     });
     const s = createGameStore(store);
-    expect(s.getState().start('easy', mulberry32(2))).toBe(true);
+    expect(s.getState().start('hard', mulberry32(2), ['torch-charm', null])).toBe(true);
     const game = s.getState().run!.game;
     for (const cell of game.cells) {
       if (cell.kind === 'mine') {
@@ -211,26 +242,48 @@ describe('#62 store Use', () => {
     }
     s.setState({ run: { ...s.getState().run! } });
     expect(s.getState().useTorch(mulberry32(2))).toBe(false);
-    expect(s.getState().meta.items['torch-charm']).toBe(1);
+    expect(runKitOf(s.getState().run)['torch-charm']).toBe(1);
+    expect(s.getState().meta.items['torch-charm']).toBe(0);
   });
 
-  it('keeps a live hint across reload until it expires', () => {
+  it('keeps kit and a live hint across reload until it expires', () => {
     const store = memoryStore({
       [COLLECTION_KEY]: JSON.stringify({
         v: 1,
-        gold: 0,
-        items: { 'torch-charm': 1 },
+        gold: 30,
+        items: { 'torch-charm': 2 },
       }),
     });
     const s = createGameStore(store);
-    expect(s.getState().start('medium', mulberry32(6))).toBe(true);
+    expect(s.getState().start('hard', mulberry32(6), ['torch-charm', null])).toBe(true);
+    expect(runKitOf(s.getState().run)['torch-charm']).toBe(1);
     expect(s.getState().useTorch(mulberry32(6))).toBe(true);
     const until = s.getState().run!.game.torchHint!.until;
     const indices = s.getState().run!.game.torchHint!.indices;
     const again = createGameStore(store);
     expect(loadRun(store).run?.game.torchHint).toEqual({ indices, until });
     expect(again.getState().run?.game.torchHint).toEqual({ indices, until });
-    expect(again.getState().meta.items['torch-charm']).toBe(0);
+    expect(runKitOf(again.getState().run)['torch-charm']).toBe(0);
+    expect(again.getState().meta.items['torch-charm']).toBe(1);
+  });
+
+  it('Campaign kit survives nextFloor', () => {
+    const store = memoryStore({
+      [COLLECTION_KEY]: JSON.stringify({
+        v: 1,
+        gold: 100,
+        items: { 'torch-charm': 30 },
+      }),
+    });
+    const s = createGameStore(store);
+    expect(s.getState().start('campaign', mulberry32(3), ['torch-charm', null])).toBe(true);
+    expect(s.getState().run?.floor).toBe(0);
+    s.getState().nextFloor(mulberry32(3));
+    expect(s.getState().run?.floor).toBe(1);
+    expect(runKitOf(s.getState().run)['torch-charm']).toBe(1);
+    expect(s.getState().meta.items['torch-charm']).toBe(29);
+    expect(s.getState().useTorch(mulberry32(3))).toBe(true);
+    expect(runKitOf(s.getState().run)['torch-charm']).toBe(0);
   });
 });
 
@@ -247,6 +300,9 @@ describe('#62 UI wiring', () => {
     expect(collection).toContain('onBack()');
     expect(route).toContain('useTorch');
     expect(route).toContain('onUseTorch');
+    expect(route).toContain('kit={fromPlay ? run?.kit : undefined}');
+    const play = readFileSync(resolve(__dirname, '../native/src/ui/PlayScreen.tsx'), 'utf8');
+    expect(play).toContain("torchCount: run.kit?.['torch-charm'] ?? 0");
     expect(board).toContain('activeTorchHintIndices');
     expect(board).toContain('Mine hint');
     expect(board).toContain('mineHint');

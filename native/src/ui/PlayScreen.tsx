@@ -244,7 +244,7 @@ export default function PlayScreen({
             holdPlay: holdPlayTip,
             arena,
             chests: game.chests,
-            torchCount: meta.items['torch-charm'] ?? 0,
+            torchCount: run.kit?.['torch-charm'] ?? 0,
           }),
         )
       : null;

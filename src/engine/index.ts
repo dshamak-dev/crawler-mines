@@ -97,7 +97,6 @@ export {
   selectFlagSkin,
   selectGridSkin,
   sellLoot,
-  useTorchCharm,
 } from './collection';
 export type { CollectionState, KeyStore } from './collection';
 export type {
@@ -235,6 +234,7 @@ export {
   isBossHead,
   isSocketable,
   isSocketableFor,
+  kitFromOfferings,
   modeUsesOfferings,
   normalizeOfferings,
   offeringCaption,
@@ -307,6 +307,7 @@ export {
   recoverBank,
   resumeLabel,
   rewardsFromGame,
+  runKitOf,
   runStash,
   sanitizePerfectFloors,
   sanitizeRun,

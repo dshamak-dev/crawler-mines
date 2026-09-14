@@ -121,6 +121,7 @@ describe('run snapshot hydrate', () => {
     expect(restored.game.status).toBe('playing');
     expect(restored.game.rewardsGranted).toBe(false);
     expect(inventoryTotal(restored.game.inventory)).toBe(0);
+    expect(restored.kit?.['torch-charm'] ?? 0).toBe(0);
     const chest = restored.game.cells[idx(restored.game, 1, 0)];
     expect(chest.kind).toBe('chest');
     expect(chest.state).toBe('revealed');

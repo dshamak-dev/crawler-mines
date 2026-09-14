@@ -26,6 +26,7 @@ import {
   modeUsesOfferings,
   recoverBank,
   resolveLockedBossId,
+  kitFromOfferings,
   rollBonusKey,
   RUN_KEY,
   runStash,
@@ -38,7 +39,7 @@ import {
   sellLoot,
   spendEntry,
   stashToRewards,
-  useTorchCharm,
+  applyTorchCharm,
   type CollectionState,
   type Difficulty,
   type Game,
@@ -100,6 +101,7 @@ function freshRun(
   rng: Rng,
   stash = emptyStash(),
   lockedBossId: Run['lockedBossId'] = null,
+  kit: Inventory = emptyInventory(),
 ): Run {
   const game = createGame(configFor(mode, 0), rng, mode, lockedBossId ?? null);
   return {
@@ -112,6 +114,7 @@ function freshRun(
     bossRevealPending: false,
     perfectFloors: emptyPerfectFloors(),
     lockedBossId: lockedBossId ?? null,
+    kit,
   };
 }
 
@@ -128,6 +131,7 @@ function freshRiteRun(rng: Rng, lockedBossId: NonNullable<Run['lockedBossId']>):
     perfectFloors: emptyPerfectFloors(),
     lockedBossId,
     rite: true,
+    kit: emptyInventory(),
   };
 }
 
@@ -233,7 +237,7 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
             mode === 'campaign' ? resolveLockedBossId(slots ?? [null, null], rng) : null;
           set({
             meta: spent,
-            run: freshRun(mode, rng, emptyStash(), locked),
+            run: freshRun(mode, rng, emptyStash(), locked, kitFromOfferings(slots)),
             runLoot: emptyInventory(),
           });
           return true;
@@ -262,6 +266,7 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
               bossRevealPending: Boolean(game.boss),
               perfectFloors: sanitizePerfectFloors(run.perfectFloors),
               lockedBossId: locked,
+              kit: run.kit ?? emptyInventory(),
             },
           });
         },
@@ -396,15 +401,14 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
           return true;
         },
         useTorch: (rng = Math.random) => {
-          const { run, meta } = get();
+          const { run } = get();
           if (!run || run.game.status !== 'playing') return false;
           if (run.bossRevealPending) return false;
           const game = cloneGame(run.game);
-          const next = useTorchCharm(meta, game, rng, keyStore);
-          if (!next) return false;
+          const kit = applyTorchCharm(run.kit ?? emptyInventory(), game, rng);
+          if (!kit) return false;
           set({
-            meta: next,
-            run: { ...run, game },
+            run: { ...run, game, kit },
           });
           return true;
         },
