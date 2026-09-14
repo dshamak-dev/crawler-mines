@@ -7,6 +7,7 @@ import {
   inventoryTotal,
   isSkinOwned,
   isTicketKey,
+  runKitEntries,
   sealedRowLabel,
   sealedRunRows,
   selectedFlagSkin,
@@ -63,6 +64,7 @@ export default function CollectionScreen({
         game={game}
         runLoot={runLoot}
         stashGold={stashGold}
+        kit={meta.items}
         onBack={onBack}
         onUi={onUi}
       />
@@ -293,30 +295,57 @@ function SealedCollection({
   game,
   runLoot,
   stashGold,
+  kit,
   onBack,
   onUi,
 }: {
   game: Game;
   runLoot: Inventory;
   stashGold: number;
+  kit: Inventory;
   onBack: () => void;
   onUi?: () => void;
 }) {
   const [preview, setPreview] = useState<ItemPreviewModel | null>(null);
-  const rows = sealedRunRows(game, runLoot, stashGold);
-  const total = rows.reduce((sum, row) => sum + row.count, 0);
+  const kitRows = runKitEntries(kit);
+  const sealedRows = sealedRunRows(game, runLoot, stashGold);
+  const kitTotal = kitRows.reduce((sum, row) => sum + row.count, 0);
+  const sealedTotal = sealedRows.reduce((sum, row) => sum + row.count, 0);
+  const total = kitTotal + sealedTotal;
   const cue = onUi ?? (() => {});
+  const empty = kitRows.length === 0 && sealedRows.length === 0;
+  const pill = kitTotal > 0 ? `${total} held` : `${sealedTotal} sealed`;
 
   return (
     <View style={styles.shell}>
-      <Header title="Collection" pill={`${total} sealed`} onBack={onBack} />
-      {rows.length === 0 ? (
+      <Header title="Collection" pill={pill} onBack={onBack} />
+      {empty ? (
         <View style={styles.empty}>
           <Text style={styles.emptyCopy}>{EMPTY_COPY}</Text>
         </View>
       ) : (
         <ScrollView style={styles.list} contentContainerStyle={styles.listInner}>
-          {rows.map((row) => {
+          {kitRows.map(({ item, count }) => (
+            <Pressable
+              key={item.id}
+              style={[styles.card, isTicketKey(item.id) && styles.ticket]}
+              onPress={() => {
+                cue();
+                setPreview(previewForItem(item.id, count, false));
+              }}
+              accessibilityLabel={`${item.name}, ${count} in kit`}
+            >
+              <View style={styles.ico}>
+                <ItemIcon id={item.id} size={34} />
+              </View>
+              <View style={styles.copy}>
+                <Text style={styles.name}>{item.name}</Text>
+                <Text style={styles.flavor}>{item.flavor}</Text>
+              </View>
+              <Text style={styles.count}>×{count}</Text>
+            </Pressable>
+          ))}
+          {sealedRows.map((row) => {
             const { title, subtitle } = sealedRowLabel(row);
             const key = `${row.kind}:${row.tier ?? 'gold'}:${row.wrecked ? 'wreck' : 'ok'}`;
             return (

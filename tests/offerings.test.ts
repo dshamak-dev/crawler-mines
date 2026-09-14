@@ -23,7 +23,10 @@ import {
   remainingFinaleBosses,
   resolveLockedBossId,
   rollBossId,
+  runKitEntries,
   saveCollection,
+  sealedRowLabel,
+  sealedRunRows,
   socketedBossId,
   spendEntry,
   type CollectionState,
@@ -152,14 +155,21 @@ describe('#35 gold vs key slot', () => {
     expect(offeringCaption(['lust-head', 'campaign-key'], left)).toBe('Floor 5 · Lust · Dive free');
   });
 
-  it('Hard still auto-prefers a Hard key; campaign does not auto-prefer its key', () => {
+  it('Hard key only counts when socketed, like Campaign; keys do not cross-pay', () => {
     const meta = {
       ...emptyCollection(),
       gold: 200,
       items: { ...emptyInventory(), 'hard-key': 1, 'campaign-key': 1 },
     };
-    expect(quoteEntry('hard', meta).kind).toBe('key');
+    expect(quoteEntry('hard', meta).kind).toBe('gold');
+    expect(quoteEntry('hard', meta, [null, null]).kind).toBe('gold');
+    expect(quoteEntry('hard', meta, ['hard-key', null])).toMatchObject({
+      kind: 'key',
+      keyId: 'hard-key',
+    });
     expect(quoteEntry('campaign', meta).kind).toBe('gold');
+    expect(quoteEntry('campaign', meta, ['hard-key', null]).kind).toBe('gold');
+    expect(quoteEntry('hard', meta, ['campaign-key', null]).kind).toBe('gold');
   });
 });
 
@@ -401,5 +411,141 @@ describe('#35 README', () => {
     expect(readme).toMatch(/Two heads are allowed/);
     expect(readme).toMatch(/Gluttony \+ Wrath → Lust/);
     expect(readme).not.toMatch(/At most one head/);
+  });
+});
+
+describe('#65 Hard offering enter', () => {
+  it('Hard picker is torch/gem/shard/Hard key; no heads or Campaign key', () => {
+    const meta = { ...emptyCollection(), items: { ...emptyInventory(), ...PACK } };
+    const rows = offeringPickerRows(meta, [null, null], 0, 'hard');
+    expect(rows.map((r) => r.id)).toEqual(['torch-charm', 'gem', 'relic-shard', 'hard-key']);
+    expect(canSocket('lust-head', meta, [null, null], 0, 'hard')).toBe(false);
+    expect(canSocket('campaign-key', meta, [null, null], 0, 'hard')).toBe(false);
+    expect(canSocket('hard-key', meta, [null, null], 0, 'hard')).toBe(true);
+    expect(canSocket('hard-key', meta, [null, null], 0, 'campaign')).toBe(false);
+    expect(normalizeOfferings(['lust-head', 'hard-key'], meta, 'hard')).toEqual([
+      null,
+      'hard-key',
+    ]);
+    expect(normalizeOfferings(['campaign-key', 'torch-charm'], meta, 'hard')).toEqual([
+      null,
+      'torch-charm',
+    ]);
+    expect(isSocketable('hard-key')).toBe(false);
+  });
+
+  it('socketed Hard key is a free enter; unsocketed Hard key stays and gold is charged', () => {
+    const { store, meta } = withWallet(90, { 'hard-key': 1, 'torch-charm': 1 });
+    const gold = spendEntry(meta, 'hard', store, ['torch-charm', null]);
+    expect(gold?.gold).toBe(60);
+    expect(gold?.items['hard-key']).toBe(1);
+    expect(gold?.items['torch-charm']).toBe(0);
+
+    const { store: keys, meta: keyed } = withWallet(90, { 'hard-key': 2, 'torch-charm': 1 });
+    const free = spendEntry(keyed, 'hard', keys, ['hard-key', 'torch-charm']);
+    expect(free?.gold).toBe(90);
+    expect(free?.items['hard-key']).toBe(1);
+    expect(free?.items['torch-charm']).toBe(0);
+    expect(quoteEntry('hard', keyed, ['hard-key', null]).kind).toBe('key');
+    expect(confirmLabel(quoteEntry('hard', keyed, ['hard-key', null]))).toBe('Use Hard key');
+    expect(offeringCaption(['hard-key', null], quoteEntry('hard', keyed, ['hard-key', null]))).toBe(
+      'Dive free',
+    );
+    expect(offeringCaption(['torch-charm', null], quoteEntry('hard', meta, ['torch-charm', null]))).toBe(
+      '30 gold',
+    );
+  });
+
+  it('Hard start burns sockets, ignores heads, and keeps Easy/Medium offering-free', () => {
+    const { store } = withWallet(30, {
+      'torch-charm': 2,
+      'lust-head': 1,
+      'campaign-key': 1,
+      gem: 1,
+    });
+    const s = createGameStore(store);
+    expect(s.getState().start('easy', mulberry32(1), ['torch-charm', 'gem'])).toBe(true);
+    expect(s.getState().meta.items['torch-charm']).toBe(2);
+    expect(s.getState().meta.items.gem).toBe(1);
+    expect(s.getState().meta.gold).toBe(30);
+    s.getState().abandon();
+    expect(s.getState().start('hard', mulberry32(2), ['torch-charm', 'lust-head'])).toBe(true);
+    expect(s.getState().run?.mode).toBe('hard');
+    expect(s.getState().run?.lockedBossId).toBeNull();
+    expect(s.getState().meta.gold).toBe(0);
+    expect(s.getState().meta.items['torch-charm']).toBe(1);
+    expect(s.getState().meta.items['lust-head']).toBe(1);
+    expect(s.getState().meta.items['campaign-key']).toBe(1);
+    expect(s.getState().meta.items.gem).toBe(1);
+  });
+
+  it('Hard key start is free; cancel/blocked spend nothing', () => {
+    const { store } = withWallet(10, { 'hard-key': 1, 'torch-charm': 1 });
+    const s = createGameStore(store);
+    expect(s.getState().start('hard', mulberry32(3), ['torch-charm', null])).toBe(false);
+    expect(s.getState().run).toBeNull();
+    expect(s.getState().meta.gold).toBe(10);
+    expect(s.getState().meta.items['torch-charm']).toBe(1);
+    expect(s.getState().start('hard', mulberry32(4), ['hard-key', null])).toBe(true);
+    expect(s.getState().meta.gold).toBe(10);
+    expect(s.getState().meta.items['hard-key']).toBe(0);
+    expect(s.getState().meta.items['torch-charm']).toBe(1);
+    expect(s.getState().run?.mode).toBe('hard');
+  });
+});
+
+describe('#65 this-run kit', () => {
+  it('lists remaining torches after a Hard offering burn; gems stay off the kit', () => {
+    const { store } = withWallet(30, { 'torch-charm': 2, gem: 1 });
+    const s = createGameStore(store);
+    expect(s.getState().start('hard', mulberry32(5), ['torch-charm', null])).toBe(true);
+    expect(s.getState().meta.items['torch-charm']).toBe(1);
+    expect(s.getState().meta.items.gem).toBe(1);
+    const kit = runKitEntries(s.getState().meta.items);
+    expect(kit.map((r) => r.item.id)).toEqual(['torch-charm']);
+    expect(kit[0].count).toBe(1);
+    const sealed = sealedRunRows(
+      s.getState().run!.game,
+      s.getState().runLoot,
+      s.getState().run?.campaignStash?.gold ?? 0,
+    );
+    expect(sealed.every((row) => row.kind === 'chest' || row.kind === 'gold-bag')).toBe(true);
+    expect(sealed.map((row) => sealedRowLabel(row).title).join(' ')).not.toMatch(/torch/i);
+  });
+
+  it('Campaign offering burn also leaves leftover torches on the kit list', () => {
+    const { store } = withWallet(100, { 'torch-charm': 2, 'relic-shard': 1 });
+    const s = createGameStore(store);
+    expect(s.getState().start('campaign', mulberry32(6), ['torch-charm', 'relic-shard'])).toBe(
+      true,
+    );
+    expect(s.getState().meta.items['torch-charm']).toBe(1);
+    expect(s.getState().meta.items['relic-shard']).toBe(0);
+    const kit = runKitEntries(s.getState().meta.items);
+    expect(kit).toEqual([{ item: expect.objectContaining({ id: 'torch-charm' }), count: 1 }]);
+  });
+});
+
+describe('#65 Hard offering UI', () => {
+  it('reuses Campaign wells for Hard and lists kit on the in-run collection', () => {
+    const title = readFileSync(resolve(__dirname, '../native/src/ui/TitleMenu.tsx'), 'utf8');
+    const collection = readFileSync(
+      resolve(__dirname, '../native/src/ui/CollectionScreen.tsx'),
+      'utf8',
+    );
+    expect(title).toContain('HARD_OFFERING_COPY');
+    expect(title).toContain('modeUsesOfferings');
+    expect(title).toContain("pending === 'hard' ? 'Enter Hard?'");
+    expect(title).not.toContain("Can't enter Hard");
+    expect(title).toContain('OfferingWell');
+    expect(title).toContain('offeringPickerRows(meta, slots, fillingSlot, mode)');
+    expect(collection).toContain('runKitEntries');
+    expect(collection).toContain('kit={meta.items}');
+    expect(collection).toContain('previewForItem(item.id, count, false)');
+    expect(collection).not.toContain('This run');
+    const readme = readFileSync(resolve('README.md'), 'utf8');
+    expect(readme).toMatch(/Hard key/);
+    expect(readme).toMatch(/no boss heads/i);
+    expect(readme).toMatch(/carried kit/);
   });
 });

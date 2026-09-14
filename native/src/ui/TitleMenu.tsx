@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   CAMPAIGN_OFFERING_COPY,
+  HARD_OFFERING_COPY,
   ITEMS,
   canSocket,
-  confirmCopy,
   confirmLabel,
   emptyOfferings,
+  entryKeyId,
+  modeUsesOfferings,
   offeringCaptionParts,
   offeringPickerRows,
   quoteEntry,
@@ -50,7 +52,7 @@ export default function TitleMenu({
   const [offerings, setOfferings] = useState<OfferingSlots>(emptyOfferings);
   const [pickingSlot, setPickingSlot] = useState<0 | 1 | null>(null);
   const quote = pending
-    ? quoteEntry(pending, meta, pending === 'campaign' ? offerings : undefined)
+    ? quoteEntry(pending, meta, modeUsesOfferings(pending) ? offerings : undefined)
     : null;
 
   const closeStart = () => {
@@ -62,11 +64,11 @@ export default function TitleMenu({
   };
 
   const pick = (mode: Difficulty) => {
-    if (mode === 'campaign') {
+    if (modeUsesOfferings(mode)) {
       onUi();
       setOfferings(emptyOfferings());
       setPickingSlot(null);
-      setPending('campaign');
+      setPending(mode);
       return;
     }
     const next = quoteEntry(mode, meta);
@@ -89,7 +91,7 @@ export default function TitleMenu({
       return;
     }
     const mode = pending;
-    const slots = mode === 'campaign' ? offerings : undefined;
+    const slots = modeUsesOfferings(mode) ? offerings : undefined;
     onUi();
     setPending(null);
     setStartOpen(false);
@@ -99,7 +101,7 @@ export default function TitleMenu({
   };
 
   const socket = (slot: 0 | 1, id: ItemId) => {
-    if (!canSocket(id, meta, offerings, slot)) {
+    if (!pending || !canSocket(id, meta, offerings, slot, pending)) {
       onDeny();
       return;
     }
@@ -197,30 +199,7 @@ export default function TitleMenu({
         </Overlay>
       ) : null}
 
-      {quote && pending === 'hard' ? (
-        <Overlay onBackdrop={() => setPending(null)}>
-          <Tablet>
-            <DisplayText>{quote.kind === 'blocked' ? "Can't enter Hard" : 'Enter Hard?'}</DisplayText>
-            <MutedText style={styles.pad}>{confirmCopy(quote)}</MutedText>
-            {quote.kind === 'blocked' ? (
-              <StoneButton gold onPress={() => setPending(null)} style={styles.centerBtn}>
-                Got it
-              </StoneButton>
-            ) : (
-              <View style={styles.col}>
-                <StoneButton gold onPress={confirm} style={styles.centerBtn}>
-                  {confirmLabel(quote)}
-                </StoneButton>
-                <StoneButton onPress={() => setPending(null)} style={styles.centerBtn}>
-                  Cancel
-                </StoneButton>
-              </View>
-            )}
-          </Tablet>
-        </Overlay>
-      ) : null}
-
-      {quote && pending === 'campaign' ? (
+      {quote && pending && modeUsesOfferings(pending) ? (
         <Overlay
           onBackdrop={() => {
             if (pickingSlot != null) {
@@ -232,8 +211,12 @@ export default function TitleMenu({
           }}
         >
           <Tablet>
-            <DisplayText style={styles.entryTitle}>Enter Campaign?</DisplayText>
-            <MutedText style={styles.entryCopy}>{CAMPAIGN_OFFERING_COPY}</MutedText>
+            <DisplayText style={styles.entryTitle}>
+              {pending === 'hard' ? 'Enter Hard?' : 'Enter Campaign?'}
+            </DisplayText>
+            <MutedText style={styles.entryCopy}>
+              {pending === 'hard' ? HARD_OFFERING_COPY : CAMPAIGN_OFFERING_COPY}
+            </MutedText>
             <View style={styles.wells}>
               <OfferingWell
                 itemId={offerings[0]}
@@ -267,7 +250,7 @@ export default function TitleMenu({
                 onPress={confirm}
                 style={styles.centerBtn}
               >
-                {quote.kind === 'blocked' ? 'Spend 100 gold' : confirmLabel(quote)}
+                {quote.kind === 'blocked' ? `Spend ${quote.cost} gold` : confirmLabel(quote)}
               </StoneButton>
               <StoneButton
                 onPress={() => {
@@ -285,8 +268,9 @@ export default function TitleMenu({
         </Overlay>
       ) : null}
 
-      {pending === 'campaign' && pickingSlot != null ? (
+      {pending && modeUsesOfferings(pending) && pickingSlot != null ? (
         <OfferingsPicker
+          mode={pending}
           meta={meta}
           slots={offerings}
           fillingSlot={pickingSlot}
@@ -338,6 +322,7 @@ function OfferingWell({
 }
 
 function OfferingsPicker({
+  mode,
   meta,
   slots,
   fillingSlot,
@@ -345,6 +330,7 @@ function OfferingsPicker({
   onCancel,
   onDeny,
 }: {
+  mode: Difficulty;
   meta: CollectionState;
   slots: OfferingSlots;
   fillingSlot: 0 | 1;
@@ -352,7 +338,7 @@ function OfferingsPicker({
   onCancel: () => void;
   onDeny: () => void;
 }) {
-  const rows = offeringPickerRows(meta, slots, fillingSlot);
+  const rows = offeringPickerRows(meta, slots, fillingSlot, mode);
   return (
     <Overlay onBackdrop={onCancel}>
       <Tablet>
@@ -407,10 +393,9 @@ function ModeButton({
 }) {
   const quote = quoteEntry(mode, meta);
   const free = quote.kind === 'free';
+  const keyId = entryKeyId(mode);
   const locked =
-    mode === 'campaign'
-      ? quote.kind === 'blocked' && (meta.items['campaign-key'] ?? 0) < 1
-      : quote.kind === 'blocked';
+    quote.kind === 'blocked' && (keyId == null || (meta.items[keyId] ?? 0) < 1);
   return (
     <StoneButton gold={gold} locked={locked} onPress={() => onPick(mode)}>
       <Text style={[styles.rowLabel, gold && { color: colors.gold2 }]}>{label}</Text>
@@ -424,7 +409,7 @@ function ModeButton({
               <GoldIcon size={16} />
               <Text style={styles.ticket}>{quote.cost}</Text>
             </View>
-            {mode !== 'campaign' && quote.keyCount > 0 && quote.keyId ? (
+            {mode === 'hard' && quote.keyCount > 0 && quote.keyId ? (
               <View style={styles.price}>
                 <ItemIcon id={quote.keyId} size={16} />
                 <Text style={styles.ticket}>×{quote.keyCount}</Text>
@@ -466,7 +451,6 @@ const styles = StyleSheet.create({
   cta: { justifyContent: 'center' },
   modes: { gap: 10, marginTop: 12, marginBottom: 8 },
   centerBtn: { justifyContent: 'center', marginTop: 8 },
-  pad: { marginVertical: 10 },
   col: { gap: 8, marginTop: 8 },
   entryTitle: { color: colors.ink, textTransform: 'uppercase' },
   entryCopy: { fontSize: 13, marginVertical: 10 },

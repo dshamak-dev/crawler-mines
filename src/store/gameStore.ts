@@ -23,6 +23,7 @@ import {
   mergeStash,
   newGrantKey,
   normalizeOfferings,
+  modeUsesOfferings,
   recoverBank,
   resolveLockedBossId,
   rollBonusKey,
@@ -221,7 +222,9 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
         run: loaded.run,
         runLoot: recovered.runLoot,
         start: (mode, rng = Math.random, offerings) => {
-          const slots = mode === 'campaign' ? normalizeOfferings(offerings, get().meta) : undefined;
+          const slots = modeUsesOfferings(mode)
+            ? normalizeOfferings(offerings, get().meta, mode)
+            : undefined;
           const spent = spendEntry(get().meta, mode, keyStore, slots);
           if (!spent) return false;
           const locked =
