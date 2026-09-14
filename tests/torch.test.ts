@@ -354,7 +354,7 @@ describe('#62 UI wiring', () => {
     expect(cellFn).toContain('if (flagMode) onFlag(index)');
     expect(cellFn).toContain('Gesture.LongPress()');
     expect(cellFn).toContain('Flagged mine hint');
-    expect(cellFn).toContain('styles.mineHint');
+    expect(cellFn).toContain('cellStyle(visual, bossHere, bossId, door, gridPaint, mineHint)');
     const cellView = cellFn.slice(cellFn.indexOf('<Animated.View'), cellFn.indexOf('</Animated.View>'));
     expect(cellView).not.toContain('pointerEvents');
     expect(board).toContain('hinted && styles.mineHint');
