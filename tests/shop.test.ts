@@ -247,27 +247,42 @@ describe('sellLoot gold math', () => {
   });
 });
 
+const BUY_CATALOG_ROWS: Array<[string, number]> = [
+  ['torch-charm', 8],
+  ['gem', 30],
+  ['bone-dust', 50],
+  ['witchcraft-bag', 150],
+  ['scroll-of-portal', 80],
+  ['flag-golden', 500],
+  ['flag-pirate', 500],
+  ['grid-classic', 1000],
+  ['grid-vintage', 1000],
+];
+
 describe('buy catalog', () => {
-  it('lists locked shop reagents and paid skins at the locked prices', () => {
+  it('lists torch, gem, reagents, and paid skins at the locked prices', () => {
+    expect(buyGold('torch-charm')).toBe(8);
+    expect(buyGold('gem')).toBe(30);
     expect(buyGold('bone-dust')).toBe(50);
     expect(buyGold('witchcraft-bag')).toBe(150);
     expect(buyGold('scroll-of-portal')).toBe(80);
+    expect(SHOP_BUY['torch-charm']).toBe(8);
+    expect(SHOP_BUY.gem).toBe(30);
     expect(SHOP_BUY['bone-dust']).toBe(50);
     expect(SHOP_BUY['witchcraft-bag']).toBe(150);
     expect(SHOP_BUY['scroll-of-portal']).toBe(80);
-    expect(buyableEntries().map((row) => [row.item.id, row.gold])).toEqual([
-      ['bone-dust', 50],
-      ['witchcraft-bag', 150],
-      ['scroll-of-portal', 80],
-      ['flag-golden', 500],
-      ['flag-pirate', 500],
-      ['grid-classic', 1000],
-      ['grid-vintage', 1000],
-    ]);
+    expect(sellGold('torch-charm')).toBe(2);
+    expect(sellGold('gem')).toBe(10);
+    expect(buyableEntries().map((row) => [row.item.id, row.gold])).toEqual(BUY_CATALOG_ROWS);
+    const shopOnly = new Set<ItemId>(['bone-dust', 'witchcraft-bag', 'scroll-of-portal']);
+    const lootBuy = new Set<ItemId>(['torch-charm', 'gem']);
     for (const id of ITEM_IDS) {
-      if (id === 'bone-dust' || id === 'witchcraft-bag' || id === 'scroll-of-portal') {
+      if (shopOnly.has(id)) {
         expect(isBuyable(id)).toBe(true);
         expect(isShopOnly(id)).toBe(true);
+      } else if (lootBuy.has(id)) {
+        expect(isBuyable(id)).toBe(true);
+        expect(isShopOnly(id)).toBe(false);
       } else {
         expect(isBuyable(id)).toBe(false);
         expect(buyGold(id)).toBe(0);
@@ -278,6 +293,8 @@ describe('buy catalog', () => {
     expect(isSellable('bone-dust')).toBe(true);
     expect(isSellable('scroll-of-portal')).toBe(true);
     expect(isSellable('witchcraft-bag')).toBe(false);
+    expect(isSellable('torch-charm')).toBe(true);
+    expect(isSellable('gem')).toBe(true);
   });
 
   it('clears the slotted item and qty when Sell↔Buy changes', () => {
@@ -302,6 +319,8 @@ describe('buy catalog', () => {
     const ids = (rows: ReturnType<typeof buyableEntries>) => rows.map((row) => row.item.id);
     const fresh = emptyCollection();
     expect(ids(buyableEntries())).toEqual([
+      'torch-charm',
+      'gem',
       'bone-dust',
       'witchcraft-bag',
       'scroll-of-portal',
@@ -311,6 +330,8 @@ describe('buy catalog', () => {
       'grid-vintage',
     ]);
     expect(ids(buyableEntries(SHOP_BUY, fresh))).toEqual([
+      'torch-charm',
+      'gem',
       'bone-dust',
       'witchcraft-bag',
       'scroll-of-portal',
@@ -324,8 +345,11 @@ describe('buy catalog', () => {
     const owned = {
       ...fresh,
       ownedSkins: [...fresh.ownedSkins, 'flag-golden' as const, 'grid-classic' as const],
+      items: { ...fresh.items, 'torch-charm': 4, gem: 2 },
     };
     expect(ids(buyableEntries(SHOP_BUY, owned))).toEqual([
+      'torch-charm',
+      'gem',
       'bone-dust',
       'witchcraft-bag',
       'scroll-of-portal',
@@ -334,6 +358,8 @@ describe('buy catalog', () => {
     ]);
     expect(ids(buyableEntries(SHOP_BUY, owned))).not.toContain('flag-golden');
     expect(ids(buyableEntries(SHOP_BUY, owned))).not.toContain('grid-classic');
+    expect(ids(buyableEntries(SHOP_BUY, owned))).toContain('torch-charm');
+    expect(ids(buyableEntries(SHOP_BUY, owned))).toContain('gem');
   });
 });
 
@@ -359,6 +385,8 @@ describe('buyLoot gold math', () => {
     expect(loadCollection(store).items.gem).toBe(0);
     expect(buyLoot(packed({}, 19), 'gem', 2, store, catalog)).toBeNull();
     expect(loadCollection(store).gold).toBe(0);
+    expect(buyLoot(packed({}, 7), 'torch-charm', 1, store)).toBeNull();
+    expect(buyLoot(packed({}, 29), 'gem', 1, store)).toBeNull();
     expect(buyLoot(packed({}, 49), 'bone-dust', 1, store)).toBeNull();
     expect(buyLoot(packed({}, 149), 'witchcraft-bag', 1, store)).toBeNull();
     expect(loadCollection(store).gold).toBe(0);
@@ -394,10 +422,32 @@ describe('buyLoot gold math', () => {
     ).toEqual(['gem', 'bone-dust', 'witchcraft-bag']);
   });
 
+  it('buys torch charm at 8 and cave gem at 30, stacks, and persists', () => {
+    const store = memoryStore();
+    const torch = buyLoot(packed({ gem: 1 }, 50), 'torch-charm', 2, store);
+    expect(torch).not.toBeNull();
+    expect(torch!.gold).toBe(34);
+    expect(torch!.items['torch-charm']).toBe(2);
+    expect(torch!.items.gem).toBe(1);
+    const gems = buyLoot(torch!, 'gem', 1, store);
+    expect(gems).not.toBeNull();
+    expect(gems!.gold).toBe(4);
+    expect(gems!.items.gem).toBe(2);
+    expect(gems!.items['torch-charm']).toBe(2);
+    const loaded = loadCollection(store);
+    expect(loaded.gold).toBe(4);
+    expect(loaded.items['torch-charm']).toBe(2);
+    expect(loaded.items.gem).toBe(2);
+    expect(JSON.parse(store.getItem(COLLECTION_KEY) ?? '{}').items['torch-charm']).toBe(2);
+    expect(buyableEntries(SHOP_BUY, loaded).map((row) => row.item.id)).toEqual(
+      expect.arrayContaining(['torch-charm', 'gem']),
+    );
+  });
+
   it('rejects a missing catalog price and does not charge partial', () => {
     const store = memoryStore();
     expect(buyLoot(packed({}, 40), 'relic-shard', 1, store, catalog)).toBeNull();
-    expect(buyLoot(packed({}, 40), 'gem', 1, store)).toBeNull();
+    expect(buyLoot(packed({}, 40), 'relic-shard', 1, store)).toBeNull();
     expect(loadCollection(store).gold).toBe(0);
     expect(clampBuyQty(0)).toBe(1);
     expect(clampBuyQty(40)).toBe(40);
@@ -429,6 +479,31 @@ describe('buyLoot gold math', () => {
     expect(game.getState().sell('bone-dust', 1)).toBe(true);
     expect(game.getState().meta.gold).toBe(15);
     expect(game.getState().meta.items['bone-dust']).toBe(1);
+  });
+
+  it('updates the game store meta immediately when buying torch and gem', () => {
+    const store = memoryStore({
+      [COLLECTION_KEY]: JSON.stringify({
+        v: 1,
+        gold: 50,
+        items: { 'torch-charm': 1 },
+      }),
+    });
+    const game = createGameStore(store);
+    expect(game.getState().buy('torch-charm', 1)).toBe(true);
+    expect(game.getState().meta.gold).toBe(42);
+    expect(game.getState().meta.items['torch-charm']).toBe(2);
+    expect(game.getState().buy('gem', 1)).toBe(true);
+    expect(game.getState().meta.gold).toBe(12);
+    expect(game.getState().meta.items.gem).toBe(1);
+    expect(loadCollection(store).gold).toBe(12);
+    expect(loadCollection(store).items['torch-charm']).toBe(2);
+    expect(loadCollection(store).items.gem).toBe(1);
+    expect(game.getState().buy('gem', 1)).toBe(false);
+    expect(game.getState().meta.gold).toBe(12);
+    expect(game.getState().sell('gem', 1)).toBe(true);
+    expect(game.getState().meta.gold).toBe(22);
+    expect(game.getState().meta.items.gem).toBe(0);
   });
 });
 

@@ -358,11 +358,14 @@ export function sellableEntries(
 export type ShopGoodId = ItemId | SkinId;
 
 /**
- * Title-shop buy prices. Paid skins live here with the reagents (#49).
- * Defaults stay free / always owned and are not catalog rows.
- * `buyableEntries(catalog, owned)` also drops already-owned paid skins.
+ * Title-shop buy prices. Torch charm and cave gem (#64) sit with the reagents
+ * (#49) and paid skins. Defaults stay free / always owned and are not catalog
+ * rows. `buyableEntries(catalog, owned)` also drops already-owned paid skins.
+ * Stackable loot stays listed after purchase (no hide-owned filter).
  */
 export const SHOP_BUY: Partial<Record<ShopGoodId, number>> = {
+  'torch-charm': 8,
+  gem: 30,
   'bone-dust': 50,
   'witchcraft-bag': 150,
   'scroll-of-portal': 80,
