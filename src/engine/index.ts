@@ -278,6 +278,23 @@ export {
   spendEntry,
 } from './ticket';
 export type { EntryKind, EntryQuote, PaidMode } from './ticket';
+export type { TipDef, TipId, TipNeed, TipSurface, TipWorld } from './tips';
+export {
+  LEGACY_TUTORIAL_KEY,
+  OFFERING_TIP_WORLD,
+  START_TIP_WORLD,
+  TIPS,
+  TIPS_KEY,
+  TIP_CATALOG,
+  TIP_IDS,
+  isTipId,
+  loadSeenTips,
+  markTipSeen,
+  orderedSeen,
+  pickTip,
+  playTipWorld,
+  saveSeenTips,
+} from './tips';
 export {
   RUN_KEY,
   allDescentPerfect,

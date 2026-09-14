@@ -4,23 +4,31 @@ import {
   CAMPAIGN_OFFERING_COPY,
   HARD_OFFERING_COPY,
   ITEMS,
+  OFFERING_TIP_WORLD,
+  START_TIP_WORLD,
   canSocket,
   confirmLabel,
   emptyOfferings,
   entryKeyId,
+  loadSeenTips,
+  markTipSeen,
   modeUsesOfferings,
   offeringCaptionParts,
   offeringPickerRows,
+  pickTip,
   quoteEntry,
   type CollectionState,
   type Difficulty,
   type ItemId,
   type OfferingSlots,
+  type TipId,
 } from '../../../src/engine';
+import { keyStore } from '../storage';
 import { colors, fonts } from '../theme';
 import { BagIcon, GoldIcon, ItemIcon, ScalesIcon, TorchIcon } from './icons';
 import MuteButton from './MuteButton';
 import { DisplayText, MutedText, Overlay, StoneButton, Tablet } from './primitives';
+import TipSheet from './TipSheet';
 
 export default function TitleMenu({
   onStart,
@@ -51,6 +59,7 @@ export default function TitleMenu({
   const [pending, setPending] = useState<Difficulty | null>(null);
   const [offerings, setOfferings] = useState<OfferingSlots>(emptyOfferings);
   const [pickingSlot, setPickingSlot] = useState<0 | 1 | null>(null);
+  const [seenTips, setSeenTips] = useState(() => loadSeenTips(keyStore));
   const quote = pending
     ? quoteEntry(pending, meta, modeUsesOfferings(pending) ? offerings : undefined)
     : null;
@@ -118,6 +127,17 @@ export default function TitleMenu({
     next[slot] = null;
     setOfferings(next);
   };
+
+  const dismissMenuTip = (id: TipId) => {
+    setSeenTips(markTipSeen(keyStore, id));
+  };
+
+  const startTip = startOpen && !pending ? pickTip(seenTips, START_TIP_WORLD) : null;
+  const offeringTip =
+    pending && modeUsesOfferings(pending) && pickingSlot == null
+      ? pickTip(seenTips, OFFERING_TIP_WORLD)
+      : null;
+  const menuTip = startTip ?? offeringTip;
 
   return (
     <View style={styles.shell}>
@@ -282,6 +302,8 @@ export default function TitleMenu({
           onDeny={onDeny}
         />
       ) : null}
+
+      {menuTip ? <TipSheet tip={menuTip} onDismiss={() => dismissMenuTip(menuTip.id)} onUi={onUi} /> : null}
     </View>
   );
 }
