@@ -57,6 +57,7 @@ function packed(
 describe('sell catalog', () => {
   it('sells only named loot at the locked unit prices', () => {
     expect(sellGold('rusty-key')).toBe(4);
+    expect(sellGold('secret-chest')).toBe(25);
     expect(sellGold('torch-charm')).toBe(2);
     expect(sellGold('gem')).toBe(10);
     expect(sellGold('relic-shard')).toBe(18);
@@ -67,6 +68,7 @@ describe('sell catalog', () => {
     expect(sellGold('scroll-of-portal')).toBe(20);
     const sellable = new Set([
       'rusty-key',
+      'secret-chest',
       'torch-charm',
       'gem',
       'relic-shard',
@@ -110,6 +112,7 @@ describe('sell catalog', () => {
     const rows = sellableEntries({
       ...emptyCollection().items,
       'rusty-key': 1,
+      'secret-chest': 2,
       'torch-charm': 2,
       gem: 1,
       'relic-shard': 1,
@@ -129,6 +132,7 @@ describe('sell catalog', () => {
     });
     expect(rows.map((row) => row.item.id)).toEqual([
       'rusty-key',
+      'secret-chest',
       'torch-charm',
       'gem',
       'relic-shard',
@@ -194,7 +198,6 @@ describe('sellLoot gold math', () => {
         'lust-head': 1,
         'gold-cup': 2,
         'witchcraft-bag': 2,
-        'secret-chest': 2,
         'rusty-key': 1,
       },
       10,
@@ -206,7 +209,6 @@ describe('sellLoot gold math', () => {
     expect(sellLoot(meta, 'lust-head', 1, store)).toBeNull();
     expect(sellLoot(meta, 'gold-cup', 1, store)).toBeNull();
     expect(sellLoot(meta, 'witchcraft-bag', 1, store)).toBeNull();
-    expect(sellLoot(meta, 'secret-chest', 1, store)).toBeNull();
     expect(sellLoot(meta, 'gold-pouch', 1, store)).toBeNull();
     expect(loadCollection(store).gold).toBe(0);
     expect(loadCollection(store).items['hard-key']).toBe(0);
@@ -254,6 +256,7 @@ describe('sellLoot gold math', () => {
 });
 
 const BUY_CATALOG_ROWS: Array<[string, number]> = [
+  ['secret-chest', 40],
   ['torch-charm', 8],
   ['gem', 30],
   ['bone-dust', 50],
@@ -269,21 +272,22 @@ describe('buy catalog', () => {
   it('lists torch, gem, reagents, and paid skins at the locked prices', () => {
     expect(buyGold('torch-charm')).toBe(8);
     expect(buyGold('gem')).toBe(30);
-    expect(buyGold('secret-chest')).toBe(0);
+    expect(buyGold('secret-chest')).toBe(40);
     expect(buyGold('bone-dust')).toBe(50);
     expect(buyGold('witchcraft-bag')).toBe(150);
     expect(buyGold('scroll-of-portal')).toBe(80);
     expect(SHOP_BUY['torch-charm']).toBe(8);
     expect(SHOP_BUY.gem).toBe(30);
-    expect(SHOP_BUY['secret-chest']).toBeUndefined();
+    expect(SHOP_BUY['secret-chest']).toBe(40);
     expect(SHOP_BUY['bone-dust']).toBe(50);
     expect(SHOP_BUY['witchcraft-bag']).toBe(150);
     expect(SHOP_BUY['scroll-of-portal']).toBe(80);
     expect(sellGold('torch-charm')).toBe(2);
     expect(sellGold('gem')).toBe(10);
+    expect(sellGold('secret-chest')).toBe(25);
     expect(buyableEntries().map((row) => [row.item.id, row.gold])).toEqual(BUY_CATALOG_ROWS);
     const shopOnly = new Set<ItemId>(['bone-dust', 'witchcraft-bag', 'scroll-of-portal']);
-    const lootBuy = new Set<ItemId>(['torch-charm', 'gem']);
+    const lootBuy = new Set<ItemId>(['secret-chest', 'torch-charm', 'gem']);
     for (const id of ITEM_IDS) {
       if (shopOnly.has(id)) {
         expect(isBuyable(id)).toBe(true);
@@ -303,6 +307,7 @@ describe('buy catalog', () => {
     expect(isSellable('witchcraft-bag')).toBe(false);
     expect(isSellable('torch-charm')).toBe(true);
     expect(isSellable('gem')).toBe(true);
+    expect(isSellable('secret-chest')).toBe(true);
   });
 
   it('clears the slotted item and qty when Sell↔Buy changes', () => {
@@ -327,6 +332,7 @@ describe('buy catalog', () => {
     const ids = (rows: ReturnType<typeof buyableEntries>) => rows.map((row) => row.item.id);
     const fresh = emptyCollection();
     expect(ids(buyableEntries())).toEqual([
+      'secret-chest',
       'torch-charm',
       'gem',
       'bone-dust',
@@ -338,6 +344,7 @@ describe('buy catalog', () => {
       'grid-vintage',
     ]);
     expect(ids(buyableEntries(SHOP_BUY, fresh))).toEqual([
+      'secret-chest',
       'torch-charm',
       'gem',
       'bone-dust',
@@ -356,6 +363,7 @@ describe('buy catalog', () => {
       items: { ...fresh.items, 'torch-charm': 4, gem: 2 },
     };
     expect(ids(buyableEntries(SHOP_BUY, owned))).toEqual([
+      'secret-chest',
       'torch-charm',
       'gem',
       'bone-dust',
@@ -512,6 +520,50 @@ describe('buyLoot gold math', () => {
     expect(game.getState().sell('gem', 1)).toBe(true);
     expect(game.getState().meta.gold).toBe(22);
     expect(game.getState().meta.items.gem).toBe(0);
+  });
+
+  it('buys a secret chest at 40 into Collection and sells at 25 without opening it', () => {
+    const store = memoryStore();
+    const bought = buyLoot(packed({ 'rusty-key': 1 }, 80), 'secret-chest', 1, store);
+    expect(bought).not.toBeNull();
+    expect(bought!.gold).toBe(40);
+    expect(bought!.items['secret-chest']).toBe(1);
+    expect(bought!.items['rusty-key']).toBe(1);
+    expect(bought!.items['witchcraft-bag']).toBe(0);
+    expect(bought!.items['bone-dust']).toBe(0);
+    expect(bought!.items['scroll-of-portal']).toBe(0);
+    expect(loadCollection(store).items['secret-chest']).toBe(1);
+    expect(loadCollection(store).gold).toBe(40);
+    expect(buyLoot(packed({}, 39), 'secret-chest', 1, store)).toBeNull();
+    const sold = sellLoot(bought!, 'secret-chest', 1, store);
+    expect(sold).not.toBeNull();
+    expect(sold!.gold).toBe(65);
+    expect(sold!.items['secret-chest']).toBe(0);
+    expect(sold!.items['rusty-key']).toBe(1);
+    expect(loadCollection(store).gold).toBe(65);
+    expect(loadCollection(store).items['secret-chest']).toBe(0);
+  });
+
+  it('updates the game store when buying and selling a secret chest', () => {
+    const store = memoryStore({
+      [COLLECTION_KEY]: JSON.stringify({
+        v: 1,
+        gold: 40,
+        items: { 'rusty-key': 2 },
+      }),
+    });
+    const game = createGameStore(store);
+    expect(game.getState().buy('secret-chest', 1)).toBe(true);
+    expect(game.getState().meta.gold).toBe(0);
+    expect(game.getState().meta.items['secret-chest']).toBe(1);
+    expect(game.getState().meta.items['rusty-key']).toBe(2);
+    expect(game.getState().meta.items['witchcraft-bag']).toBe(0);
+    expect(game.getState().buy('secret-chest', 1)).toBe(false);
+    expect(game.getState().sell('secret-chest', 1)).toBe(true);
+    expect(game.getState().meta.gold).toBe(25);
+    expect(game.getState().meta.items['secret-chest']).toBe(0);
+    expect(game.getState().meta.items['rusty-key']).toBe(2);
+    expect(loadCollection(store).gold).toBe(25);
   });
 });
 

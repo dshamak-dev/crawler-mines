@@ -88,7 +88,7 @@ export function quoteEntry(
 
 export function confirmLabel(quote: EntryQuote): string {
   if (quote.kind === 'key') {
-    return quote.mode === 'hard' ? 'Use Hard key' : 'Dive free';
+    return 'Start free';
   }
   if (quote.kind === 'gold') {
     return `Spend ${quote.cost} gold`;
