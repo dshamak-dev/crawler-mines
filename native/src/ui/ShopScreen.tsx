@@ -3,14 +3,14 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   ITEMS,
   SHOP_BUY,
-  SKINS,
+  THEMES,
   buyGold,
   buyableEntries,
   clampBuyQty,
   clampSellQty,
   isItemId,
-  isSkinId,
-  isSkinOwned,
+  isThemeId,
+  isThemeOwned,
   sellGold,
   sellableEntries,
   shopSelectionAfterModeChange,
@@ -20,11 +20,11 @@ import {
   type ShopGoodId,
   type ShopMode,
 } from '../../../src/engine';
-import { colors, fonts } from '../theme';
-import { GoldIcon, ItemIcon, SkinIcon } from './icons';
+import { colors, fonts, useTheme } from '../theme';
+import { GoldIcon, ItemIcon, ThemeIcon } from './icons';
 import ItemPreviewSheet, {
   previewForItem,
-  previewForSkin,
+  previewForTheme,
   type ItemPreviewModel,
 } from './ItemPreviewSheet';
 import RitualSheet from './RitualSheet';
@@ -52,40 +52,41 @@ export default function ShopScreen({
   const [qty, setQty] = useState(0);
   const [preview, setPreview] = useState<ItemPreviewModel | null>(null);
   const [ritualOpen, setRitualOpen] = useState(false);
+  const t = useTheme();
 
   const sellRows = sellableEntries(meta.items);
   const buyRows = useMemo(() => buyableEntries(SHOP_BUY, meta), [meta]);
   const rows = mode === 'sell' ? sellRows : buyRows;
   const ownedItem = slotted && isItemId(slotted) ? Math.max(0, meta.items[slotted] ?? 0) : 0;
-  const skinOwned = slotted && isSkinId(slotted) ? isSkinOwned(meta, slotted) : false;
-  const skinForSale = Boolean(slotted && isSkinId(slotted) && buyGold(slotted) > 0 && !skinOwned);
+  const themeOwned = slotted && isThemeId(slotted) ? isThemeOwned(meta, slotted) : false;
+  const themeForSale = Boolean(slotted && isThemeId(slotted) && buyGold(slotted) > 0 && !themeOwned);
   const empty =
     mode === 'sell'
       ? !slotted || !isItemId(slotted) || ownedItem < 1
-      : !slotted || (isSkinId(slotted) && !skinForSale);
+      : !slotted || (isThemeId(slotted) && !themeForSale);
   const liveQty =
     empty || !slotted
       ? 0
       : mode === 'sell'
         ? clampSellQty(ownedItem, qty)
-        : clampBuyQty(qty, isSkinId(slotted) ? 1 : 99);
+        : clampBuyQty(qty, isThemeId(slotted) ? 1 : 99);
   const unit = !slotted ? 0 : mode === 'sell' && isItemId(slotted) ? sellGold(slotted) : buyGold(slotted);
   const total = empty || !slotted ? 0 : unit * liveQty;
   const captionName = slotted
-    ? isSkinId(slotted)
-      ? SKINS[slotted].name
+    ? isThemeId(slotted)
+      ? THEMES[slotted].name
       : ITEMS[slotted].name
     : '';
 
   const caption = useMemo(() => {
     if (empty || !slotted) {
       if (mode === 'sell') return 'Tap an item to sell.';
-      if (slotted && isSkinId(slotted) && skinOwned) return `${SKINS[slotted].name} · owned`;
+      if (slotted && isThemeId(slotted) && themeOwned) return `${THEMES[slotted].name} · owned`;
       return 'Tap an item to buy.';
     }
     if (mode === 'sell' && isItemId(slotted)) return `${ITEMS[slotted].name} · ${ownedItem} owned`;
     return `${captionName} · ${unit} each`;
-  }, [empty, slotted, ownedItem, mode, unit, skinOwned, captionName]);
+  }, [empty, slotted, ownedItem, mode, unit, themeOwned, captionName]);
 
   const changeMode = (next: ShopMode) => {
     const after = shopSelectionAfterModeChange(mode, next, slotted, qty);
@@ -104,8 +105,8 @@ export default function ShopScreen({
 
   const openPreview = (id: ShopGoodId) => {
     onUi();
-    if (isSkinId(id)) {
-      setPreview(previewForSkin(id, isSkinOwned(meta, id), false, false));
+    if (isThemeId(id)) {
+      setPreview(previewForTheme(id, isThemeOwned(meta, id), false, false));
       return;
     }
     setPreview(previewForItem(id, meta.items[id] ?? 0, Boolean(onStartRite)));
@@ -117,7 +118,7 @@ export default function ShopScreen({
     setQty(
       mode === 'sell'
         ? clampSellQty(ownedItem, liveQty + delta)
-        : clampBuyQty(liveQty + delta, slotted && isSkinId(slotted) ? 1 : 99),
+        : clampBuyQty(liveQty + delta, slotted && isThemeId(slotted) ? 1 : 99),
     );
   };
 
@@ -136,7 +137,7 @@ export default function ShopScreen({
       return;
     }
     if (mode === 'buy') {
-      if (isSkinId(slotted)) {
+      if (isThemeId(slotted)) {
         setSlotted(null);
         setQty(0);
       }
@@ -151,13 +152,13 @@ export default function ShopScreen({
     setQty(clampSellQty(remain, liveQty));
   };
 
-  const buyLocked = mode === 'buy' && Boolean(slotted && isSkinId(slotted) && skinOwned);
+  const buyLocked = mode === 'buy' && Boolean(slotted && isThemeId(slotted) && themeOwned);
   const actionLocked = empty || buyLocked;
 
   return (
     <View style={styles.shell}>
       <View style={styles.stage}>
-      <View style={styles.tablet}>
+        <View style={[styles.tablet, { backgroundColor: t.tabletBg, borderColor: t.tabletBorder }]}>
         <View style={styles.head}>
           <GhostButton
             onPress={() => {
@@ -167,12 +168,12 @@ export default function ShopScreen({
             accessibilityLabel="Back"
             style={styles.backThumb}
           >
-            <Text style={styles.chev}>‹</Text>
+            <Text style={[styles.chev, { color: t.ink }]}>‹</Text>
           </GhostButton>
           <DisplayText style={styles.h1}>Shop</DisplayText>
           <View style={styles.wallet}>
             <GoldIcon size={18} />
-            <Text style={styles.walletN}>{meta.gold}</Text>
+            <Text style={[styles.walletN, { color: t.gold2 }]}>{meta.gold}</Text>
           </View>
         </View>
 
@@ -195,7 +196,7 @@ export default function ShopScreen({
           </StoneButton>
         </View>
 
-        <Text style={styles.stashLabel}>{mode === 'sell' ? 'Your stash' : 'For sale'}</Text>
+        <Text style={[styles.stashLabel, { color: t.gold2 }]}>{mode === 'sell' ? 'Your stash' : 'For sale'}</Text>
         {rows.length === 0 ? (
           <Text style={styles.empty}>
             {mode === 'sell' ? 'Nothing sellable yet.' : 'Nothing for sale yet.'}
@@ -205,11 +206,11 @@ export default function ShopScreen({
             {rows.map((row) => {
               const count = 'count' in row ? row.count : undefined;
               const id = row.item.id;
-              const ownedSkin = isSkinId(id) && isSkinOwned(meta, id);
+              const ownedTheme = isThemeId(id) && isThemeOwned(meta, id);
               return (
                 <Pressable
                   key={id}
-                  style={[styles.cell, slotted === id && styles.cellOn]}
+                  style={[styles.cell, slotted === id && styles.cellOn, { backgroundColor: t.stoneLo, borderColor: t.accentBorder }, slotted === id && { borderColor: t.gold }]}
                   onPress={() => slotGood(id)}
                   onLongPress={() => {
                     setSlotted(id);
@@ -220,14 +221,14 @@ export default function ShopScreen({
                   accessibilityLabel={
                     count != null
                       ? `${row.item.name}, ${count} owned`
-                      : ownedSkin
+                      : ownedTheme
                         ? `${row.item.name}, owned`
                         : `${row.item.name}, ${row.gold} gold`
                   }
                 >
-                  {isSkinId(id) ? <SkinIcon id={id} size={36} /> : <ItemIcon id={id} size={36} />}
-                  <Text style={styles.cellQty}>
-                    {count != null ? `x${count}` : ownedSkin ? 'own' : row.gold}
+                  {isThemeId(id) ? <ThemeIcon id={id} size={36} /> : <ItemIcon id={id} size={36} />}
+                  <Text style={[styles.cellQty, { color: t.gold2 }]}>
+                    {count != null ? `x${count}` : ownedTheme ? 'own' : row.gold}
                   </Text>
                 </Pressable>
               );
@@ -236,7 +237,7 @@ export default function ShopScreen({
         )}
 
         <Pressable
-          style={[styles.slot, empty && styles.slotEmpty]}
+          style={[styles.slot, empty && styles.slotEmpty, { borderColor: empty ? t.accentBorder : t.gold, backgroundColor: t.cardBg }]}
           disabled={!slotted}
           onPress={() => {
             if (slotted) openPreview(slotted);
@@ -244,20 +245,20 @@ export default function ShopScreen({
           accessibilityLabel={slotted ? `${captionName} preview` : undefined}
         >
           {slotted ? (
-            isSkinId(slotted) ? (
-              <SkinIcon id={slotted} size={64} />
+            isThemeId(slotted) ? (
+              <ThemeIcon id={slotted} size={64} />
             ) : (
               <ItemIcon id={slotted} size={64} />
             )
           ) : null}
         </Pressable>
-        <Text style={styles.caption}>{caption}</Text>
+        <Text style={[styles.caption, { color: t.gold2 }]}>{caption}</Text>
 
         <View style={styles.qty}>
           <StoneButton disabled={empty} onPress={() => bump(-1)} style={styles.step} accessibilityLabel="Decrease quantity">
             −
           </StoneButton>
-          <Text style={styles.qtyN}>{liveQty}</Text>
+          <Text style={[styles.qtyN, { color: t.gold2 }]}>{liveQty}</Text>
           <StoneButton disabled={empty} onPress={() => bump(1)} style={styles.step} accessibilityLabel="Increase quantity">
             +
           </StoneButton>

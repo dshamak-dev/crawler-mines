@@ -1,15 +1,14 @@
 import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg';
 import {
-  flagSkinPaint,
-  gridSkinPaint,
-  isFlagSkinId,
+  themeTokens,
   type BossId,
   type ChestTier,
-  type FlagSkinId,
-  type GridSkinId,
+  type FlagPaint,
   type ItemId,
-  type SkinId,
+  type ThemeId,
+  type ThemeTokens,
 } from '../../../src/engine';
+import { useTheme } from '../theme';
 
 type GlyphProps = { size?: number; color?: string };
 
@@ -129,50 +128,115 @@ export function BombIcon({ cracked = false, size = 24 }: { cracked?: boolean; si
 export function FlagIcon({
   ember = false,
   size = 24,
-  skin = 'flag-red',
+  paint,
 }: {
   ember?: boolean;
   size?: number;
-  skin?: FlagSkinId;
+  paint?: FlagPaint;
 }) {
-  const paint = flagSkinPaint(skin);
-  const cloth = ember ? '#8b2e2e' : paint.cloth;
-  const shine = ember ? '#d45a2a' : paint.shine;
+  const themed = useTheme().flag;
+  const flag = paint ?? themed;
+  const cloth = ember ? '#8b2e2e' : flag.cloth;
+  const shine = ember ? '#d45a2a' : flag.shine;
   return (
     <Svg viewBox="0 0 32 32" width={size} height={size}>
-      <Path d="M10 6v20" stroke={paint.pole} strokeWidth="2" />
+      <Path d="M10 6v20" stroke={flag.pole} strokeWidth="2" />
       <Path d="M11 7h14l-4 5 4 5H11V7z" fill={cloth} />
       <Path d="M11 7h10l-3 5 3 5H11" fill={shine} opacity="0.85" />
-      {paint.mark === 'skull' ? (
-        <>
-          <Circle cx="17.2" cy="10.6" r="2.15" fill="#e8dcc8" />
-          <Path
-            d="M15.4 13.8l4 3M19.4 13.8l-4 3"
-            stroke="#e8dcc8"
-            strokeWidth="1.35"
-            strokeLinecap="round"
-          />
-        </>
-      ) : null}
     </Svg>
   );
 }
 
-export function GridSkinIcon({ id, size = 24 }: { id: GridSkinId; size?: number }) {
-  const paint = gridSkinPaint(id);
+export function LeafIcon({ size = 24, color }: GlyphProps) {
+  const t = useTheme();
+  const fill = color ?? t.foundAccent;
   return (
     <Svg viewBox="0 0 32 32" width={size} height={size}>
-      <Rect x="3" y="3" width="12" height="12" rx="2" fill={paint.hidden} />
-      <Rect x="17" y="3" width="12" height="12" rx="2" fill={paint.revealed} />
-      <Rect x="3" y="17" width="12" height="12" rx="2" fill={paint.chest} />
-      <Rect x="17" y="17" width="12" height="12" rx="2" fill={paint.hidden} />
+      <Path
+        d="M16 5c7 2 12 8 11 16-6 1-12-2-15-8 2 6 2 11-2 14-1-8 1-16 6-22z"
+        fill={fill}
+      />
+      <Path d="M16 8c-1 6-2 11-6 16" stroke="#1a2410" strokeWidth="1.2" fill="none" opacity="0.45" />
     </Svg>
   );
 }
 
-export function SkinIcon({ id, size = 24 }: { id: SkinId; size?: number }) {
-  if (isFlagSkinId(id)) return <FlagIcon skin={id} size={size} />;
-  return <GridSkinIcon id={id} size={size} />;
+export function ThemeIcon({ id, size = 24 }: { id: ThemeId; size?: number }) {
+  const paint = themeTokens(id);
+  return (
+    <Svg viewBox="0 0 32 32" width={size} height={size}>
+      <Rect x="3" y="3" width="12" height="12" rx="2" fill={paint.hidden} stroke={paint.cellBorder} />
+      <Rect x="17" y="3" width="12" height="12" rx="2" fill={paint.revealed} stroke={paint.cellBorder} />
+      <Rect x="3" y="17" width="12" height="12" rx="2" fill={paint.chest} stroke={paint.cellBorder} />
+      <Rect x="17" y="17" width="12" height="12" rx="2" fill={paint.hidden} stroke={paint.cellBorder} />
+    </Svg>
+  );
+}
+
+export function CellFace({
+  size,
+  fill,
+  theme,
+}: {
+  size: number;
+  fill: string;
+  theme: ThemeTokens;
+}) {
+  const face = theme.cellFace;
+  if (face === 'flat') return null;
+  const grain = theme.grain;
+  if (face === 'neon') {
+    return (
+      <Svg
+        pointerEvents="none"
+        width={size}
+        height={size}
+        viewBox="0 0 32 32"
+        style={{ position: 'absolute', top: 0, left: 0 }}
+      >
+        <Rect x="1.4" y="1.4" width="29.2" height="29.2" rx="5" fill="none" stroke={theme.cellBorder} strokeWidth="1.4" />
+      </Svg>
+    );
+  }
+  if (face === 'wood') {
+    return (
+      <Svg
+        pointerEvents="none"
+        width={size}
+        height={size}
+        viewBox="0 0 32 32"
+        style={{ position: 'absolute', top: 0, left: 0 }}
+      >
+        <Path d="M3 8h26M4 16h24M3 24h26" stroke={grain} strokeWidth="1.2" />
+        <Path d="M8 4v24M22 5v22" stroke={grain} strokeWidth="0.7" opacity="0.7" />
+      </Svg>
+    );
+  }
+  if (face === 'cloud') {
+    return (
+      <Svg
+        pointerEvents="none"
+        width={size}
+        height={size}
+        viewBox="0 0 32 32"
+        style={{ position: 'absolute', top: 0, left: 0 }}
+      >
+        <Path d="M6 10c2-3 6-3 8 0 3-2 7 0 6 4H6c-1-1-1-3 0-4z" fill={grain} />
+      </Svg>
+    );
+  }
+  return (
+    <Svg
+      pointerEvents="none"
+      width={size}
+      height={size}
+      viewBox="0 0 32 32"
+      style={{ position: 'absolute', top: 0, left: 0 }}
+    >
+      <Path d="M3 4c3 1 4 4 2 6M26 5c-2 2-2 5 1 6M5 26c2-2 6-1 6 2M24 24c2 2 4 1 5-1" stroke={grain} strokeWidth="1.4" fill="none" />
+      <Path d="M8 8h2v2H8zM22 20h2v2h-2z" fill={fill === theme.hidden ? grain : 'transparent'} />
+    </Svg>
+  );
 }
 
 export function HeartIcon({ size = 24 }: GlyphProps) {

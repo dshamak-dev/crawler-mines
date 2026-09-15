@@ -24,7 +24,7 @@ import {
   type TipId,
 } from '../../../src/engine';
 import { keyStore } from '../storage';
-import { colors, fonts } from '../theme';
+import { colors, fonts, useTheme } from '../theme';
 import { BagIcon, GoldIcon, ItemIcon, ScalesIcon, TorchIcon } from './icons';
 import MuteButton from './MuteButton';
 import { DisplayText, MutedText, Overlay, StoneButton, Tablet } from './primitives';
@@ -55,6 +55,7 @@ export default function TitleMenu({
   onUi: () => void;
   onDeny: () => void;
 }) {
+  const t = useTheme();
   const [startOpen, setStartOpen] = useState(false);
   const [pending, setPending] = useState<Difficulty | null>(null);
   const [offerings, setOfferings] = useState<OfferingSlots>(emptyOfferings);
@@ -143,13 +144,13 @@ export default function TitleMenu({
     <View style={styles.shell}>
       <View style={styles.title}>
         <TorchIcon size={42} />
-        <Text style={styles.h1}>Crawler Mines</Text>
-        <Text style={styles.tagline}>Bombs don&apos;t kill you. They kill the loot.</Text>
+        <Text style={[styles.h1, { color: t.gold }]}>Crawler Mines</Text>
+        <Text style={[styles.tagline, { color: t.muted }]}>Bombs don&apos;t kill you. They kill the loot.</Text>
       </View>
-      <View style={styles.rules}>
-        <Text style={styles.rule}>Clear every safe tile.</Text>
-        <Text style={styles.rule}>Blasts chain into nearby bombs.</Text>
-        <Text style={styles.rule}>Long-press to flag.</Text>
+      <View style={[styles.rules, { borderColor: t.accentSoft, backgroundColor: t.cardBg }]}>
+        <Text style={[styles.rule, { color: t.muted }]}>Clear every safe tile.</Text>
+        <Text style={[styles.rule, { color: t.muted }]}>Blasts chain into nearby bombs.</Text>
+        <Text style={[styles.rule, { color: t.muted }]}>Long-press to flag.</Text>
       </View>
       <View style={styles.nav}>
         {onResume && resumeCopy ? (
@@ -159,8 +160,8 @@ export default function TitleMenu({
               onResume();
             }}
           >
-            <Text style={styles.rowLabel}>Resume</Text>
-            <Text style={styles.meta}>{resumeCopy}</Text>
+            <Text style={[styles.rowLabel, { color: t.ink }]}>Resume</Text>
+            <Text style={[styles.meta, { color: t.muted }]}>{resumeCopy}</Text>
           </StoneButton>
         ) : null}
         <StoneButton
@@ -181,11 +182,11 @@ export default function TitleMenu({
         >
           <View style={styles.rowMain}>
             <BagIcon size={26} />
-            <Text style={styles.rowLabel}>Collection</Text>
+            <Text style={[styles.rowLabel, { color: t.ink }]}>Collection</Text>
           </View>
           <View style={styles.wallet}>
             <GoldIcon size={20} />
-            <Text style={styles.walletN}>{gold}</Text>
+            <Text style={[styles.walletN, { color: t.gold2 }]}>{gold}</Text>
           </View>
         </StoneButton>
         <StoneButton
@@ -196,7 +197,7 @@ export default function TitleMenu({
         >
           <View style={styles.rowMain}>
             <ScalesIcon size={26} />
-            <Text style={styles.rowLabel}>Shop</Text>
+            <Text style={[styles.rowLabel, { color: t.ink }]}>Shop</Text>
           </View>
         </StoneButton>
         <MuteButton muted={muted} onToggle={onToggleMute} />
@@ -414,13 +415,14 @@ function ModeButton({
   onPick: (mode: Difficulty) => void;
 }) {
   const quote = quoteEntry(mode, meta);
+  const t = useTheme();
   const free = quote.kind === 'free';
   const keyId = entryKeyId(mode);
   const locked =
     quote.kind === 'blocked' && (keyId == null || (meta.items[keyId] ?? 0) < 1);
   return (
     <StoneButton gold={gold} locked={locked} onPress={() => onPick(mode)}>
-      <Text style={[styles.rowLabel, gold && { color: colors.gold2 }]}>{label}</Text>
+      <Text style={[styles.rowLabel, gold && { color: t.gold2 }]}>{label}</Text>
       <View style={styles.modeMeta}>
         <Text style={styles.meta}>{size}</Text>
         {free ? (

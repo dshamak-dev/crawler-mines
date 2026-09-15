@@ -12,8 +12,6 @@ import {
   markTipSeen,
   pickTip,
   playTipWorld,
-  selectedFlagSkin,
-  selectedGridSkin,
   stackedEntries,
   type GameEvent,
   type TipId,
@@ -22,10 +20,10 @@ import { sfxFromEvents } from '../audio';
 import { getAudio } from '../audio/player';
 import { keyStore } from '../storage';
 import { floorReport, useGameStore, type FloorReport, type Run } from '../store';
-import { colors, fonts } from '../theme';
+import { fonts, useTheme } from '../theme';
 import Board, { chainDuration, collectFx, type BlastFx } from './Board';
 import { clampBoardSlot, fitBoardCellPx } from './fitBoardCell';
-import { BagIcon, BossIcon, ChestIcon, FlagIcon, ItemIcon, MenuIcon, ShovelIcon } from './icons';
+import { BagIcon, BossIcon, ChestIcon, FlagIcon, ItemIcon, LeafIcon, MenuIcon, ShovelIcon } from './icons';
 import LootGrantCards from './LootGrantCards';
 import LootQueue, { type LootToastItem } from './LootToast';
 import MuteButton from './MuteButton';
@@ -48,10 +46,8 @@ export default function PlayScreen({
   onCollection: () => void;
   onExitRun: () => void;
 }) {
-  const meta = useGameStore((s) => s.meta);
   const run = useGameStore((s) => s.run);
-  const flagSkin = selectedFlagSkin(meta);
-  const gridSkin = selectedGridSkin(meta);
+  const t = useTheme();
   const applyDig = useGameStore((s) => s.applyDig);
   const applyFlag = useGameStore((s) => s.applyFlag);
   const applyExtract = useGameStore((s) => s.applyExtract);
@@ -266,23 +262,23 @@ export default function PlayScreen({
           }}
           accessibilityLabel="Game menu"
         >
-          <MenuIcon size={20} />
+          <MenuIcon size={20} color={t.ink} />
         </GhostButton>
         <View style={styles.stats}>
           {showChestHud ? (
             <>
-              <View style={[styles.stat, styles.found]}>
-                <Text style={[styles.statLabel, styles.foundLabel]}>Found</Text>
+              <View style={[styles.stat, styles.found, { borderColor: t.accentSoft }]}>
+                <Text style={[styles.statLabel, { color: t.foundAccent }]}>Found</Text>
                 <View style={styles.statRow}>
                   <ChestIcon tier="wooden" size={16} />
-                  <Text style={styles.statN}>{game.chestsOpened}</Text>
+                  <Text style={[styles.statN, { color: t.ink }]}>{game.chestsOpened}</Text>
                 </View>
               </View>
-              <View style={[styles.stat, styles.wreck]}>
-                <Text style={[styles.statLabel, styles.wreckLabel]}>Broken</Text>
+              <View style={[styles.stat, styles.wreck, { borderColor: t.accentSoft }]}>
+                <Text style={[styles.statLabel, { color: t.brokenAccent }]}>Broken</Text>
                 <View style={styles.statRow}>
                   <ChestIcon wrecked tier="wooden" size={16} />
-                  <Text style={styles.statN}>{game.chestsDestroyed}</Text>
+                  <Text style={[styles.statN, { color: t.ink }]}>{game.chestsDestroyed}</Text>
                 </View>
               </View>
             </>
@@ -292,12 +288,12 @@ export default function PlayScreen({
               <Text style={[styles.statLabel, styles.bossLabel]}>{bossName}</Text>
               <View style={styles.statRow}>
                 <BossIcon id={boss.id} size={16} />
-                <Text style={styles.statN}>{Math.max(0, boss.lives)}</Text>
+                <Text style={[styles.statN, { color: t.ink }]}>{Math.max(0, boss.lives)}</Text>
               </View>
             </View>
           ) : null}
         </View>
-        <Text style={styles.pill}>{hudPill}</Text>
+        <Text style={[styles.pill, { color: t.muted, borderColor: t.hudPillBorder }]}>{hudPill}</Text>
       </View>
 
       <View
@@ -313,8 +309,6 @@ export default function PlayScreen({
             game={game}
             cellPx={cellPx}
             flagMode={flagMode}
-            flagSkin={flagSkin}
-            gridSkin={gridSkin}
             blasts={blasts}
             sparkles={sparkles}
             shaking={shaking}
@@ -333,29 +327,29 @@ export default function PlayScreen({
       />
 
       <View style={styles.dock}>
-        <View style={styles.toggle}>
+        <View style={[styles.toggle, { borderColor: t.accentSoft, backgroundColor: t.cardBg }]}>
           <Pressable
-            style={[styles.toggleBtn, !flagMode && styles.toggleOn]}
+            style={[styles.toggleBtn, !flagMode && { backgroundColor: t.stoneHi }]}
             onPress={() => {
               cueUi();
               setFlagMode(false);
             }}
           >
-            <ShovelIcon size={22} />
-            <Text style={[styles.toggleText, !flagMode && styles.toggleOnText]}>Dig</Text>
+            {t.digGlyph === 'leaf' ? <LeafIcon size={22} /> : <ShovelIcon size={22} />}
+            <Text style={[styles.toggleText, { color: t.muted }, !flagMode && { color: t.gold2 }]}>Dig</Text>
           </Pressable>
           <Pressable
-            style={[styles.toggleBtn, flagMode && styles.toggleFlag]}
+            style={[styles.toggleBtn, flagMode && { backgroundColor: t.stoneHi }]}
             onPress={() => {
               cueUi();
               setFlagMode(true);
             }}
           >
-            <FlagIcon skin={flagSkin} size={22} />
-            <Text style={[styles.toggleText, flagMode && styles.toggleFlagText]}>Flag</Text>
+            <FlagIcon paint={t.flag} size={22} />
+            <Text style={[styles.toggleText, { color: t.muted }, flagMode && { color: t.flagAccent }]}>Flag</Text>
           </Pressable>
         </View>
-        <Text style={styles.hint}>
+        <Text style={[styles.hint, { color: t.muted }]}>
           {boss
             ? boss.lives <= 0
               ? 'The boss is dead. Find the door and extract.'
@@ -395,7 +389,7 @@ export default function PlayScreen({
               >
                 <View style={styles.rowMain}>
                   <BagIcon size={26} />
-                  <Text style={styles.rowLabel}>Collection</Text>
+                  <Text style={[styles.rowLabel, { color: t.ink }]}>Collection</Text>
                 </View>
               </StoneButton>
               <MuteButton muted={muted} onToggle={onToggleMute} />
@@ -500,12 +494,12 @@ export default function PlayScreen({
                 {arena ? null : (
                   <View style={styles.tally}>
                     <View>
-                      <Text style={styles.tallyEm}>Found</Text>
-                      <Text style={styles.pos}>{report.opened}</Text>
+                      <Text style={[styles.tallyEm, { color: t.muted }]}>Found</Text>
+                      <Text style={[styles.pos, { color: t.foundAccent }]}>{report.opened}</Text>
                     </View>
                     <View>
-                      <Text style={styles.tallyEm}>Broken</Text>
-                      <Text style={styles.neg}>{report.wrecked}</Text>
+                      <Text style={[styles.tallyEm, { color: t.muted }]}>Broken</Text>
+                      <Text style={[styles.neg, { color: t.blood }]}>{report.wrecked}</Text>
                     </View>
                   </View>
                 )}
@@ -514,23 +508,23 @@ export default function PlayScreen({
                 ) : null}
                 {report.bossHead ? (
                   <View style={styles.bonusRow}>
-                    <Text style={styles.bonus}>Trophy</Text>
+                    <Text style={[styles.bonus, { color: t.gold2 }]}>Trophy</Text>
                     <ItemIcon id={report.bossHead} size={18} />
-                    <Text style={styles.bonus}>{ITEMS[report.bossHead].name}</Text>
+                    <Text style={[styles.bonus, { color: t.gold2 }]}>{ITEMS[report.bossHead].name}</Text>
                   </View>
                 ) : null}
                 {report.goldCup ? (
                   <View style={styles.bonusRow}>
-                    <Text style={styles.bonus}>Trophy</Text>
+                    <Text style={[styles.bonus, { color: t.gold2 }]}>Trophy</Text>
                     <ItemIcon id={report.goldCup} size={18} />
-                    <Text style={styles.bonus}>{ITEMS[report.goldCup].name}</Text>
+                    <Text style={[styles.bonus, { color: t.gold2 }]}>{ITEMS[report.goldCup].name}</Text>
                   </View>
                 ) : null}
                 {report.bonusKey ? (
                   <View style={styles.bonusRow}>
-                    <Text style={styles.bonus}>Bonus</Text>
+                    <Text style={[styles.bonus, { color: t.gold2 }]}>Bonus</Text>
                     <ItemIcon id={report.bonusKey} size={18} />
-                    <Text style={styles.bonus}>{ITEMS[report.bonusKey].name}</Text>
+                    <Text style={[styles.bonus, { color: t.gold2 }]}>{ITEMS[report.bonusKey].name}</Text>
                   </View>
                 ) : null}
                 {report.gold > 0 || salvage.length > 0 ? (
@@ -635,21 +629,16 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 0.6,
     textTransform: 'uppercase',
-    color: colors.muted,
   },
-  foundLabel: { color: colors.gold },
-  wreckLabel: { color: colors.ash },
   bossLabel: { color: '#c9b4ff' },
   statRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  statN: { fontFamily: fonts.uiBold, color: colors.ink, fontSize: 14 },
+  statN: { fontFamily: fonts.uiBold, fontSize: 14 },
   pill: {
     fontFamily: fonts.display,
     fontSize: 11,
     letterSpacing: 1,
     textTransform: 'uppercase',
-    color: colors.muted,
     borderWidth: 1,
-    borderColor: 'rgba(224, 180, 74, 0.25)',
     paddingVertical: 4,
     paddingHorizontal: 7,
     borderRadius: 999,
@@ -658,11 +647,9 @@ const styles = StyleSheet.create({
   toggle: {
     flexDirection: 'row',
     gap: 8,
-    backgroundColor: 'rgba(0,0,0,0.28)',
     padding: 6,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
   },
   toggleBtn: {
     flex: 1,
@@ -673,23 +660,19 @@ const styles = StyleSheet.create({
     minHeight: 48,
     borderRadius: 14,
   },
-  toggleOn: { backgroundColor: colors.stoneHi },
-  toggleFlag: { backgroundColor: colors.stoneHi },
-  toggleText: { fontFamily: fonts.display, color: colors.muted, letterSpacing: 1 },
-  toggleOnText: { color: colors.gold2 },
-  toggleFlagText: { color: '#ffb4b4' },
-  hint: { marginTop: 6, textAlign: 'center', color: colors.muted, fontFamily: fonts.ui, fontSize: 12 },
+  toggleText: { fontFamily: fonts.display, letterSpacing: 1 },
+  hint: { marginTop: 6, textAlign: 'center', fontFamily: fonts.ui, fontSize: 12 },
   menuNav: { gap: 12, marginTop: 12 },
   center: { justifyContent: 'center' },
   rowMain: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  rowLabel: { fontFamily: fonts.display, color: colors.ink, fontSize: 17 },
+  rowLabel: { fontFamily: fonts.display, fontSize: 17 },
   pad: { marginVertical: 8 },
   col: { gap: 8, marginTop: 8 },
   bossReveal: { alignItems: 'center', marginBottom: 8 },
   tally: { flexDirection: 'row', justifyContent: 'space-around', marginVertical: 12 },
-  tallyEm: { fontFamily: fonts.ui, color: colors.muted, fontSize: 12, textAlign: 'center' },
-  pos: { fontFamily: fonts.display, color: colors.gold, fontSize: 26, textAlign: 'center' },
-  neg: { fontFamily: fonts.display, color: '#e07a6a', fontSize: 26, textAlign: 'center' },
+  tallyEm: { fontFamily: fonts.ui, fontSize: 12, textAlign: 'center' },
+  pos: { fontFamily: fonts.display, fontSize: 26, textAlign: 'center' },
+  neg: { fontFamily: fonts.display, fontSize: 26, textAlign: 'center' },
   bonusRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -697,5 +680,5 @@ const styles = StyleSheet.create({
     gap: 6,
     marginBottom: 8,
   },
-  bonus: { fontFamily: fonts.display, color: colors.gold2, fontSize: 15, textAlign: 'center' },
+  bonus: { fontFamily: fonts.display, fontSize: 15, textAlign: 'center' },
 });

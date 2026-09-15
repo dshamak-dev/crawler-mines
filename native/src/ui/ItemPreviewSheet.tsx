@@ -1,19 +1,19 @@
 import { StyleSheet, Text, View } from 'react-native';
 import {
   ITEMS,
-  SKINS,
+  THEMES,
   canUseFromPreview,
   type ChestTier,
   type ItemId,
-  type SkinId,
+  type ThemeId,
 } from '../../../src/engine';
-import { colors, fonts } from '../theme';
-import { ChestIcon, ItemIcon, SkinIcon } from './icons';
+import { fonts, useTheme } from '../theme';
+import { ChestIcon, ItemIcon, ThemeIcon } from './icons';
 import { DisplayText, MutedText, Overlay, StoneButton, Tablet } from './primitives';
 
 export type ItemPreviewIcon =
   | { kind: 'item'; itemId: ItemId }
-  | { kind: 'skin'; skinId: SkinId }
+  | { kind: 'theme'; themeId: ThemeId }
   | { kind: 'chest'; tier: ChestTier; wrecked?: boolean }
   | { kind: 'gold-bag' };
 
@@ -44,17 +44,17 @@ export function previewForItem(
   };
 }
 
-export function previewForSkin(
-  skinId: SkinId,
+export function previewForTheme(
+  themeId: ThemeId,
   owned: boolean,
   selected: boolean,
   allowSelect: boolean,
 ): ItemPreviewModel {
-  const skin = SKINS[skinId];
+  const theme = THEMES[themeId];
   return {
-    title: skin.name,
-    flavor: skin.flavor,
-    icon: { kind: 'skin', skinId },
+    title: theme.name,
+    flavor: theme.flavor,
+    icon: { kind: 'theme', themeId },
     canUse: false,
     canSelect: allowSelect && owned && !selected,
     selected: allowSelect && owned && selected,
@@ -75,6 +75,7 @@ export default function ItemPreviewSheet({
   onUi?: () => void;
 }) {
   const cue = onUi ?? (() => {});
+  const t = useTheme();
 
   return (
     <Overlay
@@ -84,12 +85,15 @@ export default function ItemPreviewSheet({
       }}
     >
       <Tablet>
-        <View style={styles.ico} accessibilityLabel={`${preview.title} icon`}>
+        <View
+          style={[styles.ico, { borderColor: t.accentBorder, backgroundColor: t.stoneLo }]}
+          accessibilityLabel={`${preview.title} icon`}
+        >
           <PreviewGlyph icon={preview.icon} />
         </View>
-        <DisplayText style={styles.title}>{preview.title}</DisplayText>
+        <DisplayText style={[styles.title, { color: t.ink }]}>{preview.title}</DisplayText>
         <MutedText style={styles.flavor}>{preview.flavor}</MutedText>
-        {preview.qty != null ? <Text style={styles.qty}>×{preview.qty}</Text> : null}
+        {preview.qty != null ? <Text style={[styles.qty, { color: t.gold2 }]}>×{preview.qty}</Text> : null}
         <View style={styles.col}>
           {preview.canUse ? (
             <StoneButton
@@ -145,7 +149,7 @@ export default function ItemPreviewSheet({
 
 function PreviewGlyph({ icon }: { icon: ItemPreviewIcon }) {
   if (icon.kind === 'item') return <ItemIcon id={icon.itemId} size={72} />;
-  if (icon.kind === 'skin') return <SkinIcon id={icon.skinId} size={72} />;
+  if (icon.kind === 'theme') return <ThemeIcon id={icon.themeId} size={72} />;
   if (icon.kind === 'gold-bag') return <ItemIcon id="gold-pouch" size={72} />;
   return <ChestIcon wrecked={icon.wrecked} tier={icon.tier} size={72} />;
 }
@@ -156,18 +160,15 @@ const styles = StyleSheet.create({
     height: 96,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(224, 180, 74, 0.35)',
-    backgroundColor: '#1a1512',
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',
     marginBottom: 12,
   },
-  title: { color: colors.ink, letterSpacing: 0.6 },
+  title: { letterSpacing: 0.6 },
   flavor: { fontSize: 14, marginTop: 10, marginBottom: 6 },
   qty: {
     fontFamily: fonts.uiBold,
-    color: colors.gold2,
     fontSize: 20,
     textAlign: 'center',
     marginTop: 4,

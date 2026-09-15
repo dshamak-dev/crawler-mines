@@ -21,21 +21,16 @@ import {
 } from './loot';
 import type { Rng } from './types';
 import {
-  DEFAULT_FLAG_SKIN,
-  DEFAULT_GRID_SKIN,
-  defaultOwnedSkins,
-  isDefaultSkin,
-  isFlagSkinId,
-  isGridSkinId,
-  isSkinId,
-  isSkinOwned,
-  normalizeOwnedSkins,
-  selectedFlagSkin,
-  selectedGridSkin,
-  type FlagSkinId,
-  type GridSkinId,
-  type SkinId,
-} from './skins';
+  DEFAULT_THEME,
+  defaultOwnedThemes,
+  isDefaultTheme,
+  isThemeId,
+  isThemeOwned,
+  migrateLegacySkins,
+  normalizeOwnedThemes,
+  selectedTheme,
+  type ThemeId,
+} from './themes';
 
 export const COLLECTION_KEY = 'crawler-mines-collection';
 
@@ -50,9 +45,8 @@ export interface CollectionState {
   items: Inventory;
   /** Floor instance whose rewards were already banked. Blocks a second wallet/pack grant. */
   lastGrantKey: string | null;
-  ownedSkins: SkinId[];
-  selectedFlagSkin: FlagSkinId;
-  selectedGridSkin: GridSkinId;
+  ownedThemes: ThemeId[];
+  selectedTheme: ThemeId;
 }
 
 export function emptyCollection(): CollectionState {
@@ -60,9 +54,8 @@ export function emptyCollection(): CollectionState {
     gold: 0,
     items: emptyInventory(),
     lastGrantKey: null,
-    ownedSkins: defaultOwnedSkins(),
-    selectedFlagSkin: DEFAULT_FLAG_SKIN,
-    selectedGridSkin: DEFAULT_GRID_SKIN,
+    ownedThemes: defaultOwnedThemes(),
+    selectedTheme: DEFAULT_THEME,
   };
 }
 
@@ -90,18 +83,17 @@ function clampGold(value: unknown): number {
   return Math.max(0, Math.floor(value));
 }
 
-function withSkins(
-  state: Omit<CollectionState, 'ownedSkins' | 'selectedFlagSkin' | 'selectedGridSkin'> &
-    Partial<Pick<CollectionState, 'ownedSkins' | 'selectedFlagSkin' | 'selectedGridSkin'>>,
+function withThemes(
+  state: Omit<CollectionState, 'ownedThemes' | 'selectedTheme'> &
+    Partial<Pick<CollectionState, 'ownedThemes' | 'selectedTheme'>>,
 ): CollectionState {
-  const ownedSkins = normalizeOwnedSkins(state.ownedSkins);
+  const ownedThemes = normalizeOwnedThemes(state.ownedThemes);
   return {
     gold: clampGold(state.gold),
     items: state.items,
     lastGrantKey: state.lastGrantKey,
-    ownedSkins,
-    selectedFlagSkin: selectedFlagSkin({ ...state, ownedSkins }),
-    selectedGridSkin: selectedGridSkin({ ...state, ownedSkins }),
+    ownedThemes,
+    selectedTheme: selectedTheme({ ...state, ownedThemes }),
   };
 }
 
@@ -118,6 +110,8 @@ export function loadCollection(store: KeyStore = defaultStore()): CollectionStat
       ownedSkins?: unknown;
       selectedFlagSkin?: unknown;
       selectedGridSkin?: unknown;
+      ownedThemes?: unknown;
+      selectedTheme?: unknown;
     };
     if (!parsed || typeof parsed !== 'object') return state;
     state.gold = clampGold(parsed.gold);
@@ -133,16 +127,15 @@ export function loadCollection(store: KeyStore = defaultStore()): CollectionStat
         if (n > 0) state.items[key] = n;
       }
     }
-    return withSkins({
+    const migrated = migrateLegacySkins(parsed);
+    const next = withThemes({
       ...state,
-      ownedSkins: normalizeOwnedSkins(parsed.ownedSkins),
-      selectedFlagSkin: isFlagSkinId(parsed.selectedFlagSkin)
-        ? parsed.selectedFlagSkin
-        : DEFAULT_FLAG_SKIN,
-      selectedGridSkin: isGridSkinId(parsed.selectedGridSkin)
-        ? parsed.selectedGridSkin
-        : DEFAULT_GRID_SKIN,
+      gold: clampGold(state.gold) + migrated.goldBonus,
+      ownedThemes: migrated.ownedThemes,
+      selectedTheme: migrated.selectedTheme,
     });
+    if (migrated.dirty) saveCollection(next, store);
+    return next;
   } catch {
     return emptyCollection();
   }
@@ -156,17 +149,16 @@ export function saveCollection(
   for (const id of Object.keys(items) as ItemId[]) {
     items[id] = isCollectible(id) ? Math.max(0, Math.floor(state.items[id] ?? 0)) : 0;
   }
-  const next = withSkins({ ...state, items });
+  const next = withThemes({ ...state, items });
   store.setItem(
     COLLECTION_KEY,
     JSON.stringify({
-      v: 1,
+      v: 2,
       gold: next.gold,
       items,
       lastGrantKey: next.lastGrantKey,
-      ownedSkins: next.ownedSkins,
-      selectedFlagSkin: next.selectedFlagSkin,
-      selectedGridSkin: next.selectedGridSkin,
+      ownedThemes: next.ownedThemes,
+      selectedTheme: next.selectedTheme,
     }),
   );
 }
@@ -187,7 +179,7 @@ export function applyRewards(
       items = addItem(items, r.itemId);
     }
   }
-  const next = withSkins({
+  const next = withThemes({
     ...state,
     gold,
     items,
@@ -220,7 +212,7 @@ export function sellLoot(
   const owned = Math.max(0, Math.floor(state.items[itemId] ?? 0));
   const n = clampSellQty(owned, qty);
   if (n < 1) return null;
-  const next = withSkins({
+  const next = withThemes({
     ...state,
     gold: clampGold(state.gold) + sellGold(itemId) * n,
     items: removeItem(state.items, itemId, n),
@@ -247,7 +239,7 @@ export function buyLoot(
   const cost = buyGold(itemId, catalog) * n;
   const gold = clampGold(state.gold);
   if (gold < cost) return null;
-  const next = withSkins({
+  const next = withThemes({
     ...state,
     gold: gold - cost,
     items: addItem(state.items, itemId, n),
@@ -293,7 +285,7 @@ export function openSecretChest(
       rewards.push({ itemId, gold: 0 });
     }
   }
-  const next = withSkins({
+  const next = withThemes({
     ...state,
     gold,
     items,
@@ -303,30 +295,30 @@ export function openSecretChest(
 }
 
 /**
- * Buy one paid skin. Already-owned, default, missing price, or short gold
+ * Buy one paid theme. Already-owned, default, missing price, or short gold
  * returns null and charges nothing.
  */
-export function buySkin(
+export function buyTheme(
   state: CollectionState,
-  skinId: SkinId,
+  themeId: ThemeId,
   store: KeyStore = defaultStore(),
   catalog: ShopBuyCatalog = SHOP_BUY,
 ): CollectionState | null {
-  if (!isSkinId(skinId) || isDefaultSkin(skinId) || isSkinOwned(state, skinId)) return null;
-  if (!isBuyable(skinId, catalog)) return null;
-  const cost = buyGold(skinId, catalog);
+  if (!isThemeId(themeId) || isDefaultTheme(themeId) || isThemeOwned(state, themeId)) return null;
+  if (!isBuyable(themeId, catalog)) return null;
+  const cost = buyGold(themeId, catalog);
   const gold = clampGold(state.gold);
   if (gold < cost) return null;
-  const next = withSkins({
+  const next = withThemes({
     ...state,
     gold: gold - cost,
-    ownedSkins: normalizeOwnedSkins([...(state.ownedSkins ?? []), skinId]),
+    ownedThemes: normalizeOwnedThemes([...(state.ownedThemes ?? []), themeId]),
   });
   saveCollection(next, store);
   return next;
 }
 
-/** Item or paid skin. Skins ignore qty and buy at most one copy. */
+/** Item or paid theme. Themes ignore qty and buy at most one copy. */
 export function buyGoods(
   state: CollectionState,
   id: ShopGoodId,
@@ -334,29 +326,18 @@ export function buyGoods(
   store: KeyStore = defaultStore(),
   catalog: ShopBuyCatalog = SHOP_BUY,
 ): CollectionState | null {
-  if (isSkinId(id)) return buySkin(state, id, store, catalog);
+  if (isThemeId(id)) return buyTheme(state, id, store, catalog);
   if (isItemId(id)) return buyLoot(state, id, qty, store, catalog);
   return null;
 }
 
-export function selectFlagSkin(
+export function selectTheme(
   state: CollectionState,
-  skinId: FlagSkinId,
+  themeId: ThemeId,
   store: KeyStore = defaultStore(),
 ): CollectionState | null {
-  if (!isFlagSkinId(skinId) || !isSkinOwned(state, skinId)) return null;
-  const next = withSkins({ ...state, selectedFlagSkin: skinId });
-  saveCollection(next, store);
-  return next;
-}
-
-export function selectGridSkin(
-  state: CollectionState,
-  skinId: GridSkinId,
-  store: KeyStore = defaultStore(),
-): CollectionState | null {
-  if (!isGridSkinId(skinId) || !isSkinOwned(state, skinId)) return null;
-  const next = withSkins({ ...state, selectedGridSkin: skinId });
+  if (!isThemeId(themeId) || !isThemeOwned(state, themeId)) return null;
+  const next = withThemes({ ...state, selectedTheme: themeId });
   saveCollection(next, store);
   return next;
 }

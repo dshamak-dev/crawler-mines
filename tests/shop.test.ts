@@ -262,14 +262,15 @@ const BUY_CATALOG_ROWS: Array<[string, number]> = [
   ['bone-dust', 50],
   ['witchcraft-bag', 150],
   ['scroll-of-portal', 80],
-  ['flag-golden', 500],
-  ['flag-pirate', 500],
-  ['grid-classic', 1000],
-  ['grid-vintage', 1000],
+  ['theme-vintage-stone', 1000],
+  ['theme-neon-cyber', 1000],
+  ['theme-woodland', 1000],
+  ['theme-ocean-breeze', 1000],
+  ['theme-forest-trail', 1000],
 ];
 
 describe('buy catalog', () => {
-  it('lists torch, gem, reagents, and paid skins at the locked prices', () => {
+  it('lists torch, gem, reagents, and paid themes at the locked prices', () => {
     expect(buyGold('torch-charm')).toBe(8);
     expect(buyGold('gem')).toBe(30);
     expect(buyGold('secret-chest')).toBe(40);
@@ -328,7 +329,7 @@ describe('buy catalog', () => {
     });
   });
 
-  it('hides default and owned skins from the Buy catalog', () => {
+  it('hides default and owned themes from the Buy catalog', () => {
     const ids = (rows: ReturnType<typeof buyableEntries>) => rows.map((row) => row.item.id);
     const fresh = emptyCollection();
     expect(ids(buyableEntries())).toEqual([
@@ -338,10 +339,11 @@ describe('buy catalog', () => {
       'bone-dust',
       'witchcraft-bag',
       'scroll-of-portal',
-      'flag-golden',
-      'flag-pirate',
-      'grid-classic',
-      'grid-vintage',
+      'theme-vintage-stone',
+      'theme-neon-cyber',
+      'theme-woodland',
+      'theme-ocean-breeze',
+      'theme-forest-trail',
     ]);
     expect(ids(buyableEntries(SHOP_BUY, fresh))).toEqual([
       'secret-chest',
@@ -350,16 +352,17 @@ describe('buy catalog', () => {
       'bone-dust',
       'witchcraft-bag',
       'scroll-of-portal',
-      'flag-golden',
-      'flag-pirate',
-      'grid-classic',
-      'grid-vintage',
+      'theme-vintage-stone',
+      'theme-neon-cyber',
+      'theme-woodland',
+      'theme-ocean-breeze',
+      'theme-forest-trail',
     ]);
-    expect(ids(buyableEntries(SHOP_BUY, fresh))).not.toContain('flag-red');
-    expect(ids(buyableEntries(SHOP_BUY, fresh))).not.toContain('grid-gray');
+    expect(ids(buyableEntries(SHOP_BUY, fresh))).not.toContain('theme-classic-dark');
+    expect(ids(buyableEntries(SHOP_BUY, fresh))).not.toContain('flag-golden');
     const owned = {
       ...fresh,
-      ownedSkins: [...fresh.ownedSkins, 'flag-golden' as const, 'grid-classic' as const],
+      ownedThemes: [...fresh.ownedThemes, 'theme-vintage-stone' as const, 'theme-neon-cyber' as const],
       items: { ...fresh.items, 'torch-charm': 4, gem: 2 },
     };
     expect(ids(buyableEntries(SHOP_BUY, owned))).toEqual([
@@ -369,11 +372,12 @@ describe('buy catalog', () => {
       'bone-dust',
       'witchcraft-bag',
       'scroll-of-portal',
-      'flag-pirate',
-      'grid-vintage',
+      'theme-woodland',
+      'theme-ocean-breeze',
+      'theme-forest-trail',
     ]);
-    expect(ids(buyableEntries(SHOP_BUY, owned))).not.toContain('flag-golden');
-    expect(ids(buyableEntries(SHOP_BUY, owned))).not.toContain('grid-classic');
+    expect(ids(buyableEntries(SHOP_BUY, owned))).not.toContain('theme-vintage-stone');
+    expect(ids(buyableEntries(SHOP_BUY, owned))).not.toContain('theme-neon-cyber');
     expect(ids(buyableEntries(SHOP_BUY, owned))).toContain('torch-charm');
     expect(ids(buyableEntries(SHOP_BUY, owned))).toContain('gem');
   });
@@ -624,7 +628,7 @@ describe('title shop wiring', () => {
   it('opens the shared item preview from a long-press row or the selected slot', () => {
     expect(shop).toContain('ItemPreviewSheet');
     expect(shop).toContain('previewForItem');
-    expect(shop).toContain('previewForSkin');
+    expect(shop).toContain('previewForTheme');
     expect(shop).toContain('openPreview');
     expect(shop).toContain('onLongPress');
     expect(shop).toContain('onPress={() => slotGood(id)}');

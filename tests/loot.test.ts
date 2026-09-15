@@ -274,7 +274,7 @@ describe('meta collection persistence', () => {
     expect(loaded.items.gem).toBe(1);
     expect(loaded.items['gold-pouch']).toBe(0);
     expect(loaded.gold).toBe(0);
-    expect(JSON.parse(store.getItem(COLLECTION_KEY) ?? '{}').v).toBe(1);
+    expect(JSON.parse(store.getItem(COLLECTION_KEY) ?? '{}').v).toBe(2);
   });
 
   it('turns gold pouches into wallet coins and never stacks pouches', () => {

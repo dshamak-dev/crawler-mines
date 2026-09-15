@@ -1,10 +1,11 @@
 import {
-  SKIN_IDS,
-  SKINS,
-  isSkinOwned,
-  type SkinDef,
-  type SkinId,
-} from './skins';
+  THEMES,
+  THEME_PRICE,
+  isThemeOwned,
+  paidThemeIds,
+  type ThemeDef,
+  type ThemeId,
+} from './themes';
 import type { Difficulty, Rng } from './types';
 
 export const ITEM_IDS = [
@@ -422,13 +423,13 @@ export function sellableEntries(
     .filter((row) => row.count > 0);
 }
 
-export type ShopGoodId = ItemId | SkinId;
+export type ShopGoodId = ItemId | ThemeId;
 
 /**
  * Title-shop buy prices. Secret chest, torch charm, and cave gem sit with the
- * reagents and paid skins. Buy banks a Collection stack; it does not open the
- * chest. Defaults stay free / always owned and are not catalog rows.
- * `buyableEntries(catalog, owned)` also drops already-owned paid skins.
+ * reagents and paid themes. Buy banks a Collection stack; it does not open the
+ * chest. The default theme stays free / always owned and is not a catalog row.
+ * `buyableEntries(catalog, owned)` also drops already-owned paid themes.
  * Stackable loot stays listed after purchase (no hide-owned filter).
  */
 export const SHOP_BUY: Partial<Record<ShopGoodId, number>> = {
@@ -438,18 +439,19 @@ export const SHOP_BUY: Partial<Record<ShopGoodId, number>> = {
   'bone-dust': 50,
   'witchcraft-bag': 150,
   'scroll-of-portal': 80,
-  'flag-golden': 500,
-  'flag-pirate': 500,
-  'grid-classic': 1000,
-  'grid-vintage': 1000,
+  'theme-vintage-stone': THEME_PRICE,
+  'theme-neon-cyber': THEME_PRICE,
+  'theme-woodland': THEME_PRICE,
+  'theme-ocean-breeze': THEME_PRICE,
+  'theme-forest-trail': THEME_PRICE,
 };
 
 export type ShopBuyCatalog = Partial<Record<ShopGoodId, number>>;
 export type ShopMode = 'sell' | 'buy';
 
 export interface ShopBuyRow {
-  kind: 'item' | 'skin';
-  item: ItemDef | SkinDef;
+  kind: 'item' | 'theme';
+  item: ItemDef | ThemeDef;
   gold: number;
 }
 
@@ -463,7 +465,7 @@ export function isBuyable(id: ShopGoodId, catalog: ShopBuyCatalog = SHOP_BUY): b
   return buyGold(id, catalog) > 0;
 }
 
-/** Empty slot → 0. Otherwise clamp to 1..max (default 99). Skins cap at 1. */
+/** Empty slot → 0. Otherwise clamp to 1..max (default 99). Themes cap at 1. */
 export function clampBuyQty(qty: number, max = 99): number {
   const cap = Math.max(1, Math.floor(max));
   const n = Math.floor(qty);
@@ -473,7 +475,7 @@ export function clampBuyQty(qty: number, max = 99): number {
 
 export function buyableEntries(
   catalog: ShopBuyCatalog = SHOP_BUY,
-  owned?: { ownedSkins?: readonly string[] } | null,
+  owned?: { ownedThemes?: readonly string[] } | null,
 ): ShopBuyRow[] {
   const loot = ITEM_IDS.filter((id) => isBuyable(id, catalog) && !isShopOnly(id)).map((id) => ({
     kind: 'item' as const,
@@ -485,14 +487,14 @@ export function buyableEntries(
     item: ITEMS[id],
     gold: buyGold(id, catalog),
   }));
-  const skins = SKIN_IDS.filter(
-    (id) => isBuyable(id, catalog) && !isSkinOwned(owned, id),
-  ).map((id) => ({
-    kind: 'skin' as const,
-    item: SKINS[id],
-    gold: buyGold(id, catalog),
-  }));
-  return [...loot, ...reagents, ...skins];
+  const themes = paidThemeIds().filter((id) => isBuyable(id, catalog) && !isThemeOwned(owned, id)).map(
+    (id) => ({
+      kind: 'theme' as const,
+      item: THEMES[id],
+      gold: buyGold(id, catalog),
+    }),
+  );
+  return [...loot, ...reagents, ...themes];
 }
 
 /** Switching Sell↔Buy drops the slotted good and qty; same-mode is a no-op. */
