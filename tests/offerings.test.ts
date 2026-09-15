@@ -153,7 +153,7 @@ describe('#35 gold vs key slot', () => {
     const right = quoteEntry('campaign', meta, ['lust-head', 'campaign-key']);
     expect(left).toMatchObject({ kind: 'key', keyId: 'campaign-key' });
     expect(right.kind).toBe('key');
-    expect(confirmLabel(left)).toBe('Dive free');
+    expect(confirmLabel(left)).toBe('Start free');
     expect(offeringCaption(['lust-head', 'campaign-key'], left)).toBe('Floor 5 · Lust · Dive free');
   });
 
@@ -451,7 +451,7 @@ describe('#65 Hard offering enter', () => {
     expect(free?.items['hard-key']).toBe(1);
     expect(free?.items['torch-charm']).toBe(0);
     expect(quoteEntry('hard', keyed, ['hard-key', null]).kind).toBe('key');
-    expect(confirmLabel(quoteEntry('hard', keyed, ['hard-key', null]))).toBe('Use Hard key');
+    expect(confirmLabel(quoteEntry('hard', keyed, ['hard-key', null]))).toBe('Start free');
     expect(offeringCaption(['hard-key', null], quoteEntry('hard', keyed, ['hard-key', null]))).toBe(
       'Dive free',
     );

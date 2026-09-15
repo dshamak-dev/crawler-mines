@@ -16,6 +16,7 @@ import {
   SECRET_SCROLL_RATE,
   SHOP_BUY,
   TIER_COPY,
+  buyGold,
   buyableEntries,
   canOpenSecretChest,
   canUseFromPreview,
@@ -33,6 +34,7 @@ import {
   mulberry32,
   openSecretChest,
   rollSecretChestLoot,
+  sellGold,
   stackedEntries,
   type ItemId,
   type KeyStore,
@@ -184,20 +186,22 @@ describe('secret chest loot table', () => {
 });
 
 describe('secret chest is a collection item', () => {
-  it('stacks in Collection, is usable out of run, and is not a shop buy', () => {
+  it('stacks in Collection, is usable out of run, and is a shop good at 40 / 25', () => {
     expect(isSecretChestId(SECRET_CHEST_ID)).toBe(true);
     expect(isItemId(SECRET_CHEST_ID)).toBe(true);
     expect(isCollectible(SECRET_CHEST_ID)).toBe(true);
-    expect(isSellable(SECRET_CHEST_ID)).toBe(false);
+    expect(isSellable(SECRET_CHEST_ID)).toBe(true);
     expect(isUsable(SECRET_CHEST_ID)).toBe(true);
     expect(canUseFromPreview(SECRET_CHEST_ID, 1)).toBe(true);
     expect(canUseFromPreview(SECRET_CHEST_ID, 0)).toBe(false);
     expect(canUseFromPreview(SECRET_CHEST_ID, 1, true)).toBe(false);
     expect(CHEST_TIERS).toContain('secret');
     expect(SECRET_CHEST.name).toBe('Secret chest');
-    expect(isBuyable(SECRET_CHEST_ID)).toBe(false);
-    expect(SHOP_BUY[SECRET_CHEST_ID]).toBeUndefined();
-    expect(buyableEntries().some((row) => row.item.id === SECRET_CHEST_ID)).toBe(false);
+    expect(isBuyable(SECRET_CHEST_ID)).toBe(true);
+    expect(SHOP_BUY[SECRET_CHEST_ID]).toBe(40);
+    expect(buyGold(SECRET_CHEST_ID)).toBe(40);
+    expect(sellGold(SECRET_CHEST_ID)).toBe(25);
+    expect(buyableEntries().some((row) => row.item.id === SECRET_CHEST_ID)).toBe(true);
     const rows = stackedEntries({
       ...emptyCollection().items,
       'rusty-key': 2,
@@ -267,6 +271,25 @@ describe('collection open consumes a rusty key', () => {
     expect(game.getState().openSecretChest('rusty-key', seqRng([0.1]))).toBeNull();
     expect(game.getState().meta.gold).toBe(20);
     expect(game.getState().buy(SECRET_CHEST_ID, 1)).toBe(false);
+  });
+
+  it('Shop Buy banks a chest at 40 without a rusty key and does not open it', () => {
+    const store = memoryStore({
+      [COLLECTION_KEY]: banked({ gem: 1 }, 80),
+    });
+    const game = createGameStore(store);
+    expect(game.getState().buy(SECRET_CHEST_ID, 1)).toBe(true);
+    expect(game.getState().meta.gold).toBe(40);
+    expect(game.getState().meta.items[SECRET_CHEST_ID]).toBe(1);
+    expect(game.getState().meta.items['rusty-key']).toBe(0);
+    expect(game.getState().meta.items['witchcraft-bag']).toBe(0);
+    expect(game.getState().meta.items['bone-dust']).toBe(0);
+    expect(game.getState().meta.items['scroll-of-portal']).toBe(0);
+    expect(game.getState().meta.items.gem).toBe(1);
+    expect(game.getState().sell(SECRET_CHEST_ID, 1)).toBe(true);
+    expect(game.getState().meta.gold).toBe(65);
+    expect(game.getState().meta.items[SECRET_CHEST_ID]).toBe(0);
+    expect(loadCollection(store).gold).toBe(65);
   });
 });
 

@@ -371,6 +371,7 @@ export function canUseFromPreview(itemId: ItemId, owned: number, inRun = false):
 /** Title-shop unit prices. Pouches, ticket keys, heads, and the gold cup do not sell. */
 const SELL_GOLD: Partial<Record<ItemId, number>> = {
   'rusty-key': 4,
+  'secret-chest': 25,
   'torch-charm': 2,
   gem: 10,
   'relic-shard': 18,
@@ -424,13 +425,14 @@ export function sellableEntries(
 export type ShopGoodId = ItemId | SkinId;
 
 /**
- * Title-shop buy prices. Torch charm and cave gem (#64) sit with the reagents
- * (#49) and paid skins. Secret chests are found in-run, not sold. Defaults stay
- * free / always owned and are not catalog rows.
+ * Title-shop buy prices. Secret chest, torch charm, and cave gem sit with the
+ * reagents and paid skins. Buy banks a Collection stack; it does not open the
+ * chest. Defaults stay free / always owned and are not catalog rows.
  * `buyableEntries(catalog, owned)` also drops already-owned paid skins.
  * Stackable loot stays listed after purchase (no hide-owned filter).
  */
 export const SHOP_BUY: Partial<Record<ShopGoodId, number>> = {
+  'secret-chest': 40,
   'torch-charm': 8,
   gem: 30,
   'bone-dust': 50,

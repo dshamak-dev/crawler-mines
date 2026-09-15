@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   CAMPAIGN_COST,
@@ -104,9 +106,42 @@ describe('entry quotes', () => {
       cost: CAMPAIGN_COST,
       keyId: null,
     });
-    expect(confirmLabel(quoteEntry('hard', hard, ['hard-key', null]))).toBe('Use Hard key');
+    expect(confirmLabel(quoteEntry('hard', hard, ['hard-key', null]))).toBe('Start free');
     expect(confirmLabel(quoteEntry('campaign', campaign))).toBe('Spend 100 gold');
+    expect(confirmLabel(quoteEntry('campaign', campaign, ['campaign-key', null]))).toBe(
+      'Start free',
+    );
     expect(quoteEntry('hard', campaign).kind).toBe('gold');
+  });
+
+  it('Hard and Campaign confirm buttons say Start free when the matching key is socketed', () => {
+    const hard = {
+      ...emptyCollection(),
+      gold: 0,
+      items: { ...emptyInventory(), 'hard-key': 1 },
+    };
+    const campaign = {
+      ...emptyCollection(),
+      gold: 0,
+      items: { ...emptyInventory(), 'campaign-key': 1 },
+    };
+    expect(confirmLabel(quoteEntry('hard', hard, ['hard-key', null]))).toBe('Start free');
+    expect(confirmLabel(quoteEntry('campaign', campaign, ['campaign-key', null]))).toBe(
+      'Start free',
+    );
+    expect(confirmLabel(quoteEntry('hard', { ...emptyCollection(), gold: 30 }))).toBe(
+      'Spend 30 gold',
+    );
+    expect(confirmLabel(quoteEntry('campaign', { ...emptyCollection(), gold: 100 }))).toBe(
+      'Spend 100 gold',
+    );
+    expect(confirmLabel(quoteEntry('hard', { ...emptyCollection(), gold: 0 }))).toBe('');
+    const title = readFileSync(resolve(__dirname, '../native/src/ui/TitleMenu.tsx'), 'utf8');
+    expect(title).toContain(
+      '{quote.kind === \'blocked\' ? `Spend ${quote.cost} gold` : confirmLabel(quote)}',
+    );
+    expect(title).not.toContain('Use Hard key');
+    expect(title).not.toContain('Dive free');
   });
 
   it('blocks when there is neither enough gold nor a matching key', () => {
