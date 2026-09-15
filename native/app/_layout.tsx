@@ -10,7 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useGameAudio, type AppScreen } from '../src/audio';
 import { useNavStackSync } from '../src/nav';
 import { useGameStore } from '../src/store';
-import { colors } from '../src/theme';
+import { ThemeProvider, useTheme } from '../src/theme';
 
 export const unstable_settings = {
   initialRouteName: 'index',
@@ -66,25 +66,34 @@ export default function RootLayout() {
   if (!loaded) return null;
 
   return (
-    <GestureHandlerRootView style={styles.root}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <View style={styles.root}>
-          <StatusBar style="light" />
-          <NavSync />
-          <AudioHost />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: colors.bg, flex: 1, overflow: 'hidden' },
-              animation: 'fade',
-            }}
-          />
-        </View>
+        <ThemeProvider>
+          <ThemedRoot />
+        </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
 
+function ThemedRoot() {
+  const t = useTheme();
+  return (
+    <View style={[styles.root, { backgroundColor: t.bg }]}>
+      <StatusBar style="light" />
+      <NavSync />
+      <AudioHost />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: t.bg, flex: 1, overflow: 'hidden' },
+          animation: 'fade',
+        }}
+      />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
+  root: { flex: 1 },
 });

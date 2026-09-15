@@ -26,8 +26,8 @@ describe('Dmitry polish wiring', () => {
     expect(block).toContain('onResume && resumeCopy');
   });
 
-  it('paints board numbers from the selected grid skin', () => {
-    expect(board).toContain('gridNumberColor(gridPaint, cell.adjacentMines)');
+  it('paints board numbers from the selected theme', () => {
+    expect(board).toContain('gridNumberColor(theme, cell.adjacentMines)');
     expect(board).not.toContain('NUMBER_COLORS');
   });
 

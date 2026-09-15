@@ -14,8 +14,7 @@ export default function CollectionRoute() {
   const runLoot = useGameStore((s) => s.runLoot);
   const run = useGameStore((s) => s.run);
   const startRite = useGameStore((s) => s.startRite);
-  const pickFlag = useGameStore((s) => s.selectFlagSkin);
-  const pickGrid = useGameStore((s) => s.selectGridSkin);
+  const pickTheme = useGameStore((s) => s.selectTheme);
   const fromPlay = from === 'play' && Boolean(run);
 
   return (
@@ -40,8 +39,7 @@ export default function CollectionRoute() {
         onOpenSecret={
           fromPlay ? undefined : (socketed) => useGameStore.getState().openSecretChest(socketed)
         }
-        onSelectFlag={fromPlay ? undefined : pickFlag}
-        onSelectGrid={fromPlay ? undefined : pickGrid}
+        onSelectTheme={fromPlay ? undefined : pickTheme}
         onUi={() => getAudio().playSfx('ui')}
         onDeny={playDeny}
         onUseTorch={fromPlay ? () => useGameStore.getState().useTorch() : undefined}

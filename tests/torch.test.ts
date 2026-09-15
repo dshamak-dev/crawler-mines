@@ -342,7 +342,7 @@ describe('#62 UI wiring', () => {
     expect(board).toContain('activeTorchHintIndices');
     expect(board).toContain('Mine hint');
     expect(board).toContain('mineHint');
-    expect(board).toContain('styles.mineHint');
+    expect(board).toContain('mineHintBorder');
   });
 
   it('shows a flag on a torch-hinted mine and keeps the hint ring', () => {
@@ -356,10 +356,10 @@ describe('#62 UI wiring', () => {
     expect(cellFn).toContain('if (flagMode) onFlag(index)');
     expect(cellFn).toContain('Gesture.LongPress()');
     expect(cellFn).toContain('Flagged mine hint');
-    expect(cellFn).toContain('cellStyle(visual, bossHere, bossId, door, gridPaint, mineHint)');
+    expect(cellFn).toContain('cellStyle(visual, bossHere, bossId, door, theme, mineHint)');
     const cellView = cellFn.slice(cellFn.indexOf('<Animated.View'), cellFn.indexOf('</Animated.View>'));
     expect(cellView).not.toContain('pointerEvents');
-    expect(board).toContain('hinted && styles.mineHint');
+    expect(board).toContain('hinted && { borderWidth: 2, borderColor: paint.mineHintBorder }');
   });
 
   it('surfaces floor-cleared or lost from onFlag the same way as dig', () => {

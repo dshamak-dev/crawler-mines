@@ -13,18 +13,15 @@ import {
   activeTorchHintIndices,
   cellVisual,
   gridNumberColor,
-  gridSkinPaint,
   type BossId,
   type Cell,
-  type FlagSkinId,
   type Game,
   type GameEvent,
-  type GridSkinId,
-  type GridSkinPaint,
+  type ThemeTokens,
 } from '../../../src/engine';
-import { colors, fonts } from '../theme';
+import { fonts, useTheme } from '../theme';
 import { BOARD_GAP } from './fitBoardCell';
-import { BombIcon, BossIcon, ChestIcon, DoorIcon, FlagIcon, HeartIcon } from './icons';
+import { BombIcon, BossIcon, CellFace, ChestIcon, DoorIcon, FlagIcon, HeartIcon } from './icons';
 
 const LONG_MS = 400;
 const GAP = BOARD_GAP;
@@ -70,8 +67,6 @@ interface BoardProps {
   game: Game;
   cellPx: number;
   flagMode: boolean;
-  flagSkin?: FlagSkinId;
-  gridSkin?: GridSkinId;
   blasts: BlastFx[];
   sparkles: Array<{ id: number; index: number }>;
   shaking: boolean;
@@ -84,8 +79,6 @@ export default function Board({
   game,
   cellPx,
   flagMode,
-  flagSkin = 'flag-red',
-  gridSkin = 'grid-gray',
   blasts,
   sparkles,
   shaking,
@@ -93,6 +86,7 @@ export default function Board({
   onDig,
   onFlag,
 }: BoardProps) {
+  const theme = useTheme();
   const rows = useMemo(() => {
     const out: number[][] = [];
     for (let y = 0; y < game.height; y += 1) {
@@ -160,8 +154,7 @@ export default function Board({
                     cell={cell}
                     size={cellPx}
                     flagMode={flagMode}
-                    flagSkin={flagSkin}
-                    gridPaint={gridSkinPaint(gridSkin)}
+                    theme={theme}
                     wave={waveOf.get(i)}
                     wreckedWave={wreckWave.get(i)}
                     reduce={reduceMotion}
@@ -206,8 +199,7 @@ const DungeonCell = memo(function DungeonCell({
   cell,
   size,
   flagMode,
-  flagSkin,
-  gridPaint,
+  theme,
   wave,
   wreckedWave,
   reduce,
@@ -224,8 +216,7 @@ const DungeonCell = memo(function DungeonCell({
   cell: Cell;
   size: number;
   flagMode: boolean;
-  flagSkin: FlagSkinId;
-  gridPaint: GridSkinPaint;
+  theme: ThemeTokens;
   wave?: number;
   wreckedWave?: number;
   reduce: boolean;
@@ -301,13 +292,14 @@ const DungeonCell = memo(function DungeonCell({
         accessibilityLabel={label}
         style={[
           styles.cell,
-          cellStyle(visual, bossHere, bossId, door, gridPaint, mineHint),
+          cellStyle(visual, bossHere, bossId, door, theme, mineHint),
           { width: size, height: size },
           popStyle,
         ]}
       >
+        <CellFace size={size} fill={cellFill(visual, theme, mineHint)} theme={theme} />
         {flagged ? (
-          <FlagIcon ember={visual === 'bomb-flagged'} skin={flagSkin} size={icon} />
+          <FlagIcon ember={visual === 'bomb-flagged'} paint={theme.flag} size={icon} />
         ) : mineHint ? (
           <BombIcon size={icon} />
         ) : hearted ? (
@@ -326,7 +318,7 @@ const DungeonCell = memo(function DungeonCell({
           <Text
             style={[
               styles.rune,
-              { color: gridNumberColor(gridPaint, cell.adjacentMines), fontSize: size * 0.46 },
+              { color: gridNumberColor(theme, cell.adjacentMines), fontSize: size * 0.46 },
             ]}
           >
             {cell.adjacentMines}
@@ -335,7 +327,7 @@ const DungeonCell = memo(function DungeonCell({
           <Text
             style={[
               styles.rune,
-              { color: gridNumberColor(gridPaint, cell.adjacentMines), fontSize: size * 0.32, opacity: 0.35 },
+              { color: gridNumberColor(theme, cell.adjacentMines), fontSize: size * 0.32, opacity: 0.35 },
             ]}
           >
             {cell.adjacentMines}
@@ -364,6 +356,7 @@ function Burst({
   delay: number;
   kind: 'bomb' | 'gold';
 }) {
+  const t = useTheme();
   const col = index % width;
   const row = Math.floor(index / width);
   const x = col * (cellPx + GAP) + cellPx / 2;
@@ -382,7 +375,22 @@ function Burst({
     opacity.value = withTiming(0, { duration: 520 + delay });
   }, [delay, kind, opacity, scale]);
 
-  return <Animated.View pointerEvents="none" style={[styles.burst, kind === 'bomb' ? styles.burstBomb : styles.burstGold, style]} />;
+  return <Animated.View pointerEvents="none" style={[styles.burst, kind === 'bomb' ? styles.burstBomb : { backgroundColor: t.gold2 }, style]} />;
+}
+
+function cellFill(visual: string, paint: ThemeTokens, hinted: boolean): string {
+  const revealed =
+    visual === 'empty' ||
+    visual === 'number' ||
+    visual === 'chest' ||
+    visual === 'wrecked' ||
+    visual === 'exploded';
+  if (hinted && visual !== 'flagged' && visual !== 'bomb-flagged') return paint.exploded;
+  if (visual === 'chest') return paint.chest;
+  if (visual === 'wrecked') return paint.wrecked;
+  if (visual === 'exploded') return paint.exploded;
+  if (revealed) return paint.revealed;
+  return paint.hidden;
 }
 
 function cellStyle(
@@ -390,32 +398,20 @@ function cellStyle(
   bossHere: boolean,
   bossId: BossId,
   door: boolean,
-  paint: GridSkinPaint,
+  paint: ThemeTokens,
   hinted = false,
 ) {
-  const revealed =
-    visual === 'empty' ||
-    visual === 'number' ||
-    visual === 'chest' ||
-    visual === 'wrecked' ||
-    visual === 'exploded';
-  const fill =
-    hinted && visual !== 'flagged' && visual !== 'bomb-flagged'
-      ? paint.exploded
-      : visual === 'chest'
-      ? paint.chest
-      : visual === 'wrecked'
-        ? paint.wrecked
-        : visual === 'exploded'
-          ? paint.exploded
-          : revealed
-            ? paint.revealed
-            : paint.hidden;
+  const fill = cellFill(visual, paint, hinted);
   return [
-    { backgroundColor: fill },
+    {
+      backgroundColor: fill,
+      borderRadius: paint.cellRadius,
+      borderWidth: paint.cellBorderWidth,
+      borderColor: paint.cellBorder,
+    },
     bossHere && (bossId === 'lust' ? styles.bossLust : styles.boss),
     door && styles.door,
-    hinted && styles.mineHint,
+    hinted && { borderWidth: 2, borderColor: paint.mineHintBorder },
   ];
 }
 
@@ -447,7 +443,6 @@ const styles = StyleSheet.create({
   board: { gap: GAP },
   row: { flexDirection: 'row', gap: GAP },
   cell: {
-    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -455,10 +450,6 @@ const styles = StyleSheet.create({
   boss: { backgroundColor: '#2a1830' },
   bossLust: { backgroundColor: '#2a1218' },
   door: {},
-  mineHint: {
-    borderWidth: 2,
-    borderColor: colors.gold2,
-  },
   rune: { fontFamily: fonts.display, fontWeight: '700' },
   bossGlyph: {
     position: 'absolute',
@@ -479,5 +470,4 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   burstBomb: { backgroundColor: '#ffd166' },
-  burstGold: { backgroundColor: colors.gold2 },
 });

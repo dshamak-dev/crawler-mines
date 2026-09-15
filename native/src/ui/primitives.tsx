@@ -10,7 +10,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
-import { colors, fonts } from '../theme';
+import { fonts, useTheme } from '../theme';
 
 export function StoneButton({
   children,
@@ -31,6 +31,7 @@ export function StoneButton({
   disabled?: boolean;
   accessibilityLabel?: string;
 }) {
+  const t = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
@@ -39,14 +40,17 @@ export function StoneButton({
       onPress={onPress}
       style={({ pressed }) => [
         stone.btn,
-        gold && stone.gold,
+        { borderColor: t.border, backgroundColor: t.stoneHi, shadowColor: t.stoneLo },
+        gold && { borderColor: t.goldBorder, backgroundColor: t.goldBtn },
         (locked || disabled) && stone.locked,
         pressed && !locked && !disabled && stone.pressed,
         style,
       ]}
     >
       {typeof children === 'string' ? (
-        <Text style={[stone.label, gold && stone.goldLabel, textStyle]}>{children}</Text>
+        <Text style={[stone.label, { color: t.ink }, gold && { color: t.gold2 }, textStyle]}>
+          {children}
+        </Text>
       ) : (
         children
       )}
@@ -84,8 +88,9 @@ export function Overlay({
   children: ReactNode;
   onBackdrop?: () => void;
 }) {
+  const t = useTheme();
   return (
-    <View style={stone.overlay}>
+    <View style={[stone.overlay, { backgroundColor: t.overlay }]}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onBackdrop} />
       {children}
     </View>
@@ -101,8 +106,16 @@ export function Tablet({
   style?: StyleProp<ViewStyle>;
   wide?: boolean;
 }) {
+  const t = useTheme();
   return (
-    <View style={[stone.tablet, wide && stone.tabletWide, style]}>
+    <View
+      style={[
+        stone.tablet,
+        { backgroundColor: t.tabletBg, borderColor: t.tabletBorder },
+        wide && stone.tabletWide,
+        style,
+      ]}
+    >
       <ScrollView
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={stone.tabletInner}
@@ -121,7 +134,8 @@ export function DisplayText({
   children: ReactNode;
   style?: StyleProp<TextStyle>;
 }) {
-  return <Text style={[stone.display, style]}>{children}</Text>;
+  const t = useTheme();
+  return <Text style={[stone.display, { color: t.gold2 }, style]}>{children}</Text>;
 }
 
 export function MutedText({
@@ -131,14 +145,13 @@ export function MutedText({
   children: ReactNode;
   style?: StyleProp<TextStyle>;
 }) {
-  return <Text style={[stone.muted, style]}>{children}</Text>;
+  const t = useTheme();
+  return <Text style={[stone.muted, { color: t.muted }, style]}>{children}</Text>;
 }
 
 export const stone = StyleSheet.create({
   btn: {
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.stoneHi,
     borderRadius: 14,
     paddingVertical: 14,
     paddingHorizontal: 16,
@@ -147,14 +160,9 @@ export const stone = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 10,
-    shadowColor: colors.stoneLo,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 1,
     shadowRadius: 0,
-  },
-  gold: {
-    borderColor: colors.goldBorder,
-    backgroundColor: '#6b4e1e',
   },
   locked: { opacity: 0.58 },
   pressed: { transform: [{ translateY: 2 }] },
@@ -162,10 +170,8 @@ export const stone = StyleSheet.create({
     fontFamily: fonts.display,
     letterSpacing: 0.8,
     fontSize: 17,
-    color: colors.ink,
     flexShrink: 1,
   },
-  goldLabel: { color: colors.gold2 },
   ghost: {
     width: 36,
     height: 36,
@@ -178,7 +184,6 @@ export const stone = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     width: '100%',
     height: '100%',
-    backgroundColor: 'rgba(8, 6, 5, 0.72)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
@@ -188,9 +193,7 @@ export const stone = StyleSheet.create({
     width: '100%',
     maxWidth: 340,
     maxHeight: '88%',
-    backgroundColor: '#241e1a',
     borderWidth: 1,
-    borderColor: '#6b5340',
     borderRadius: 18,
     overflow: 'hidden',
   },
@@ -201,14 +204,12 @@ export const stone = StyleSheet.create({
   },
   display: {
     fontFamily: fonts.displayBlack,
-    color: colors.gold2,
     fontSize: 20,
     letterSpacing: 1,
     textAlign: 'center',
   },
   muted: {
     fontFamily: fonts.ui,
-    color: colors.muted,
     fontSize: 15,
     lineHeight: 21,
     textAlign: 'center',

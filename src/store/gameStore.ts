@@ -47,13 +47,11 @@ import {
   type Game,
   type GameEvent,
   type Inventory,
-  type FlagSkinId,
-  type GridSkinId,
+  type ThemeId,
   type ItemId,
   type KeyStore,
   type LootGrant,
-  selectFlagSkin as persistFlagSkin,
-  selectGridSkin as persistGridSkin,
+  selectTheme as persistTheme,
   type ShopGoodId,
   type OfferingSlots,
   type Rng,
@@ -78,8 +76,7 @@ export interface GameStoreState {
   applyExtract: (rng?: Rng) => GameEvent[];
   sell: (itemId: ItemId, qty?: number) => boolean;
   buy: (id: ShopGoodId, qty?: number, rng?: Rng) => boolean;
-  selectFlagSkin: (skinId: FlagSkinId) => boolean;
-  selectGridSkin: (skinId: GridSkinId) => boolean;
+  selectTheme: (themeId: ThemeId) => boolean;
   startRite: (slots: RitualSlots, rng?: Rng) => boolean;
   openSecretChest: (socketed: ItemId | null, rng?: Rng) => LootGrant[] | null;
   useTorch: (rng?: Rng) => boolean;
@@ -393,14 +390,8 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
           set({ meta: next });
           return true;
         },
-        selectFlagSkin: (skinId) => {
-          const next = persistFlagSkin(get().meta, skinId, keyStore);
-          if (!next) return false;
-          set({ meta: next });
-          return true;
-        },
-        selectGridSkin: (skinId) => {
-          const next = persistGridSkin(get().meta, skinId, keyStore);
+        selectTheme: (themeId) => {
+          const next = persistTheme(get().meta, themeId, keyStore);
           if (!next) return false;
           set({ meta: next });
           return true;

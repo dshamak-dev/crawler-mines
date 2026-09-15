@@ -1,34 +1,30 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
-  FLAG_SKIN_IDS,
-  GRID_SKIN_IDS,
-  SKINS,
+  THEME_IDS,
+  THEMES,
   emptyInventory,
   inventoryTotal,
-  isSkinOwned,
+  isThemeOwned,
   isTicketKey,
   runKitEntries,
   sealedRowLabel,
   sealedRunRows,
-  selectedFlagSkin,
-  selectedGridSkin,
+  selectedTheme,
   stackedEntries,
   type CollectionState,
-  type FlagSkinId,
   type Game,
-  type GridSkinId,
   type Inventory,
   type ItemId,
   type LootGrant,
   type RitualSlots,
-  type SkinId,
+  type ThemeId,
 } from '../../../src/engine';
-import { colors, fonts } from '../theme';
-import { BagIcon, ChestIcon, GoldIcon, ItemIcon, SkinIcon } from './icons';
+import { colors, fonts, useTheme } from '../theme';
+import { BagIcon, ChestIcon, GoldIcon, ItemIcon, ThemeIcon } from './icons';
 import ItemPreviewSheet, {
   previewForItem,
-  previewForSkin,
+  previewForTheme,
   type ItemPreviewModel,
 } from './ItemPreviewSheet';
 import RitualSheet from './RitualSheet';
@@ -47,8 +43,7 @@ export default function CollectionScreen({
   onBack,
   onStartRite,
   onOpenSecret,
-  onSelectFlag,
-  onSelectGrid,
+  onSelectTheme,
   onUi,
   onDeny,
   onUseTorch,
@@ -63,8 +58,7 @@ export default function CollectionScreen({
   onBack: () => void;
   onStartRite?: (slots: RitualSlots) => boolean;
   onOpenSecret?: (socketed: ItemId | null) => LootGrant[] | null;
-  onSelectFlag?: (skinId: FlagSkinId) => boolean;
-  onSelectGrid?: (skinId: GridSkinId) => boolean;
+  onSelectTheme?: (themeId: ThemeId) => boolean;
   onUi?: () => void;
   onDeny?: () => void;
   onUseTorch?: () => boolean;
@@ -90,8 +84,7 @@ export default function CollectionScreen({
       onBack={onBack}
       onStartRite={onStartRite}
       onOpenSecret={onOpenSecret}
-      onSelectFlag={onSelectFlag}
-      onSelectGrid={onSelectGrid}
+      onSelectTheme={onSelectTheme}
       onUi={onUi}
       onDeny={onDeny}
     />
@@ -103,8 +96,7 @@ function TitleCollection({
   onBack,
   onStartRite,
   onOpenSecret,
-  onSelectFlag,
-  onSelectGrid,
+  onSelectTheme,
   onUi,
   onDeny,
 }: {
@@ -112,61 +104,58 @@ function TitleCollection({
   onBack: () => void;
   onStartRite?: (slots: RitualSlots) => boolean;
   onOpenSecret?: (socketed: ItemId | null) => LootGrant[] | null;
-  onSelectFlag?: (skinId: FlagSkinId) => boolean;
-  onSelectGrid?: (skinId: GridSkinId) => boolean;
+  onSelectTheme?: (themeId: ThemeId) => boolean;
   onUi?: () => void;
   onDeny?: () => void;
 }) {
-  const [tab, setTab] = useState<'items' | 'skins'>('items');
+  const [tab, setTab] = useState<'items' | 'themes'>('items');
   const [preview, setPreview] = useState<ItemPreviewModel | null>(null);
-  const [previewSkin, setPreviewSkin] = useState<SkinId | null>(null);
+  const [previewTheme, setPreviewTheme] = useState<ThemeId | null>(null);
   const [previewItem, setPreviewItem] = useState<ItemId | null>(null);
   const [ritualOpen, setRitualOpen] = useState(false);
   const [secretOpen, setSecretOpen] = useState(false);
+  const t = useTheme();
   const rows = stackedEntries(meta.items);
   const total = inventoryTotal(meta.items);
-  const ownedSkinCount = [...FLAG_SKIN_IDS, ...GRID_SKIN_IDS].filter((id) =>
-    isSkinOwned(meta, id),
-  ).length;
+  const ownedThemeCount = THEME_IDS.filter((id) => isThemeOwned(meta, id)).length;
   const cue = onUi ?? (() => {});
   const deny = onDeny ?? (() => {});
   const allowUse = tab === 'items' && (Boolean(onStartRite) || Boolean(onOpenSecret));
-  const flagId = selectedFlagSkin(meta);
-  const gridId = selectedGridSkin(meta);
-  const pill = tab === 'items' ? `${total} held` : `${ownedSkinCount} owned`;
+  const activeTheme = selectedTheme(meta);
+  const pill = tab === 'items' ? `${total} held` : `${ownedThemeCount} owned`;
 
-  const openSkin = (id: SkinId) => {
+  const openTheme = (id: ThemeId) => {
     cue();
-    const owned = isSkinOwned(meta, id);
-    const selected = SKINS[id].slot === 'flag' ? flagId === id : gridId === id;
-    setPreviewSkin(id);
-    setPreview(previewForSkin(id, owned, selected, owned));
+    const owned = isThemeOwned(meta, id);
+    const selected = activeTheme === id;
+    setPreviewTheme(id);
+    setPreview(previewForTheme(id, owned, selected, owned));
   };
 
   return (
     <View style={styles.shell}>
       <Header title="Collection" pill={pill} onBack={onBack} />
-      <View style={styles.wallet} accessibilityLabel={`${meta.gold} coins in wallet`}>
+      <View style={[styles.wallet, { borderColor: t.accentBorder, backgroundColor: t.bg2 }]} accessibilityLabel={`${meta.gold} coins in wallet`}>
         <GoldIcon size={28} />
         <View style={styles.walletCopy}>
-          <Text style={styles.walletN}>{meta.gold}</Text>
-          <Text style={styles.walletEm}>wallet</Text>
+          <Text style={[styles.walletN, { color: t.gold2 }]}>{meta.gold}</Text>
+          <Text style={[styles.walletEm, { color: t.muted }]}>wallet</Text>
         </View>
       </View>
       <View style={styles.filters}>
         <Pressable
-          style={[styles.chip, tab === 'items' && styles.chipOn]}
+          style={[styles.chip, tab === 'items' && styles.chipOn, tab === 'items' && { borderColor: t.goldBorder, backgroundColor: t.goldBtn }]}
           onPress={() => setTab('items')}
           accessibilityLabel="Items"
         >
-          <Text style={[styles.chipText, tab === 'items' && styles.chipTextOn]}>Items</Text>
+          <Text style={[styles.chipText, { color: t.muted }, tab === 'items' && { color: t.gold2 }]}>Items</Text>
         </Pressable>
         <Pressable
-          style={[styles.chip, tab === 'skins' && styles.chipOn]}
-          onPress={() => setTab('skins')}
-          accessibilityLabel="Skins"
+          style={[styles.chip, tab === 'themes' && styles.chipOn, tab === 'themes' && { borderColor: t.goldBorder, backgroundColor: t.goldBtn }]}
+          onPress={() => setTab('themes')}
+          accessibilityLabel="Themes"
         >
-          <Text style={[styles.chipText, tab === 'skins' && styles.chipTextOn]}>Skins</Text>
+          <Text style={[styles.chipText, { color: t.muted }, tab === 'themes' && { color: t.gold2 }]}>Themes</Text>
         </Pressable>
       </View>
       {tab === 'items' ? (
@@ -182,7 +171,7 @@ function TitleCollection({
                 style={[styles.card, isTicketKey(item.id) && styles.ticket]}
                 onPress={() => {
                   cue();
-                  setPreviewSkin(null);
+                  setPreviewTheme(null);
                   setPreviewItem(item.id);
                   setPreview(previewForItem(item.id, count, allowUse));
                 }}
@@ -202,24 +191,13 @@ function TitleCollection({
         )
       ) : (
         <ScrollView style={styles.list} contentContainerStyle={styles.listInner}>
-          <Text style={styles.section}>Flag</Text>
-          {FLAG_SKIN_IDS.map((id) => (
-            <SkinRow
+          {THEME_IDS.map((id) => (
+            <ThemeRow
               key={id}
               id={id}
-              owned={isSkinOwned(meta, id)}
-              selected={flagId === id}
-              onPress={() => openSkin(id)}
-            />
-          ))}
-          <Text style={[styles.section, styles.sectionGap]}>Grid</Text>
-          {GRID_SKIN_IDS.map((id) => (
-            <SkinRow
-              key={id}
-              id={id}
-              owned={isSkinOwned(meta, id)}
-              selected={gridId === id}
-              onPress={() => openSkin(id)}
+              owned={isThemeOwned(meta, id)}
+              selected={activeTheme === id}
+              onPress={() => openTheme(id)}
             />
           ))}
         </ScrollView>
@@ -233,29 +211,25 @@ function TitleCollection({
           onUse={() => {
             const id = previewItem;
             setPreview(null);
-            setPreviewSkin(null);
+            setPreviewTheme(null);
             setPreviewItem(null);
             if (id === 'secret-chest') setSecretOpen(true);
             else setRitualOpen(true);
           }}
           onSelect={() => {
-            if (!previewSkin) return;
-            const skin = SKINS[previewSkin];
-            const ok =
-              skin.slot === 'flag'
-                ? onSelectFlag?.(previewSkin as FlagSkinId)
-                : onSelectGrid?.(previewSkin as GridSkinId);
+            if (!previewTheme) return;
+            const ok = onSelectTheme?.(previewTheme);
             if (!ok) {
               deny();
               return;
             }
             setPreview(null);
-            setPreviewSkin(null);
+            setPreviewTheme(null);
             setPreviewItem(null);
           }}
           onClose={() => {
             setPreview(null);
-            setPreviewSkin(null);
+            setPreviewTheme(null);
             setPreviewItem(null);
           }}
           onUi={cue}
@@ -289,38 +263,39 @@ function TitleCollection({
   );
 }
 
-function SkinRow({
+function ThemeRow({
   id,
   owned,
   selected,
   onPress,
 }: {
-  id: SkinId;
+  id: ThemeId;
   owned: boolean;
   selected: boolean;
   onPress: () => void;
 }) {
-  const skin = SKINS[id];
+  const theme = THEMES[id];
+  const t = useTheme();
   return (
     <Pressable
-      style={[styles.card, !owned && styles.locked]}
+      style={[styles.card, { borderColor: t.accentSoft, backgroundColor: t.cardBg }, !owned && styles.locked]}
       onPress={onPress}
       accessibilityLabel={
         selected
-          ? `${skin.name}, selected`
+          ? `${theme.name}, selected`
           : owned
-            ? `${skin.name}, owned`
-            : `${skin.name}, locked`
+            ? `${theme.name}, owned`
+            : `${theme.name}, locked`
       }
     >
       <View style={styles.ico}>
-        <SkinIcon id={id} size={34} />
+        <ThemeIcon id={id} size={34} />
       </View>
       <View style={styles.copy}>
-        <Text style={styles.name}>{skin.name}</Text>
-        <Text style={styles.flavor}>{skin.flavor}</Text>
+        <Text style={[styles.name, { color: t.ink }]}>{theme.name}</Text>
+        <Text style={[styles.flavor, { color: t.muted }]}>{theme.flavor}</Text>
       </View>
-      <Text style={selected ? styles.active : styles.owned}>
+      <Text style={selected ? [styles.active, { color: t.gold2 }] : [styles.owned, { color: t.muted }]}>
         {selected ? 'Active' : owned ? 'Owned' : 'Locked'}
       </Text>
     </Pressable>
@@ -452,16 +427,17 @@ function SealedCollection({
 }
 
 function Header({ title, pill, onBack }: { title: string; pill: string; onBack: () => void }) {
+  const t = useTheme();
   return (
     <View style={styles.head}>
       <GhostButton onPress={onBack} accessibilityLabel="Back" style={styles.backThumb}>
-        <Text style={styles.chev}>‹</Text>
+        <Text style={[styles.chev, { color: t.ink }]}>‹</Text>
       </GhostButton>
       <View style={styles.titleRow}>
         <BagIcon size={28} />
-        <Text style={styles.h1}>{title}</Text>
+        <Text style={[styles.h1, { color: t.gold2 }]}>{title}</Text>
       </View>
-      <Text style={styles.pill}>{pill}</Text>
+      <Text style={[styles.pill, { color: t.muted, borderColor: t.hudPillBorder }]}>{pill}</Text>
     </View>
   );
 }
