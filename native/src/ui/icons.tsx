@@ -527,6 +527,7 @@ export function ItemIcon({ id, size = 24 }: { id: ItemId; size?: number }) {
   if (id === 'rusty-key') return <KeyGlyph size={size} />;
   if (id === 'hard-key') return <KeyGlyph body="#8a93a0" ring="#6a7380" size={size} />;
   if (id === 'campaign-key') return <KeyGlyph body="#e0b44a" ring="#d4a017" size={size} />;
+  if (id === 'secret-chest') return <ChestIcon tier="secret" size={size} />;
   if (id === 'torch-charm') return <CharmGlyph size={size} />;
   if (id === 'gem') return <GemGlyph size={size} />;
   if (id === 'gluttony-head') return <HeadGlyph kind="gluttony" size={size} />;

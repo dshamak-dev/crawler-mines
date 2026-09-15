@@ -72,7 +72,8 @@ describe('loot table', () => {
           (row) =>
             row.itemId === 'bone-dust' ||
             row.itemId === 'witchcraft-bag' ||
-            row.itemId === 'scroll-of-portal',
+            row.itemId === 'scroll-of-portal' ||
+            row.itemId === 'secret-chest',
         ),
       ).toBe(false);
       const rng = mulberry32(21);
@@ -85,7 +86,8 @@ describe('loot table', () => {
             id === 'gold-cup' ||
             id === 'bone-dust' ||
             id === 'witchcraft-bag' ||
-            id === 'scroll-of-portal',
+            id === 'scroll-of-portal' ||
+            id === 'secret-chest',
         ).toBe(false);
       }
     }
@@ -122,6 +124,7 @@ describe('loot table', () => {
     expect(rollPouchGold(() => 0.99)).toBe(4);
     expect(rollPouchGold(() => 0.5)).toBe(3);
     expect(goldForLoot('rusty-key', 18)).toBe(0);
+    expect(goldForLoot('secret-chest', 18)).toBe(0);
     expect(goldForLoot('torch-charm', 18)).toBe(0);
     expect(goldForLoot('gem', 18)).toBe(0);
     expect(goldForLoot('relic-shard', 18)).toBe(0);
@@ -149,7 +152,7 @@ describe('chest loot identity', () => {
     expect(chests).toHaveLength(DIFFICULTIES.easy.chests);
     for (const c of chests) {
       if (c.tier === 'secret') {
-        expect(c.loot).toBeNull();
+        expect(c.loot).toBe('secret-chest');
         expect(c.lootExtra).toBeNull();
         expect(c.gold).toBe(0);
         continue;
@@ -380,5 +383,6 @@ describe('item catalog', () => {
     expect(tierForLoot('gold-cup')).toBe('rare');
     expect(tierForLoot('bone-dust')).toBe('wooden');
     expect(tierForLoot('witchcraft-bag')).toBe('wooden');
+    expect(tierForLoot('secret-chest')).toBe('secret');
   });
 });

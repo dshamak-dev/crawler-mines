@@ -41,7 +41,6 @@ export type {
   ItemDef,
   ItemId,
   ChestTier,
-  SecretChestDef,
   SecretChestId,
   ShopBuyCatalog,
   ShopBuyRow,
@@ -54,8 +53,8 @@ export {
   CHEST_TIERS,
   TIER_COPY,
   SECRET_CHEST,
+  SECRET_CHEST_COPY,
   SECRET_CHEST_ID,
-  SECRET_CHEST_BUY,
   SECRET_CHEST_SPAWN_RATE,
   SECRET_SCROLL_RATE,
   SECRET_BAG_RATE,
@@ -103,18 +102,18 @@ export {
   applyRewards,
   buyGoods,
   buyLoot,
-  buySecretChest,
   buySkin,
   collectLoot,
   defaultStore,
   emptyCollection,
   loadCollection,
+  openSecretChest,
   saveCollection,
   selectFlagSkin,
   selectGridSkin,
   sellLoot,
 } from './collection';
-export type { CollectionState, KeyStore } from './collection';
+export type { CollectionState, KeyStore, LootGrant, SecretChestOpen } from './collection';
 export type {
   FlagSkinId,
   FlagSkinPaint,
@@ -238,14 +237,13 @@ export { sealedRunRows, sealedRowsFromBoard, sealedRowsFromStash, sealedRowLabel
 export type { SealedKind, SealedRow } from './sealed';
 export { mulberry32 } from './rng';
 export {
-  grantSecretChests,
-  isLockedSecretChest,
+  canOpenSecretChest,
+  isIntactSecretChest,
   isSecretChestCell,
-  isUnlockedSecretChest,
-  stampSecretLoot,
-  unlockRemainingSecretChests,
-  unlockSecretChestCell,
+  secretChestCaption,
+  secretKeyPickerRows,
 } from './secret';
+export type { SecretKeyPickerRow } from './secret';
 export {
   CAMPAIGN_OFFERING_COPY,
   HARD_OFFERING_COPY,

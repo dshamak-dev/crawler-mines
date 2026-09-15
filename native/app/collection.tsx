@@ -37,6 +37,9 @@ export default function CollectionRoute() {
                 return ok;
               }
         }
+        onOpenSecret={
+          fromPlay ? undefined : (socketed) => useGameStore.getState().openSecretChest(socketed)
+        }
         onSelectFlag={fromPlay ? undefined : pickFlag}
         onSelectGrid={fromPlay ? undefined : pickGrid}
         onUi={() => getAudio().playSfx('ui')}

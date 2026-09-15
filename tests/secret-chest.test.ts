@@ -8,27 +8,31 @@ import {
   configFor,
   SECRET_BAG_RATE,
   SECRET_CHEST,
-  SECRET_CHEST_BUY,
+  SECRET_CHEST_COPY,
   SECRET_CHEST_ID,
   SECRET_CHEST_SPAWN_RATE,
   SECRET_DUST_RATE,
   SECRET_NORMAL_TABLE,
   SECRET_SCROLL_RATE,
   SHOP_BUY,
-  buySecretChest,
+  TIER_COPY,
   buyableEntries,
+  canOpenSecretChest,
+  canUseFromPreview,
   createGame,
   createGameFromLayout,
   emptyCollection,
-  emptyInventory,
   isBuyable,
+  isCollectible,
+  isIntactSecretChest,
   isItemId,
-  isLockedSecretChest,
   isSecretChestId,
+  isSellable,
+  isUsable,
   loadCollection,
   mulberry32,
+  openSecretChest,
   rollSecretChestLoot,
-  sfxFromEvents,
   stackedEntries,
   type ItemId,
   type KeyStore,
@@ -84,10 +88,10 @@ function layoutStore(items: Partial<Record<ItemId, number>>, gold = 0) {
       floor: 0,
       game: board,
       grantKey: 'secret-test',
-      kit: emptyInventory(),
+      kit: emptyCollection().items,
     },
     meta: loadCollection(store),
-    runLoot: emptyInventory(),
+    runLoot: emptyCollection().items,
   });
   return { game, store };
 }
@@ -179,79 +183,90 @@ describe('secret chest loot table', () => {
   });
 });
 
-describe('secret chest is not a collection item', () => {
-  it('is a shop good and chest tier, never an ItemId stack', () => {
+describe('secret chest is a collection item', () => {
+  it('stacks in Collection, is usable out of run, and is not a shop buy', () => {
     expect(isSecretChestId(SECRET_CHEST_ID)).toBe(true);
-    expect(isItemId(SECRET_CHEST_ID)).toBe(false);
+    expect(isItemId(SECRET_CHEST_ID)).toBe(true);
+    expect(isCollectible(SECRET_CHEST_ID)).toBe(true);
+    expect(isSellable(SECRET_CHEST_ID)).toBe(false);
+    expect(isUsable(SECRET_CHEST_ID)).toBe(true);
+    expect(canUseFromPreview(SECRET_CHEST_ID, 1)).toBe(true);
+    expect(canUseFromPreview(SECRET_CHEST_ID, 0)).toBe(false);
+    expect(canUseFromPreview(SECRET_CHEST_ID, 1, true)).toBe(false);
     expect(CHEST_TIERS).toContain('secret');
     expect(SECRET_CHEST.name).toBe('Secret chest');
-    expect(isBuyable(SECRET_CHEST_ID)).toBe(true);
-    expect(SHOP_BUY[SECRET_CHEST_ID]).toBe(SECRET_CHEST_BUY);
-    expect(SECRET_CHEST_BUY).toBe(20);
-    expect(buyableEntries().some((row) => row.kind === 'chest' && row.item.id === SECRET_CHEST_ID)).toBe(
-      true,
-    );
+    expect(isBuyable(SECRET_CHEST_ID)).toBe(false);
+    expect(SHOP_BUY[SECRET_CHEST_ID]).toBeUndefined();
+    expect(buyableEntries().some((row) => row.item.id === SECRET_CHEST_ID)).toBe(false);
     const rows = stackedEntries({
       ...emptyCollection().items,
       'rusty-key': 2,
+      [SECRET_CHEST_ID]: 3,
       gem: 1,
     });
-    expect(rows.map((r) => r.item.id)).not.toContain(SECRET_CHEST_ID);
+    expect(rows.map((r) => r.item.id)).toEqual(['rusty-key', SECRET_CHEST_ID, 'gem']);
+    expect(rows.find((r) => r.item.id === SECRET_CHEST_ID)?.count).toBe(3);
   });
 });
 
-describe('shop open consumes a rusty key', () => {
-  it('denies without a rusty key and charges nothing', () => {
+describe('collection open consumes a rusty key', () => {
+  it('denies without a socketed rusty key and writes nothing', () => {
     const store = memoryStore();
-    expect(buySecretChest(packed({ gem: 1 }, 80), 1, store, SHOP_BUY, seqRng([0.1]))).toBeNull();
+    const before = packed({ [SECRET_CHEST_ID]: 1, gem: 1 }, 40);
+    expect(openSecretChest(before, null, store, seqRng([0.1]))).toBeNull();
+    expect(openSecretChest(before, 'gem', store, seqRng([0.1]))).toBeNull();
+    expect(canOpenSecretChest(before, null)).toBe(false);
     expect(loadCollection(store).gold).toBe(0);
+    expect(loadCollection(store).items[SECRET_CHEST_ID]).toBe(0);
     expect(loadCollection(store).items.gem).toBe(0);
-    expect(loadCollection(store).items['rusty-key']).toBe(0);
   });
 
-  it('denies when gold is short and keeps the key', () => {
+  it('denies without a banked chest or key and keeps the pack', () => {
     const store = memoryStore();
-    const before = packed({ 'rusty-key': 1 }, 19);
-    expect(buySecretChest(before, 1, store, SHOP_BUY, seqRng([0.1]))).toBeNull();
+    expect(openSecretChest(packed({ 'rusty-key': 1 }, 10), 'rusty-key', store)).toBeNull();
+    expect(openSecretChest(packed({ [SECRET_CHEST_ID]: 1 }, 10), 'rusty-key', store)).toBeNull();
     expect(loadCollection(store).gold).toBe(0);
     expect(loadCollection(store).items['rusty-key']).toBe(0);
-    expect(buySecretChest(packed({ 'rusty-key': 1 }, 19), 1, store)).toBeNull();
+    expect(loadCollection(store).items[SECRET_CHEST_ID]).toBe(0);
   });
 
-  it('spends gold plus one key, grants two normals, and never banks a secret-chest stack', () => {
+  it('consumes one chest plus one key, grants two normals, and persists', () => {
     const store = memoryStore();
-    const opened = buySecretChest(
-      packed({ 'rusty-key': 2, gem: 1 }, 40),
-      1,
+    const opened = openSecretChest(
+      packed({ [SECRET_CHEST_ID]: 2, 'rusty-key': 2, gem: 1 }, 40),
+      'rusty-key',
       store,
-      SHOP_BUY,
       seqRng([0.1, 0, 0, 0, 0]),
     );
     expect(opened).not.toBeNull();
-    expect(opened!.gold).toBe(22);
-    expect(opened!.items['rusty-key']).toBe(1);
-    expect(opened!.items.gem).toBe(1);
-    expect(opened!.items['gold-pouch']).toBe(0);
-    expect((opened!.items as Record<string, number>)[SECRET_CHEST_ID]).toBeUndefined();
+    expect(opened!.state.gold).toBe(42);
+    expect(opened!.state.items['rusty-key']).toBe(1);
+    expect(opened!.state.items[SECRET_CHEST_ID]).toBe(1);
+    expect(opened!.state.items.gem).toBe(1);
+    expect(opened!.state.items['gold-pouch']).toBe(0);
+    expect(opened!.rewards.map((r) => r.itemId)).toEqual(['gold-pouch', 'gold-pouch']);
     const loaded = loadCollection(store);
-    expect(loaded.gold).toBe(22);
+    expect(loaded.gold).toBe(42);
     expect(loaded.items['rusty-key']).toBe(1);
-    expect(JSON.parse(store.getItem(COLLECTION_KEY) ?? '{}').items[SECRET_CHEST_ID]).toBeUndefined();
-    expect(stackedEntries(loaded.items).map((row) => row.item.id)).not.toContain(SECRET_CHEST_ID);
+    expect(loaded.items[SECRET_CHEST_ID]).toBe(1);
+    expect(stackedEntries(loaded.items).map((row) => row.item.id)).toContain(SECRET_CHEST_ID);
   });
 
   it('grants a rare bag without two normals and updates the game store', () => {
     const store = memoryStore({
-      [COLLECTION_KEY]: banked({ 'rusty-key': 1 }, 20),
+      [COLLECTION_KEY]: banked({ [SECRET_CHEST_ID]: 1, 'rusty-key': 1 }, 20),
     });
     const game = createGameStore(store);
-    expect(game.getState().buy(SECRET_CHEST_ID, 1, seqRng([0.02]))).toBe(true);
-    expect(game.getState().meta.gold).toBe(0);
+    const rewards = game.getState().openSecretChest('rusty-key', seqRng([0.02]));
+    expect(rewards).toEqual([{ itemId: 'witchcraft-bag', gold: 0 }]);
+    expect(game.getState().meta.gold).toBe(20);
     expect(game.getState().meta.items['rusty-key']).toBe(0);
+    expect(game.getState().meta.items[SECRET_CHEST_ID]).toBe(0);
     expect(game.getState().meta.items['witchcraft-bag']).toBe(1);
     expect(game.getState().meta.items['bone-dust']).toBe(0);
-    expect(game.getState().buy(SECRET_CHEST_ID, 1, seqRng([0.1]))).toBe(false);
-    expect(game.getState().meta.gold).toBe(0);
+    expect(game.getState().openSecretChest('rusty-key', seqRng([0.1]))).toBeNull();
+    expect(game.getState().meta.gold).toBe(20);
+    expect(game.getState().buy(SECRET_CHEST_ID, 1)).toBe(false);
   });
 });
 
@@ -267,7 +282,9 @@ describe('in-run secret chest', () => {
         total += 1;
         if (c.tier === 'secret') {
           secrets += 1;
-          expect(c.loot).toBeNull();
+          expect(c.loot).toBe(SECRET_CHEST_ID);
+          expect(c.lootExtra).toBeNull();
+          expect(c.gold).toBe(0);
         }
       }
     }
@@ -279,70 +296,75 @@ describe('in-run secret chest', () => {
     expect(finale.cells.some((c) => c.tier === 'secret')).toBe(false);
   });
 
-  it('denies a tap-open when the bank has no rusty key', () => {
+  it('reveals without a rusty key and does not roll loot mid-run', () => {
     const { game } = layoutStore({});
     const secret = game.getState().run!.game.cells.findIndex((c) => c.tier === 'secret');
-    game.getState().applyDig(secret, mulberry32(1));
+    const found = game.getState().applyDig(secret, mulberry32(1));
+    expect(found.some((e) => e.type === 'chest' && e.tier === 'secret')).toBe(true);
     expect(game.getState().run!.game.cells[secret].state).toBe('revealed');
-    expect(isLockedSecretChest(game.getState().run!.game.cells[secret])).toBe(true);
-    const denied = game.getState().applyDig(secret, mulberry32(2));
-    expect(denied).toEqual([{ type: 'deny' }]);
+    expect(isIntactSecretChest(game.getState().run!.game.cells[secret])).toBe(true);
+    expect(game.getState().run!.game.cells[secret].loot).toBe(SECRET_CHEST_ID);
     expect(game.getState().meta.items['rusty-key']).toBe(0);
-    expect(game.getState().run!.game.cells[secret].loot).toBeNull();
-  });
-
-  it('consumes a rusty key on tap-open and still withholds loot until clear', () => {
-    const { game } = layoutStore({ 'rusty-key': 1 });
-    const secret = game.getState().run!.game.cells.findIndex((c) => c.tier === 'secret');
-    game.getState().applyDig(secret, mulberry32(1));
-    const opened = game.getState().applyDig(secret, seqRng([0.02]));
-    expect(opened).toEqual([{ type: 'secret-open', index: secret }]);
-    expect(game.getState().meta.items['rusty-key']).toBe(0);
-    expect(game.getState().run!.game.cells[secret].loot).toBe('witchcraft-bag');
-    expect(game.getState().run!.game.inventory['witchcraft-bag']).toBe(0);
+    expect(game.getState().run!.game.inventory[SECRET_CHEST_ID]).toBe(0);
+    const again = game.getState().applyDig(secret, mulberry32(2));
+    expect(again).toEqual([]);
     expect(game.getState().run!.game.status).toBe('playing');
   });
 
-  it('grants stamped secret loot on clear and skips a locked chest with no key', () => {
-    const withKey = layoutStore({ 'rusty-key': 1 });
-    revealAllSafe(withKey.game, seqRng([0.02, 0, 0, 0, 0, 0, 0, 0, 0, 0]));
-    expect(withKey.game.getState().run!.game.status).toBe('cleared');
-    expect(withKey.game.getState().meta.items['rusty-key']).toBe(0);
-    expect(withKey.game.getState().meta.items['witchcraft-bag']).toBe(1);
-    expect(withKey.game.getState().run!.game.inventory['witchcraft-bag']).toBe(1);
-
-    const noKey = layoutStore({});
-    revealAllSafe(noKey.game, mulberry32(3));
-    expect(noKey.game.getState().run!.game.status).toBe('cleared');
-    expect(noKey.game.getState().meta.items['witchcraft-bag']).toBe(0);
-    expect(noKey.game.getState().run!.game.inventory['witchcraft-bag']).toBe(0);
-    const secret = noKey.game.getState().run!.game.cells.find((c) => c.tier === 'secret');
-    expect(secret?.loot).toBeNull();
+  it('banks intact secret chests into Collection on clear, without spending a key', () => {
+    const { game, store } = layoutStore({ 'rusty-key': 1 });
+    revealAllSafe(game, mulberry32(3));
+    expect(game.getState().run!.game.status).toBe('cleared');
+    expect(game.getState().meta.items['rusty-key']).toBe(1);
+    expect(game.getState().meta.items[SECRET_CHEST_ID]).toBe(1);
+    expect(game.getState().run!.game.inventory[SECRET_CHEST_ID]).toBe(1);
+    expect(game.getState().meta.items['witchcraft-bag']).toBe(0);
+    expect(loadCollection(store).items[SECRET_CHEST_ID]).toBe(1);
+    expect(loadCollection(store).items['rusty-key']).toBe(1);
   });
 
-  it('does not grant a wrecked secret chest even if a key is in the bank', () => {
+  it('does not grant a wrecked secret chest', () => {
     const { game } = layoutStore({ 'rusty-key': 1 });
     game.getState().applyDig(4, mulberry32(1));
     expect(game.getState().run!.game.cells.find((c) => c.tier === 'secret')?.wrecked).toBe(true);
-    revealAllSafe(game, seqRng([0.02]));
+    revealAllSafe(game, mulberry32(3));
     expect(game.getState().meta.items['rusty-key']).toBe(1);
+    expect(game.getState().meta.items[SECRET_CHEST_ID]).toBe(0);
     expect(game.getState().meta.items['witchcraft-bag']).toBe(0);
   });
 });
 
 describe('secret chest wiring', () => {
-  it('plays the chest cue when a secret latch turns', () => {
-    expect(sfxFromEvents([{ type: 'secret-open', index: 3 }])).toEqual(['chest']);
+  it('toasts sealed-for-collection copy, not a board rusty-key prompt', () => {
+    expect(TIER_COPY.secret.found).toBe('Found · sealed for collection');
+    expect(TIER_COPY.secret.found).not.toMatch(/rusty key/i);
+    expect(SECRET_CHEST_COPY).toContain('Socket a rusty key');
   });
 
-  it('paints a secret tier glyph and shop open copy', () => {
+  it('paints a secret tier glyph and Collection Use → one-slot key sheet', () => {
     const icons = readFileSync(resolve(__dirname, '../native/src/ui/icons.tsx'), 'utf8');
     const shop = readFileSync(resolve(__dirname, '../native/src/ui/ShopScreen.tsx'), 'utf8');
     const preview = readFileSync(resolve(__dirname, '../native/src/ui/ItemPreviewSheet.tsx'), 'utf8');
+    const collection = readFileSync(resolve(__dirname, '../native/src/ui/CollectionScreen.tsx'), 'utf8');
+    const sheet = readFileSync(resolve(__dirname, '../native/src/ui/SecretChestSheet.tsx'), 'utf8');
+    const route = readFileSync(resolve(__dirname, '../native/app/collection.tsx'), 'utf8');
     expect(icons).toContain('secret:');
-    expect(shop).toContain("tier=\"secret\"");
-    expect(shop).toContain('Open for ${total}');
-    expect(shop).toContain('Need a rusty key');
-    expect(preview).toContain('previewForSecretChest');
+    expect(icons).toContain("id === 'secret-chest'");
+    expect(shop).not.toContain('Open for ${total}');
+    expect(shop).not.toContain('Need a rusty key');
+    expect(shop).not.toContain('previewForSecretChest');
+    expect(shop).not.toContain('isSecretChestId');
+    expect(preview).not.toContain('previewForSecretChest');
+    expect(preview).toContain("itemId === 'secret-chest'");
+    expect(collection).toContain('SecretChestSheet');
+    expect(collection).toContain("id === 'secret-chest'");
+    expect(collection).toContain('setSecretOpen(true)');
+    expect(sheet).toContain('SECRET_CHEST_COPY');
+    expect(sheet).toContain('Empty ritual slot');
+    expect(sheet).toContain('LootGrantCards');
+    expect(sheet).toContain('Open');
+    expect(sheet).toContain('Close');
+    expect(route).toContain('openSecretChest');
+    expect(route).toContain('onOpenSecret');
   });
 });

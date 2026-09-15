@@ -19,6 +19,8 @@ import {
   type Game,
   type GridSkinId,
   type Inventory,
+  type ItemId,
+  type LootGrant,
   type RitualSlots,
   type SkinId,
 } from '../../../src/engine';
@@ -30,6 +32,7 @@ import ItemPreviewSheet, {
   type ItemPreviewModel,
 } from './ItemPreviewSheet';
 import RitualSheet from './RitualSheet';
+import SecretChestSheet from './SecretChestSheet';
 import { GhostButton, StoneButton } from './primitives';
 
 const EMPTY_COPY = 'Chests stay sealed until you clear the floor. Bombs can still smash them.';
@@ -43,6 +46,7 @@ export default function CollectionScreen({
   sealed = false,
   onBack,
   onStartRite,
+  onOpenSecret,
   onSelectFlag,
   onSelectGrid,
   onUi,
@@ -58,6 +62,7 @@ export default function CollectionScreen({
   sealed?: boolean;
   onBack: () => void;
   onStartRite?: (slots: RitualSlots) => boolean;
+  onOpenSecret?: (socketed: ItemId | null) => LootGrant[] | null;
   onSelectFlag?: (skinId: FlagSkinId) => boolean;
   onSelectGrid?: (skinId: GridSkinId) => boolean;
   onUi?: () => void;
@@ -84,6 +89,7 @@ export default function CollectionScreen({
       meta={meta}
       onBack={onBack}
       onStartRite={onStartRite}
+      onOpenSecret={onOpenSecret}
       onSelectFlag={onSelectFlag}
       onSelectGrid={onSelectGrid}
       onUi={onUi}
@@ -96,6 +102,7 @@ function TitleCollection({
   meta,
   onBack,
   onStartRite,
+  onOpenSecret,
   onSelectFlag,
   onSelectGrid,
   onUi,
@@ -104,6 +111,7 @@ function TitleCollection({
   meta: CollectionState;
   onBack: () => void;
   onStartRite?: (slots: RitualSlots) => boolean;
+  onOpenSecret?: (socketed: ItemId | null) => LootGrant[] | null;
   onSelectFlag?: (skinId: FlagSkinId) => boolean;
   onSelectGrid?: (skinId: GridSkinId) => boolean;
   onUi?: () => void;
@@ -112,7 +120,9 @@ function TitleCollection({
   const [tab, setTab] = useState<'items' | 'skins'>('items');
   const [preview, setPreview] = useState<ItemPreviewModel | null>(null);
   const [previewSkin, setPreviewSkin] = useState<SkinId | null>(null);
+  const [previewItem, setPreviewItem] = useState<ItemId | null>(null);
   const [ritualOpen, setRitualOpen] = useState(false);
+  const [secretOpen, setSecretOpen] = useState(false);
   const rows = stackedEntries(meta.items);
   const total = inventoryTotal(meta.items);
   const ownedSkinCount = [...FLAG_SKIN_IDS, ...GRID_SKIN_IDS].filter((id) =>
@@ -120,7 +130,7 @@ function TitleCollection({
   ).length;
   const cue = onUi ?? (() => {});
   const deny = onDeny ?? (() => {});
-  const allowUse = tab === 'items' && Boolean(onStartRite);
+  const allowUse = tab === 'items' && (Boolean(onStartRite) || Boolean(onOpenSecret));
   const flagId = selectedFlagSkin(meta);
   const gridId = selectedGridSkin(meta);
   const pill = tab === 'items' ? `${total} held` : `${ownedSkinCount} owned`;
@@ -173,6 +183,7 @@ function TitleCollection({
                 onPress={() => {
                   cue();
                   setPreviewSkin(null);
+                  setPreviewItem(item.id);
                   setPreview(previewForItem(item.id, count, allowUse));
                 }}
                 accessibilityLabel={`${item.name}, ${count} owned`}
@@ -220,9 +231,12 @@ function TitleCollection({
         <ItemPreviewSheet
           preview={preview}
           onUse={() => {
+            const id = previewItem;
             setPreview(null);
             setPreviewSkin(null);
-            setRitualOpen(true);
+            setPreviewItem(null);
+            if (id === 'secret-chest') setSecretOpen(true);
+            else setRitualOpen(true);
           }}
           onSelect={() => {
             if (!previewSkin) return;
@@ -237,10 +251,12 @@ function TitleCollection({
             }
             setPreview(null);
             setPreviewSkin(null);
+            setPreviewItem(null);
           }}
           onClose={() => {
             setPreview(null);
             setPreviewSkin(null);
+            setPreviewItem(null);
           }}
           onUi={cue}
         />
@@ -252,6 +268,18 @@ function TitleCollection({
           onClose={() => {
             cue();
             setRitualOpen(false);
+          }}
+          onUi={cue}
+          onDeny={deny}
+        />
+      ) : null}
+      {secretOpen && onOpenSecret ? (
+        <SecretChestSheet
+          meta={meta}
+          onOpen={(socketed) => onOpenSecret(socketed)}
+          onClose={() => {
+            cue();
+            setSecretOpen(false);
           }}
           onUi={cue}
           onDeny={deny}

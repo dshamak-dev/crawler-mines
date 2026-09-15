@@ -1,71 +1,37 @@
-import {
-  addItem,
-  goldForLoot,
-  rollSecretChestLoot,
-  type ItemId,
-} from './loot';
-import type { Cell, ChestReward, Game, Rng } from './types';
+import { ITEMS, SECRET_CHEST_ID, type Inventory, type ItemId } from './loot';
+import type { Cell } from './types';
 
 export function isSecretChestCell(c: Cell): boolean {
   return c.kind === 'chest' && c.tier === 'secret';
 }
 
-/** Revealed, intact, and still waiting for a rusty key. */
-export function isLockedSecretChest(c: Cell): boolean {
-  return isSecretChestCell(c) && !c.wrecked && c.state === 'revealed' && c.loot == null;
+/** Revealed and still intact. Banked as a Collection stack after a successful clear. */
+export function isIntactSecretChest(c: Cell): boolean {
+  return isSecretChestCell(c) && !c.wrecked && c.state === 'revealed';
 }
 
-export function isUnlockedSecretChest(c: Cell): boolean {
-  return isSecretChestCell(c) && !c.wrecked && c.state === 'revealed' && c.loot != null;
+export interface SecretKeyPickerRow {
+  id: ItemId;
+  name: string;
+  count: number;
+  disabled: boolean;
 }
 
-export function stampSecretLoot(cell: Cell, rng: Rng, drops = rollSecretChestLoot(rng)): ItemId[] {
-  cell.loot = drops[0] ?? null;
-  cell.lootExtra = drops[1] ?? null;
-  let gold = 0;
-  for (const id of drops) gold += goldForLoot(id, rng);
-  cell.gold = gold;
-  return drops;
+/** Title Collection well: only a rusty key sockets. Empty pack → nothing to pick. */
+export function secretKeyPickerRows(meta: { items: Inventory }): SecretKeyPickerRow[] {
+  const count = Math.max(0, Math.floor(meta.items['rusty-key'] ?? 0));
+  if (count < 1) return [];
+  return [{ id: 'rusty-key', name: ITEMS['rusty-key'].name, count, disabled: false }];
 }
 
-/** Stamp one locked secret. Caller spends the rusty key. */
-export function unlockSecretChestCell(cell: Cell, rustyKeys: number, rng: Rng): boolean {
-  if (!isLockedSecretChest(cell) || rustyKeys < 1) return false;
-  stampSecretLoot(cell, rng);
-  return true;
+export function secretChestCaption(socketed: ItemId | null): string {
+  if (socketed === 'rusty-key') return 'Ready to open';
+  return 'Need a rusty key';
 }
 
-/** Stamp remaining locked secrets, one rusty key each. Returns how many keys to spend. */
-export function unlockRemainingSecretChests(game: Game, rustyKeys: number, rng: Rng): number {
-  let keys = Math.max(0, Math.floor(rustyKeys));
-  let consumed = 0;
-  for (const cell of game.cells) {
-    if (!isLockedSecretChest(cell) || keys < 1) continue;
-    stampSecretLoot(cell, rng);
-    keys -= 1;
-    consumed += 1;
-  }
-  return consumed;
-}
-
-/** Grant stamped secret loot into floor inventory. Call once on a successful clear. */
-export function grantSecretChests(game: Game): ChestReward[] {
-  const rewards: ChestReward[] = [];
-  for (let i = 0; i < game.cells.length; i++) {
-    const c = game.cells[i];
-    if (!isUnlockedSecretChest(c) || !c.loot) continue;
-    const drops: ItemId[] = [c.loot];
-    if (c.lootExtra) drops.push(c.lootExtra);
-    let goldLeft = c.gold;
-    for (const itemId of drops) {
-      const gold = itemId === 'gold-pouch' ? goldLeft : 0;
-      if (itemId === 'gold-pouch') goldLeft = 0;
-      game.gold += gold;
-      if (itemId !== 'gold-pouch') {
-        game.inventory = addItem(game.inventory, itemId);
-      }
-      rewards.push({ index: i, itemId, gold });
-    }
-  }
-  return rewards;
+export function canOpenSecretChest(meta: { items: Inventory }, socketed: ItemId | null): boolean {
+  if (socketed !== 'rusty-key') return false;
+  const chests = Math.max(0, Math.floor(meta.items[SECRET_CHEST_ID] ?? 0));
+  const keys = Math.max(0, Math.floor(meta.items['rusty-key'] ?? 0));
+  return chests >= 1 && keys >= 1;
 }
