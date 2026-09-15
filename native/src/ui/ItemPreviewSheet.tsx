@@ -1,7 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import {
   ITEMS,
-  SECRET_CHEST,
   SKINS,
   canUseFromPreview,
   type ChestTier,
@@ -39,18 +38,9 @@ export function previewForItem(
   return {
     title: item.name,
     flavor: item.flavor,
-    icon: { kind: 'item', itemId },
+    icon: itemId === 'secret-chest' ? { kind: 'chest', tier: 'secret' } : { kind: 'item', itemId },
     qty: have > 0 ? have : undefined,
     canUse: allowUse && canUseFromPreview(itemId, have, inRun),
-  };
-}
-
-export function previewForSecretChest(): ItemPreviewModel {
-  return {
-    title: SECRET_CHEST.name,
-    flavor: SECRET_CHEST.flavor,
-    icon: { kind: 'chest', tier: 'secret' },
-    canUse: false,
   };
 }
 

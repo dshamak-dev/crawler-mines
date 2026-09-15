@@ -7,7 +7,6 @@ import {
   isBuyable,
   isCollectible,
   isItemId,
-  isSecretChestId,
   isSellable,
   removeItem,
   rollPouchGold,
@@ -257,41 +256,50 @@ export function buyLoot(
   return next;
 }
 
+export type LootGrant = { itemId: ItemId; gold: number };
+
+export interface SecretChestOpen {
+  state: CollectionState;
+  rewards: LootGrant[];
+}
+
 /**
- * Buy and open `qty` secret chests. Each open spends gold plus one rusty key
- * and rolls loot into the pack. Never stacks a secret-chest item. Missing key,
- * short gold, or a missing catalog price returns null and charges nothing.
+ * Open one banked secret chest with a socketed rusty key. Consumes one chest
+ * and one key, then rolls the secret table into the pack. Close/cancel never
+ * calls this. Missing chest, missing key, or a non-key socket returns null
+ * and writes nothing.
  */
-export function buySecretChest(
+export function openSecretChest(
   state: CollectionState,
-  qty: number,
+  socketed: ItemId | null,
   store: KeyStore = defaultStore(),
-  catalog: ShopBuyCatalog = SHOP_BUY,
   rng: Rng = Math.random,
-): CollectionState | null {
-  if (!isBuyable(SECRET_CHEST_ID, catalog)) return null;
-  const n = clampBuyQty(qty);
-  if (n < 1) return null;
+): SecretChestOpen | null {
+  if (socketed !== 'rusty-key') return null;
+  const chests = Math.max(0, Math.floor(state.items[SECRET_CHEST_ID] ?? 0));
   const keys = Math.max(0, Math.floor(state.items['rusty-key'] ?? 0));
-  if (keys < n) return null;
-  const cost = buyGold(SECRET_CHEST_ID, catalog) * n;
-  const gold = clampGold(state.gold);
-  if (gold < cost) return null;
-  let items = removeItem(state.items, 'rusty-key', n);
-  let nextGold = gold - cost;
-  for (let i = 0; i < n; i++) {
-    for (const itemId of rollSecretChestLoot(rng)) {
-      if (itemId === 'gold-pouch') nextGold += rollPouchGold(rng);
-      else items = addItem(items, itemId);
+  if (chests < 1 || keys < 1) return null;
+  let items = removeItem(state.items, SECRET_CHEST_ID, 1);
+  items = removeItem(items, 'rusty-key', 1);
+  let gold = clampGold(state.gold);
+  const rewards: LootGrant[] = [];
+  for (const itemId of rollSecretChestLoot(rng)) {
+    if (itemId === 'gold-pouch') {
+      const n = rollPouchGold(rng);
+      gold += n;
+      rewards.push({ itemId, gold: n });
+    } else {
+      items = addItem(items, itemId);
+      rewards.push({ itemId, gold: 0 });
     }
   }
   const next = withSkins({
     ...state,
-    gold: nextGold,
+    gold,
     items,
   });
   saveCollection(next, store);
-  return next;
+  return { state: next, rewards };
 }
 
 /**
@@ -318,16 +326,14 @@ export function buySkin(
   return next;
 }
 
-/** Item, paid skin, or secret-chest encounter. Skins ignore qty and buy at most one copy. */
+/** Item or paid skin. Skins ignore qty and buy at most one copy. */
 export function buyGoods(
   state: CollectionState,
   id: ShopGoodId,
   qty: number,
   store: KeyStore = defaultStore(),
   catalog: ShopBuyCatalog = SHOP_BUY,
-  rng: Rng = Math.random,
 ): CollectionState | null {
-  if (isSecretChestId(id)) return buySecretChest(state, qty, store, catalog, rng);
   if (isSkinId(id)) return buySkin(state, id, store, catalog);
   if (isItemId(id)) return buyLoot(state, id, qty, store, catalog);
   return null;

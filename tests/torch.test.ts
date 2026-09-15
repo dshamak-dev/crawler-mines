@@ -56,6 +56,8 @@ describe('#62 torch Use', () => {
     expect(canUseFromPreview('gem', 9, true)).toBe(false);
     expect(canUseFromPreview('witchcraft-bag', 1)).toBe(true);
     expect(canUseFromPreview('witchcraft-bag', 1, true)).toBe(false);
+    expect(canUseFromPreview('secret-chest', 1)).toBe(true);
+    expect(canUseFromPreview('secret-chest', 1, true)).toBe(false);
   });
 
   it('highlights two random closed mines for 3s and consumes one torch', () => {

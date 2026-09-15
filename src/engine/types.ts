@@ -31,7 +31,8 @@ export interface Cell {
   tier: ChestTier | null;
   /** Rolled at generation; granted only after a successful clear. */
   loot: ItemId | null;
-  /** Second secret-chest drop. Null on normal chests and unopened secrets. */
+  /** Second drop. Null on normal chests. Legacy unlocked secrets may still carry one. */
+  lootExtra: ItemId | null;
   lootExtra: ItemId | null;
   /** Lust heart overlay. Hides a revealed number until a neighboring blast strips it. */
   hearted: boolean;
@@ -90,7 +91,6 @@ export type GameEvent =
   | { type: 'reveal'; indices: number[] }
   | { type: 'explode'; index: number; wrecked: number[]; wave: number }
   | { type: 'chest'; index: number; tier: ChestTier }
-  | { type: 'secret-open'; index: number }
   | { type: 'cleared'; rewards: ChestReward[] }
   | { type: 'lost' }
   | { type: 'boss-move'; index: number }

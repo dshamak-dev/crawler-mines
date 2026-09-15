@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   ITEMS,
-  SECRET_CHEST,
   SHOP_BUY,
   SKINS,
   buyGold,
@@ -10,7 +9,6 @@ import {
   clampBuyQty,
   clampSellQty,
   isItemId,
-  isSecretChestId,
   isSkinId,
   isSkinOwned,
   sellGold,
@@ -23,10 +21,9 @@ import {
   type ShopMode,
 } from '../../../src/engine';
 import { colors, fonts } from '../theme';
-import { ChestIcon, GoldIcon, ItemIcon, SkinIcon } from './icons';
+import { GoldIcon, ItemIcon, SkinIcon } from './icons';
 import ItemPreviewSheet, {
   previewForItem,
-  previewForSecretChest,
   previewForSkin,
   type ItemPreviewModel,
 } from './ItemPreviewSheet';
@@ -60,8 +57,6 @@ export default function ShopScreen({
   const buyRows = useMemo(() => buyableEntries(SHOP_BUY, meta), [meta]);
   const rows = mode === 'sell' ? sellRows : buyRows;
   const ownedItem = slotted && isItemId(slotted) ? Math.max(0, meta.items[slotted] ?? 0) : 0;
-  const rustyKeys = Math.max(0, meta.items['rusty-key'] ?? 0);
-  const secretSlotted = Boolean(slotted && isSecretChestId(slotted));
   const skinOwned = slotted && isSkinId(slotted) ? isSkinOwned(meta, slotted) : false;
   const skinForSale = Boolean(slotted && isSkinId(slotted) && buyGold(slotted) > 0 && !skinOwned);
   const empty =
@@ -73,17 +68,14 @@ export default function ShopScreen({
       ? 0
       : mode === 'sell'
         ? clampSellQty(ownedItem, qty)
-        : clampBuyQty(qty, isSkinId(slotted) ? 1 : secretSlotted && rustyKeys > 0 ? rustyKeys : 99);
+        : clampBuyQty(qty, isSkinId(slotted) ? 1 : 99);
   const unit = !slotted ? 0 : mode === 'sell' && isItemId(slotted) ? sellGold(slotted) : buyGold(slotted);
   const total = empty || !slotted ? 0 : unit * liveQty;
   const captionName = slotted
     ? isSkinId(slotted)
       ? SKINS[slotted].name
-      : isSecretChestId(slotted)
-        ? SECRET_CHEST.name
-        : ITEMS[slotted].name
+      : ITEMS[slotted].name
     : '';
-  const keyLocked = mode === 'buy' && secretSlotted && rustyKeys < 1;
 
   const caption = useMemo(() => {
     if (empty || !slotted) {
@@ -92,12 +84,8 @@ export default function ShopScreen({
       return 'Tap an item to buy.';
     }
     if (mode === 'sell' && isItemId(slotted)) return `${ITEMS[slotted].name} · ${ownedItem} owned`;
-    if (secretSlotted) {
-      if (rustyKeys < 1) return `${SECRET_CHEST.name} · needs a rusty key`;
-      return `${SECRET_CHEST.name} · ${rustyKeys} ${rustyKeys === 1 ? 'key' : 'keys'}`;
-    }
     return `${captionName} · ${unit} each`;
-  }, [empty, slotted, ownedItem, mode, unit, skinOwned, captionName, secretSlotted, rustyKeys]);
+  }, [empty, slotted, ownedItem, mode, unit, skinOwned, captionName]);
 
   const changeMode = (next: ShopMode) => {
     const after = shopSelectionAfterModeChange(mode, next, slotted, qty);
@@ -120,10 +108,6 @@ export default function ShopScreen({
       setPreview(previewForSkin(id, isSkinOwned(meta, id), false, false));
       return;
     }
-    if (isSecretChestId(id)) {
-      setPreview(previewForSecretChest());
-      return;
-    }
     setPreview(previewForItem(id, meta.items[id] ?? 0, Boolean(onStartRite)));
   };
 
@@ -133,10 +117,7 @@ export default function ShopScreen({
     setQty(
       mode === 'sell'
         ? clampSellQty(ownedItem, liveQty + delta)
-        : clampBuyQty(
-            liveQty + delta,
-            slotted && isSkinId(slotted) ? 1 : secretSlotted && rustyKeys > 0 ? rustyKeys : 99,
-          ),
+        : clampBuyQty(liveQty + delta, slotted && isSkinId(slotted) ? 1 : 99),
     );
   };
 
@@ -155,7 +136,7 @@ export default function ShopScreen({
       return;
     }
     if (mode === 'buy') {
-      if (isSkinId(slotted) || isSecretChestId(slotted)) {
+      if (isSkinId(slotted)) {
         setSlotted(null);
         setQty(0);
       }
@@ -171,7 +152,7 @@ export default function ShopScreen({
   };
 
   const buyLocked = mode === 'buy' && Boolean(slotted && isSkinId(slotted) && skinOwned);
-  const actionLocked = empty || buyLocked || keyLocked;
+  const actionLocked = empty || buyLocked;
 
   return (
     <View style={styles.shell}>
@@ -244,13 +225,7 @@ export default function ShopScreen({
                         : `${row.item.name}, ${row.gold} gold`
                   }
                 >
-                  {isSkinId(id) ? (
-                    <SkinIcon id={id} size={36} />
-                  ) : isSecretChestId(id) ? (
-                    <ChestIcon tier="secret" size={36} />
-                  ) : (
-                    <ItemIcon id={id} size={36} />
-                  )}
+                  {isSkinId(id) ? <SkinIcon id={id} size={36} /> : <ItemIcon id={id} size={36} />}
                   <Text style={styles.cellQty}>
                     {count != null ? `x${count}` : ownedSkin ? 'own' : row.gold}
                   </Text>
@@ -271,8 +246,6 @@ export default function ShopScreen({
           {slotted ? (
             isSkinId(slotted) ? (
               <SkinIcon id={slotted} size={64} />
-            ) : isSecretChestId(slotted) ? (
-              <ChestIcon tier="secret" size={64} />
             ) : (
               <ItemIcon id={slotted} size={64} />
             )
@@ -294,8 +267,6 @@ export default function ShopScreen({
         <StoneButton gold={!actionLocked} locked={actionLocked} onPress={confirm} style={styles.sell}>
           {buyLocked ? (
             'Owned'
-          ) : keyLocked ? (
-            'Need a rusty key'
           ) : empty ? (
             mode === 'sell' ? (
               'Sell for —'
@@ -305,7 +276,7 @@ export default function ShopScreen({
           ) : (
             <View style={styles.sellRow}>
               <Text style={styles.sellText}>
-                {mode === 'sell' ? `Sell for ${total}` : secretSlotted ? `Open for ${total}` : `Buy for ${total}`}
+                {mode === 'sell' ? `Sell for ${total}` : `Buy for ${total}`}
               </Text>
               <GoldIcon size={20} />
             </View>
@@ -415,3 +386,4 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
 });
+

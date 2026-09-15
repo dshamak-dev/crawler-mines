@@ -107,7 +107,7 @@ export function createGame(
   for (const i of chestIdx) {
     if (rng() < SECRET_CHEST_SPAWN_RATE) {
       cells[i].kind = 'chest';
-      cells[i].loot = null;
+      cells[i].loot = 'secret-chest';
       cells[i].lootExtra = null;
       cells[i].tier = 'secret';
       cells[i].gold = 0;
@@ -198,7 +198,7 @@ export function createGameFromLayout(
         cells.push(
           newCell({
             kind: 'chest',
-            loot: null,
+            loot: 'secret-chest',
             lootExtra: null,
             tier: 'secret',
             gold: 0,
@@ -275,7 +275,7 @@ export function chestsRemaining(game: Game): number {
 
 /**
  * Every non-mine is revealed. Mines may stay hidden, flagged, or torch-hinted.
- * A locked secret chest still counts once it has been unearthed.
+ * A found secret chest still counts once it has been unearthed.
  */
 export function allSafeRevealed(game: Game): boolean {
   return game.cells.every((c) => c.kind === 'mine' || c.state === 'revealed');

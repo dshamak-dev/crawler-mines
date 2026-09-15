@@ -35,18 +35,13 @@ import {
   SHOP_BUY,
   consumeRitual,
   normalizeRitual,
+  openSecretChest as persistOpenSecretChest,
   riteFloorConfig,
   ritualLockedBossId,
   sellLoot,
   spendEntry,
   stashToRewards,
   applyTorchCharm,
-  grantSecretChests,
-  isLockedSecretChest,
-  removeItem,
-  saveCollection,
-  stampSecretLoot,
-  unlockRemainingSecretChests,
   type CollectionState,
   type Difficulty,
   type Game,
@@ -56,6 +51,7 @@ import {
   type GridSkinId,
   type ItemId,
   type KeyStore,
+  type LootGrant,
   selectFlagSkin as persistFlagSkin,
   selectGridSkin as persistGridSkin,
   type ShopGoodId,
@@ -85,6 +81,7 @@ export interface GameStoreState {
   selectFlagSkin: (skinId: FlagSkinId) => boolean;
   selectGridSkin: (skinId: GridSkinId) => boolean;
   startRite: (slots: RitualSlots, rng?: Rng) => boolean;
+  openSecretChest: (socketed: ItemId | null, rng?: Rng) => LootGrant[] | null;
   useTorch: (rng?: Rng) => boolean;
 }
 
@@ -223,16 +220,6 @@ function settleCampaign(
   return { meta: nextMeta, runLoot: nextLoot, campaignStash: stash, bonusKey, perfectFloors };
 }
 
-function spendRustyKeys(meta: CollectionState, n: number, keyStore: KeyStore): CollectionState {
-  if (n < 1) return meta;
-  const next = {
-    ...meta,
-    items: removeItem(meta.items, 'rusty-key', n),
-  };
-  saveCollection(next, keyStore);
-  return next;
-}
-
 function settleAction(
   run: Run,
   game: Game,
@@ -242,15 +229,7 @@ function settleAction(
   rng: Rng,
   keyStore: KeyStore,
 ) {
-  const cleared = events.find((e) => e.type === 'cleared');
-  let nextMeta = meta;
-  if (cleared && cleared.type === 'cleared') {
-    const keys = Math.max(0, Math.floor(nextMeta.items['rusty-key'] ?? 0));
-    const consumed = unlockRemainingSecretChests(game, keys, rng);
-    if (consumed > 0) nextMeta = spendRustyKeys(nextMeta, consumed, keyStore);
-    cleared.rewards.push(...grantSecretChests(game));
-  }
-  return settleCampaign(run, game, events, nextMeta, runLoot, rng, keyStore);
+  return settleCampaign(run, game, events, meta, runLoot, rng, keyStore);
 }
 
 export function createGameStore(keyStore: KeyStore = defaultStore()) {
@@ -343,16 +322,6 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
           if (!run || run.game.status !== 'playing') return [];
           if (run.bossRevealPending) return [];
           const game = cloneGame(run.game);
-          const locked = game.cells[index];
-          if (locked && isLockedSecretChest(locked)) {
-            if ((meta.items['rusty-key'] ?? 0) < 1) return [{ type: 'deny' }];
-            stampSecretLoot(locked, rng);
-            set({
-              run: { ...run, game },
-              meta: spendRustyKeys(meta, 1, keyStore),
-            });
-            return [{ type: 'secret-open', index }];
-          }
           const events = dig(game, index, rng, run.mode);
           const settled = settleAction(run, game, events, meta, runLoot, rng, keyStore);
           set({
@@ -418,7 +387,8 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
           return true;
         },
         buy: (id, qty = 1, rng = Math.random) => {
-          const next = buyGoods(get().meta, id, qty, keyStore, SHOP_BUY, rng);
+          void rng;
+          const next = buyGoods(get().meta, id, qty, keyStore, SHOP_BUY);
           if (!next) return false;
           set({ meta: next });
           return true;
@@ -446,6 +416,12 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
             runLoot: emptyInventory(),
           });
           return true;
+        },
+        openSecretChest: (socketed, rng = Math.random) => {
+          const opened = persistOpenSecretChest(get().meta, socketed, keyStore, rng);
+          if (!opened) return null;
+          set({ meta: opened.state });
+          return opened.rewards;
         },
         useTorch: (rng = Math.random) => {
           const { run } = get();

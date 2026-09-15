@@ -1,6 +1,6 @@
 import { allSafeRevealed, ensureFirstClickSafe, isWon, neighbors } from './board';
 import { capLustHearts, hitBossFromBlasts, stepBoss, stripHeartsFromBlasts } from './boss';
-import { addItem, type ChestTier, type ItemId } from './loot';
+import { addItem, SECRET_CHEST_ID, type ChestTier, type ItemId } from './loot';
 import { isArenaFloor, type Cell, type ChestReward, type Difficulty, type Game, type GameEvent, type Rng } from './types';
 
 /** Easy/Medium/Hard medals. Campaign never awards one. */
@@ -247,13 +247,25 @@ export function grantIntactLoot(game: Game, mode?: Difficulty): ChestReward[] {
   const rewards: ChestReward[] = [];
   for (let i = 0; i < game.cells.length; i++) {
     const c = game.cells[i];
-    if (c.kind !== 'chest' || c.wrecked || c.state !== 'revealed' || !c.loot) continue;
-    if (c.tier === 'secret') continue;
-    game.gold += c.gold;
-    if (c.loot !== 'gold-pouch') {
-      game.inventory = addItem(game.inventory, c.loot);
+    if (c.kind !== 'chest' || c.wrecked || c.state !== 'revealed') continue;
+    const drops: ItemId[] = [];
+    if (c.loot) drops.push(c.loot);
+    if (c.lootExtra) drops.push(c.lootExtra);
+    if (c.tier === 'secret' && (drops.length === 0 || drops[0] === SECRET_CHEST_ID)) {
+      drops.length = 0;
+      drops.push(SECRET_CHEST_ID);
     }
-    rewards.push({ index: i, itemId: c.loot, gold: c.gold });
+    if (drops.length === 0) continue;
+    let goldLeft = c.gold;
+    for (const itemId of drops) {
+      const gold = itemId === 'gold-pouch' ? goldLeft : 0;
+      if (itemId === 'gold-pouch') goldLeft = 0;
+      game.gold += gold;
+      if (itemId !== 'gold-pouch') {
+        game.inventory = addItem(game.inventory, itemId);
+      }
+      rewards.push({ index: i, itemId, gold });
+    }
   }
   const medal = mode ? medalForMode(mode) : null;
   if (medal && isPerfectClear(game)) {

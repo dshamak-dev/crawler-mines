@@ -89,6 +89,7 @@ describe('ritual combo', () => {
 
   it('marks the bag usable from title Collection and the torch from this-run', () => {
     expect(isUsable('witchcraft-bag')).toBe(true);
+    expect(isUsable('secret-chest')).toBe(true);
     expect(isUsable('torch-charm')).toBe(true);
     expect(isUsable('scroll-of-portal')).toBe(false);
     expect(isUsable('bone-dust')).toBe(false);
@@ -289,7 +290,7 @@ describe('ritual UI wiring', () => {
   it('opens a preview sheet on item tap, then ritual from preview Use', () => {
     expect(collection).toContain('ItemPreviewSheet');
     expect(collection).toContain('previewForItem');
-    expect(collection).toContain("tab === 'items' && Boolean(onStartRite)");
+    expect(collection).toContain("tab === 'items' && (Boolean(onStartRite) || Boolean(onOpenSecret))");
     expect(collection).toContain('setRitualOpen(true)');
     expect(collection).not.toContain('isUsable');
     expect(preview).toContain('canUseFromPreview');

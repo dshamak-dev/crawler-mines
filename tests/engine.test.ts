@@ -361,16 +361,17 @@ describe('win check and scoring', () => {
     expect(game.status).toBe('cleared');
   });
 
-  it('still wins when a secret chest is unearthed but still locked', () => {
+  it('still wins when a secret chest is unearthed without a key', () => {
     const game = createGameFromLayout(['.S', '*.']);
     const secret = game.cells.find((c) => c.tier === 'secret');
-    expect(secret?.loot).toBeNull();
+    expect(secret?.loot).toBe('secret-chest');
     revealAllSafe(game);
     expect(allSafeRevealed(game)).toBe(true);
     expect(isWon(game)).toBe(true);
     expect(game.status).toBe('cleared');
     expect(secret?.state).toBe('revealed');
-    expect(secret?.loot).toBeNull();
+    expect(secret?.loot).toBe('secret-chest');
+    expect(game.inventory['secret-chest']).toBe(1);
   });
 
   it('loses on a living boss floor when a flag settles the last safes-open check', () => {

@@ -10,6 +10,7 @@ import type { Difficulty, Rng } from './types';
 export const ITEM_IDS = [
   'gold-pouch',
   'rusty-key',
+  'secret-chest',
   'torch-charm',
   'gem',
   'relic-shard',
@@ -61,22 +62,9 @@ export const TIER_COPY: Record<
   },
   secret: {
     name: 'Secret chest',
-    found: 'Found · needs a rusty key',
+    found: 'Found · sealed for collection',
     broken: 'Smashed · loot lost',
   },
-};
-
-/** Shop + board encounter. Not an ItemId — never a Collection stack. */
-export interface SecretChestDef {
-  id: SecretChestId;
-  name: string;
-  flavor: string;
-}
-
-export const SECRET_CHEST: SecretChestDef = {
-  id: SECRET_CHEST_ID,
-  name: 'Secret chest',
-  flavor: 'A locked latch. One rusty key, then whatever was hiding inside.',
 };
 
 export function isSecretChestId(value: unknown): value is SecretChestId {
@@ -89,6 +77,7 @@ export function isChestTier(value: unknown): value is ChestTier {
 
 /** Visible chest shell. Inner loot stays hidden until the floor is cleared. */
 export function tierForLoot(itemId: ItemId): ChestTier {
+  if (itemId === SECRET_CHEST_ID) return 'secret';
   if (itemId === 'hard-key' || itemId === 'campaign-key' || isMedal(itemId) || itemId === 'gold-cup') {
     return 'rare';
   }
@@ -116,6 +105,12 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     id: 'rusty-key',
     name: 'Rusty key',
     flavor: 'Fits a secret chest. One latch, then gone.',
+    grantsGold: false,
+  },
+  'secret-chest': {
+    id: 'secret-chest',
+    name: 'Secret chest',
+    flavor: 'A locked latch. One rusty key, then whatever was hiding inside.',
     grantsGold: false,
   },
   'torch-charm': {
@@ -212,6 +207,12 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   },
 };
 
+/** Collection stack alias. Same row as ITEMS['secret-chest']. */
+export const SECRET_CHEST = ITEMS[SECRET_CHEST_ID];
+
+export const SECRET_CHEST_COPY =
+  'Socket a rusty key. Close cancels. The chest and key burn on open.';
+
 const BASE_LOOT_TABLE: ReadonlyArray<{ itemId: ItemId; weight: number }> = [
   { itemId: 'gold-pouch', weight: 34 },
   { itemId: 'rusty-key', weight: 22 },
@@ -234,8 +235,6 @@ export const SECRET_BAG_RATE = 0.03;
 export const SECRET_DUST_RATE = 0.05;
 /** Per generated chest. Arena floors still place zero chests. */
 export const SECRET_CHEST_SPAWN_RATE = 0.08;
-/** Proposed Buy price. Coordinator may retune vs torch 8 / gem 30. */
-export const SECRET_CHEST_BUY = 20;
 
 /** Hard and Campaign only — about 1% of chests. Easy/Medium never roll this. */
 const CAMPAIGN_KEY_WEIGHT = 1;
@@ -339,9 +338,9 @@ export function isShopOnly(itemId: ItemId): boolean {
   return itemId === 'bone-dust' || itemId === 'witchcraft-bag' || itemId === 'scroll-of-portal';
 }
 
-/** Collection Use. Bag opens the #46 ritual; torch is in-run mine hint (#62). Gem is sell-only. */
+/** Collection Use. Bag opens the #46 ritual; secret chest opens with a rusty key; torch is in-run mine hint (#62). Gem is sell-only. */
 export function isUsable(itemId: ItemId): boolean {
-  return itemId === 'witchcraft-bag' || itemId === 'torch-charm';
+  return itemId === 'witchcraft-bag' || itemId === 'secret-chest' || itemId === 'torch-charm';
 }
 
 /**
@@ -359,12 +358,12 @@ export function runKitEntries(
 }
 
 /**
- * Preview Use. Bag from title/shop Collection; torch from this-run kit.
+ * Preview Use. Bag and secret chest from title Collection; torch from this-run kit.
  * Gems stay sell-only. Owned count must be at least one.
  */
 export function canUseFromPreview(itemId: ItemId, owned: number, inRun = false): boolean {
   if (Math.max(0, Math.floor(owned)) < 1) return false;
-  if (itemId === 'witchcraft-bag') return !inRun;
+  if (itemId === 'witchcraft-bag' || itemId === 'secret-chest') return !inRun;
   if (itemId === 'torch-charm') return inRun;
   return false;
 }
@@ -422,19 +421,18 @@ export function sellableEntries(
     .filter((row) => row.count > 0);
 }
 
-export type ShopGoodId = ItemId | SkinId | SecretChestId;
+export type ShopGoodId = ItemId | SkinId;
 
 /**
  * Title-shop buy prices. Torch charm and cave gem (#64) sit with the reagents
- * (#49) and paid skins. Secret chest (#66) is an encounter, not a stackable
- * item. Defaults stay free / always owned and are not catalog rows.
+ * (#49) and paid skins. Secret chests are found in-run, not sold. Defaults stay
+ * free / always owned and are not catalog rows.
  * `buyableEntries(catalog, owned)` also drops already-owned paid skins.
  * Stackable loot stays listed after purchase (no hide-owned filter).
  */
 export const SHOP_BUY: Partial<Record<ShopGoodId, number>> = {
   'torch-charm': 8,
   gem: 30,
-  [SECRET_CHEST_ID]: SECRET_CHEST_BUY,
   'bone-dust': 50,
   'witchcraft-bag': 150,
   'scroll-of-portal': 80,
@@ -448,8 +446,8 @@ export type ShopBuyCatalog = Partial<Record<ShopGoodId, number>>;
 export type ShopMode = 'sell' | 'buy';
 
 export interface ShopBuyRow {
-  kind: 'item' | 'skin' | 'chest';
-  item: ItemDef | SkinDef | SecretChestDef;
+  kind: 'item' | 'skin';
+  item: ItemDef | SkinDef;
   gold: number;
 }
 
@@ -480,9 +478,6 @@ export function buyableEntries(
     item: ITEMS[id],
     gold: buyGold(id, catalog),
   }));
-  const chests: ShopBuyRow[] = isBuyable(SECRET_CHEST_ID, catalog)
-    ? [{ kind: 'chest', item: SECRET_CHEST, gold: buyGold(SECRET_CHEST_ID, catalog) }]
-    : [];
   const reagents = ITEM_IDS.filter((id) => isBuyable(id, catalog) && isShopOnly(id)).map((id) => ({
     kind: 'item' as const,
     item: ITEMS[id],
@@ -495,7 +490,7 @@ export function buyableEntries(
     item: SKINS[id],
     gold: buyGold(id, catalog),
   }));
-  return [...loot, ...chests, ...reagents, ...skins];
+  return [...loot, ...reagents, ...skins];
 }
 
 /** Switching Sell↔Buy drops the slotted good and qty; same-mode is a no-op. */

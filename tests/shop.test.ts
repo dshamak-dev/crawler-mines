@@ -154,11 +154,15 @@ describe('sell catalog', () => {
     expect(isCollectible('bone-dust')).toBe(true);
     expect(isCollectible('witchcraft-bag')).toBe(true);
     expect(isCollectible('scroll-of-portal')).toBe(true);
+    expect(isCollectible('secret-chest')).toBe(true);
     expect(isUsable('witchcraft-bag')).toBe(true);
+    expect(isUsable('secret-chest')).toBe(true);
     expect(isUsable('torch-charm')).toBe(true);
     expect(isUsable('scroll-of-portal')).toBe(false);
     expect(canUseFromPreview('witchcraft-bag', 1)).toBe(true);
     expect(canUseFromPreview('witchcraft-bag', 0)).toBe(false);
+    expect(canUseFromPreview('secret-chest', 1)).toBe(true);
+    expect(canUseFromPreview('secret-chest', 1, true)).toBe(false);
     expect(canUseFromPreview('bone-dust', 2)).toBe(false);
     expect(canUseFromPreview('torch-charm', 1)).toBe(false);
     expect(canUseFromPreview('torch-charm', 1, true)).toBe(true);
@@ -190,6 +194,7 @@ describe('sellLoot gold math', () => {
         'lust-head': 1,
         'gold-cup': 2,
         'witchcraft-bag': 2,
+        'secret-chest': 2,
         'rusty-key': 1,
       },
       10,
@@ -201,6 +206,7 @@ describe('sellLoot gold math', () => {
     expect(sellLoot(meta, 'lust-head', 1, store)).toBeNull();
     expect(sellLoot(meta, 'gold-cup', 1, store)).toBeNull();
     expect(sellLoot(meta, 'witchcraft-bag', 1, store)).toBeNull();
+    expect(sellLoot(meta, 'secret-chest', 1, store)).toBeNull();
     expect(sellLoot(meta, 'gold-pouch', 1, store)).toBeNull();
     expect(loadCollection(store).gold).toBe(0);
     expect(loadCollection(store).items['hard-key']).toBe(0);
@@ -250,7 +256,6 @@ describe('sellLoot gold math', () => {
 const BUY_CATALOG_ROWS: Array<[string, number]> = [
   ['torch-charm', 8],
   ['gem', 30],
-  ['secret-chest', 20],
   ['bone-dust', 50],
   ['witchcraft-bag', 150],
   ['scroll-of-portal', 80],
@@ -264,13 +269,13 @@ describe('buy catalog', () => {
   it('lists torch, gem, reagents, and paid skins at the locked prices', () => {
     expect(buyGold('torch-charm')).toBe(8);
     expect(buyGold('gem')).toBe(30);
-    expect(buyGold('secret-chest')).toBe(20);
+    expect(buyGold('secret-chest')).toBe(0);
     expect(buyGold('bone-dust')).toBe(50);
     expect(buyGold('witchcraft-bag')).toBe(150);
     expect(buyGold('scroll-of-portal')).toBe(80);
     expect(SHOP_BUY['torch-charm']).toBe(8);
     expect(SHOP_BUY.gem).toBe(30);
-    expect(SHOP_BUY['secret-chest']).toBe(20);
+    expect(SHOP_BUY['secret-chest']).toBeUndefined();
     expect(SHOP_BUY['bone-dust']).toBe(50);
     expect(SHOP_BUY['witchcraft-bag']).toBe(150);
     expect(SHOP_BUY['scroll-of-portal']).toBe(80);
@@ -324,7 +329,6 @@ describe('buy catalog', () => {
     expect(ids(buyableEntries())).toEqual([
       'torch-charm',
       'gem',
-      'secret-chest',
       'bone-dust',
       'witchcraft-bag',
       'scroll-of-portal',
@@ -336,7 +340,6 @@ describe('buy catalog', () => {
     expect(ids(buyableEntries(SHOP_BUY, fresh))).toEqual([
       'torch-charm',
       'gem',
-      'secret-chest',
       'bone-dust',
       'witchcraft-bag',
       'scroll-of-portal',
@@ -355,7 +358,6 @@ describe('buy catalog', () => {
     expect(ids(buyableEntries(SHOP_BUY, owned))).toEqual([
       'torch-charm',
       'gem',
-      'secret-chest',
       'bone-dust',
       'witchcraft-bag',
       'scroll-of-portal',
@@ -553,10 +555,10 @@ describe('title shop wiring', () => {
     expect(shop).toContain('Buy for —');
     expect(shop).toContain('Sell for ${total}');
     expect(shop).toContain('Buy for ${total}');
-    expect(shop).toContain('Open for ${total}');
-    expect(shop).toContain('Need a rusty key');
-    expect(shop).toContain('previewForSecretChest');
-    expect(shop).toContain('isSecretChestId');
+    expect(shop).not.toContain('Open for ${total}');
+    expect(shop).not.toContain('Need a rusty key');
+    expect(shop).not.toContain('previewForSecretChest');
+    expect(shop).not.toContain('isSecretChestId');
     expect(shop).toContain('Your stash');
     expect(shop).toContain('Nothing for sale yet.');
     expect(shop).toContain('onBuy');

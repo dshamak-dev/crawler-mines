@@ -91,7 +91,7 @@ export function sfxFromEvents(events: ReadonlyArray<GameEvent>): SfxId[] {
     else if (e.type === 'explode') {
       blasted = true;
       if (e.wrecked.length > 0) wrecked = true;
-    } else if (e.type === 'chest' || e.type === 'secret-open') chest = true;
+    } else if (e.type === 'chest') chest = true;
     else if (e.type === 'cleared') cleared = true;
     else if (e.type === 'lost') lost = true;
     else if (e.type === 'boss-move') bossMove = true;
