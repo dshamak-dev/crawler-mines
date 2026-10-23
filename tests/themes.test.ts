@@ -13,8 +13,10 @@ import {
   buyGold,
   buyGoods,
   buyTheme,
+  boardFrameInset,
   buyableEntries,
   emptyCollection,
+  numberCellFill,
   gridNumberColor,
   isBuyable,
   isDefaultTheme,
@@ -116,6 +118,96 @@ describe('#78 theme catalog', () => {
       THEME_TOKENS['theme-classic-dark'].numbers[1],
     );
     expect(gridNumberColor('theme-neon-cyber', 1)).not.toBe(gridNumberColor('theme-classic-dark', 1));
+  });
+});
+
+function rgb(hex: string): [number, number, number] {
+  const n = Number.parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function distance(a: string, b: string): number {
+  const [r1, g1, b1] = rgb(a);
+  const [r2, g2, b2] = rgb(b);
+  return Math.hypot(r1 - r2, g1 - g2, b1 - b2);
+}
+
+function luma(hex: string): number {
+  const [r, g, b] = rgb(hex);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+const BOARD_A = ['theme-vintage-stone', 'theme-neon-cyber', 'theme-woodland'] as const;
+
+describe('theme board A matches docs/theme-refs/theme-board-a-vintage-neon-woodland.jpg', () => {
+  it('paints 1 and 2 in the sampled reference colors', () => {
+    const sampled: Record<(typeof BOARD_A)[number], [string, string]> = {
+      'theme-vintage-stone': ['#efd9b8', '#9fd884'],
+      'theme-neon-cyber': ['#4fd8ff', '#4dfcc0'],
+      'theme-woodland': ['#f6e0b4', '#b6d466'],
+    };
+    for (const id of BOARD_A) {
+      const [one, two] = sampled[id];
+      expect(distance(gridNumberColor(id, 1), one)).toBeLessThan(30);
+      expect(distance(gridNumberColor(id, 2), two)).toBeLessThan(30);
+    }
+  });
+
+  it('raises lighter hidden tiles over dark sunken revealed and flagged tiles', () => {
+    for (const id of ['theme-vintage-stone', 'theme-woodland'] as const) {
+      const paint = THEME_TOKENS[id];
+      expect(luma(paint.hidden) - luma(paint.revealed)).toBeGreaterThan(20);
+      expect(paint.flaggedSunken).toBe(true);
+    }
+    expect(distance(THEME_TOKENS['theme-vintage-stone'].hidden, '#433a30')).toBeLessThan(20);
+    expect(distance(THEME_TOKENS['theme-vintage-stone'].revealed, '#211d17')).toBeLessThan(20);
+    expect(distance(THEME_TOKENS['theme-woodland'].hidden, '#76502d')).toBeLessThan(20);
+    expect(THEME_TOKENS['theme-neon-cyber'].flaggedSunken).toBe(true);
+  });
+
+  it('glows neon numbers and edges, dims revealed edges, and splits found/broken accents', () => {
+    const neon = THEME_TOKENS['theme-neon-cyber'];
+    expect(neon.numberGlow).toBeGreaterThan(0);
+    expect(neon.cellGlow).not.toBeNull();
+    expect(luma(neon.revealedBorder)).toBeLessThan(luma(neon.cellBorder));
+    expect(neon.foundBorder).not.toBe(neon.brokenBorder);
+    expect(neon.chamfer).toBe(true);
+    expect(THEME_TOKENS['theme-vintage-stone'].chamfer).toBe(false);
+    expect(THEME_TOKENS['theme-woodland'].chamfer).toBe(false);
+  });
+
+  it('keeps vintage and neon number cells plain, with only a faint woodland cast', () => {
+    for (const id of ['theme-vintage-stone', 'theme-neon-cyber'] as const) {
+      const paint = THEME_TOKENS[id];
+      expect(numberCellFill(paint, 2)).toBe(paint.revealed);
+    }
+    const wood = THEME_TOKENS['theme-woodland'];
+    const two = numberCellFill(wood, 2);
+    expect(two).not.toBe(wood.revealed);
+    expect(distance(two, wood.revealed)).toBeLessThan(15);
+    expect(numberCellFill(wood, 1)).toBe(wood.revealed);
+    expect(numberCellFill(THEME_TOKENS['theme-classic-dark'], 2)).toBe(
+      THEME_TOKENS['theme-classic-dark'].revealed,
+    );
+  });
+
+  it('frames the board on board A themes and leaves the others unframed', () => {
+    for (const id of BOARD_A) expect(boardFrameInset(THEME_TOKENS[id])).toBeGreaterThan(0);
+    for (const id of ['theme-classic-dark', 'theme-ocean-breeze', 'theme-forest-trail'] as const) {
+      const paint = THEME_TOKENS[id];
+      expect(boardFrameInset(paint)).toBe(0);
+      expect(paint.flaggedSunken).toBe(false);
+      expect(paint.numberTint).toBe(0);
+      expect(paint.backdrop).toBe('none');
+    }
+    expect(THEME_TOKENS['theme-woodland'].backdrop).toBe('woodland');
+    expect(THEME_TOKENS['theme-neon-cyber'].backdrop).toBe('neon');
+  });
+
+  it('keeps the Dig/Flag labels in their accent when idle on board A', () => {
+    for (const id of BOARD_A) expect(THEME_TOKENS[id].dimIdleLabel).toBe(false);
+    expect(THEME_TOKENS['theme-classic-dark'].dimIdleLabel).toBe(true);
+    expect(THEME_TOKENS['theme-woodland'].digText).not.toBe(THEME_TOKENS['theme-woodland'].flagText);
   });
 });
 
@@ -304,5 +396,19 @@ describe('#78 collection and shop wiring', () => {
     expect(icons).toContain('function ThemeIcon');
     expect(icons).toContain('function LeafIcon');
     expect(icons).not.toContain("mark === 'skull'");
+  });
+
+  it('wires the board A chrome tokens into the board, HUD, dock, and shell', () => {
+    const shell = readFileSync(resolve(__dirname, '../native/src/ui/Shell.tsx'), 'utf8');
+    expect(board).toContain('numberCellFill');
+    expect(board).toContain('revealedBorder');
+    expect(board).toContain('explodedBorder');
+    expect(board).toContain('boardFrameInset');
+    expect(play).toContain('boardFrameInset');
+    expect(play).toContain('t.foundBorder');
+    expect(play).toContain('t.brokenBorder');
+    expect(play).toContain('t.digText');
+    expect(play).toContain('t.flagText');
+    expect(shell).toContain('Backdrop');
   });
 });

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReducedMotion } from 'react-native-reanimated';
@@ -6,6 +6,7 @@ import {
   BOSS_COPY,
   CAMPAIGN_FLOORS,
   ITEMS,
+  boardFrameInset,
   chestNotices,
   isArenaFloor,
   loadSeenTips,
@@ -23,7 +24,18 @@ import { floorReport, useGameStore, type FloorReport, type Run } from '../store'
 import { fonts, useTheme } from '../theme';
 import Board, { chainDuration, collectFx, type BlastFx } from './Board';
 import { clampBoardSlot, fitBoardCellPx } from './fitBoardCell';
-import { BagIcon, BossIcon, ChestIcon, FlagIcon, ItemIcon, LeafIcon, MenuIcon, ShovelIcon } from './icons';
+import {
+  BagIcon,
+  BossIcon,
+  ChamferFrame,
+  ChestIcon,
+  FlagIcon,
+  ItemIcon,
+  LeafIcon,
+  MenuIcon,
+  ShovelIcon,
+  SurfaceGrain,
+} from './icons';
 import LootGrantCards from './LootGrantCards';
 import LootQueue, { type LootToastItem } from './LootToast';
 import MuteButton from './MuteButton';
@@ -193,6 +205,7 @@ export default function PlayScreen({
 
   const boardW = run?.game.width ?? 8;
   const boardH = run?.game.height ?? 8;
+  const frame = boardFrameInset(t) * 2;
   const cellPx = useMemo(() => {
     if (slot.w <= 0 || slot.h <= 0) return 0;
     const capped = clampBoardSlot(
@@ -205,8 +218,8 @@ export default function PlayScreen({
       insets.top,
       insets.bottom,
     );
-    return fitBoardCellPx(capped.w, capped.h, boardW, boardH);
-  }, [slot, win.width, win.height, insets.left, insets.right, insets.top, insets.bottom, boardW, boardH]);
+    return fitBoardCellPx(capped.w - frame, capped.h - frame, boardW, boardH);
+  }, [slot, win.width, win.height, insets.left, insets.right, insets.top, insets.bottom, boardW, boardH, frame]);
 
   if (!run) return null;
 
@@ -249,32 +262,44 @@ export default function PlayScreen({
   return (
     <View style={styles.shell}>
       <View
-        style={styles.hud}
+        style={[
+          styles.hud,
+          t.hudBar != null && [styles.hudBar, { backgroundColor: t.hudBar, borderColor: t.hudBarBorder }],
+        ]}
         onLayout={(e) => {
           const h = e.nativeEvent.layout.height;
           setHudH((prev) => (prev === h ? prev : h));
         }}
       >
+        {t.hudBar != null ? <SurfaceGrain theme={t} /> : null}
         <GhostButton
           onPress={() => {
             cueUi();
             setMenuOpen(true);
           }}
           accessibilityLabel="Game menu"
+          style={
+            t.chamfer
+              ? styles.menuChamfer
+              : [styles.menu, { backgroundColor: t.menuBg, borderColor: t.menuBorder }]
+          }
         >
-          <MenuIcon size={20} color={t.ink} />
+          {t.chamfer ? <ChamferFrame fill={t.menuBg} stroke={t.menuBorder} cut={7} /> : null}
+          <View>
+            <MenuIcon size={20} color={t.menuInk} />
+          </View>
         </GhostButton>
         <View style={styles.stats}>
           {showChestHud ? (
             <>
-              <View style={[styles.stat, styles.found, { borderColor: t.accentSoft }]}>
+              <View style={[styles.stat, { backgroundColor: t.hudBg, borderColor: t.foundBorder }]}>
                 <Text style={[styles.statLabel, { color: t.foundAccent }]}>Found</Text>
                 <View style={styles.statRow}>
                   <ChestIcon tier="wooden" size={16} />
                   <Text style={[styles.statN, { color: t.ink }]}>{game.chestsOpened}</Text>
                 </View>
               </View>
-              <View style={[styles.stat, styles.wreck, { borderColor: t.accentSoft }]}>
+              <View style={[styles.stat, { backgroundColor: t.hudBg, borderColor: t.brokenBorder }]}>
                 <Text style={[styles.statLabel, { color: t.brokenAccent }]}>Broken</Text>
                 <View style={styles.statRow}>
                   <ChestIcon wrecked tier="wooden" size={16} />
@@ -293,7 +318,11 @@ export default function PlayScreen({
             </View>
           ) : null}
         </View>
-        <Text style={[styles.pill, { color: t.muted, borderColor: t.hudPillBorder }]}>{hudPill}</Text>
+        <Text
+          style={[styles.pill, { color: t.pillText, borderColor: t.hudPillBorder, backgroundColor: t.pillBg }]}
+        >
+          {hudPill}
+        </Text>
       </View>
 
       <View
@@ -327,27 +356,33 @@ export default function PlayScreen({
       />
 
       <View style={styles.dock}>
-        <View style={[styles.toggle, { borderColor: t.accentSoft, backgroundColor: t.cardBg }]}>
-          <Pressable
-            style={[styles.toggleBtn, !flagMode && { backgroundColor: t.stoneHi }]}
-            onPress={() => {
-              cueUi();
-              setFlagMode(false);
-            }}
-          >
-            {t.digGlyph === 'leaf' ? <LeafIcon size={22} /> : <ShovelIcon size={22} />}
-            <Text style={[styles.toggleText, { color: t.muted }, !flagMode && { color: t.gold2 }]}>Dig</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.toggleBtn, flagMode && { backgroundColor: t.stoneHi }]}
-            onPress={() => {
-              cueUi();
-              setFlagMode(true);
-            }}
-          >
+        <View style={[styles.toggle, { borderColor: t.dockBorder, backgroundColor: t.dockBg }]}>
+          <ToggleButton active={!flagMode} border={t.digBorder} onPress={() => {
+            cueUi();
+            setFlagMode(false);
+          }}>
+            {t.digGlyph === 'leaf' ? (
+              <LeafIcon size={22} color={t.digIcon ?? undefined} />
+            ) : (
+              <ShovelIcon size={22} color={t.digIcon ?? undefined} />
+            )}
+            <Text
+              style={[styles.toggleText, { color: !flagMode || !t.dimIdleLabel ? t.digText : t.muted }]}
+            >
+              Dig
+            </Text>
+          </ToggleButton>
+          <ToggleButton active={flagMode} border={t.flagBorder} onPress={() => {
+            cueUi();
+            setFlagMode(true);
+          }}>
             <FlagIcon paint={t.flag} size={22} />
-            <Text style={[styles.toggleText, { color: t.muted }, flagMode && { color: t.flagAccent }]}>Flag</Text>
-          </Pressable>
+            <Text
+              style={[styles.toggleText, { color: flagMode || !t.dimIdleLabel ? t.flagText : t.muted }]}
+            >
+              Flag
+            </Text>
+          </ToggleButton>
         </View>
         <Text style={[styles.hint, { color: t.muted }]}>
           {boss
@@ -588,9 +623,50 @@ export default function PlayScreen({
   );
 }
 
+function ToggleButton({
+  active,
+  border,
+  onPress,
+  children,
+}: {
+  active: boolean;
+  border: string;
+  onPress: () => void;
+  children: ReactNode;
+}) {
+  const t = useTheme();
+  const fill = active ? t.toggleActiveBg : t.toggleIdleBg;
+  return (
+    <Pressable
+      style={[
+        styles.toggleBtn,
+        !t.chamfer && {
+          backgroundColor: fill,
+          borderColor: border,
+          borderWidth: border === 'transparent' ? 0 : 1,
+        },
+      ]}
+      onPress={onPress}
+    >
+      {t.chamfer ? <ChamferFrame fill={fill} stroke={border} glow={active} /> : null}
+      {active || t.cellFace === 'wood' ? <SurfaceGrain theme={t} /> : null}
+      <View style={styles.toggleInner}>{children}</View>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   shell: { flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden', gap: 6 },
   hud: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
+  hudBar: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  menu: { borderWidth: 1 },
+  menuChamfer: { backgroundColor: 'transparent' },
   boardSlot: {
     flex: 1,
     alignSelf: 'stretch',
@@ -621,8 +697,6 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     paddingHorizontal: 6,
   },
-  found: {},
-  wreck: {},
   bossStat: { borderColor: 'rgba(180, 80, 200, 0.35)' },
   statLabel: {
     fontFamily: fonts.uiBold,
@@ -659,7 +733,9 @@ const styles = StyleSheet.create({
     gap: 8,
     minHeight: 48,
     borderRadius: 14,
+    overflow: 'hidden',
   },
+  toggleInner: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   toggleText: { fontFamily: fonts.display, letterSpacing: 1 },
   hint: { marginTop: 6, textAlign: 'center', fontFamily: fonts.ui, fontSize: 12 },
   menuNav: { gap: 12, marginTop: 12 },

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme';
+import Backdrop from './Backdrop';
 import { PLAY_SIDE_PAD } from './fitBoardCell';
 
 export default function Shell({ children, tight }: { children: ReactNode; tight?: boolean }) {
@@ -27,6 +28,7 @@ export default function Shell({ children, tight }: { children: ReactNode; tight?
         },
       ]}
     >
+      <Backdrop theme={t} />
       {children}
     </View>
   );

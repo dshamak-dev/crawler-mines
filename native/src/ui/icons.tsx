@@ -1,4 +1,6 @@
-import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg';
+import { useState, type ReactNode } from 'react';
+import { StyleSheet, View } from 'react-native';
+import Svg, { Circle, Ellipse, G, Path, Rect } from 'react-native-svg';
 import {
   themeTokens,
   type BossId,
@@ -111,6 +113,18 @@ export function ChestIcon({
 }
 
 export function BombIcon({ cracked = false, size = 24 }: { cracked?: boolean; size?: number }) {
+  if (cracked) {
+    return (
+      <Svg viewBox="0 0 32 32" width={size} height={size}>
+        <Path d="M20.4 10.8l2-2.6" stroke="#4a4038" strokeWidth="2.6" strokeLinecap="round" />
+        <Path d="M22.4 8.2c.4-3.2 4-3.8 5-1.2" stroke="#e8b04a" strokeWidth="1.4" fill="none" strokeLinecap="round" />
+        <Circle cx="16" cy="18.6" r="9.6" fill="#120e0e" />
+        <Circle cx="16" cy="18.6" r="8.7" fill="#2c2626" />
+        <Circle cx="16" cy="18.6" r="5.8" fill="none" stroke="#e8382e" strokeWidth="1.7" />
+        <Path d="M13.3 15.9l5.4 5.4M18.7 15.9l-5.4 5.4" stroke="#e8382e" strokeWidth="2.1" strokeLinecap="round" />
+      </Svg>
+    );
+  }
   return (
     <Svg viewBox="0 0 32 32" width={size} height={size}>
       <Circle cx="16" cy="18" r="9" fill="#1a1514" />
@@ -118,9 +132,6 @@ export function BombIcon({ cracked = false, size = 24 }: { cracked?: boolean; si
       <Circle cx="13.5" cy="15.5" r="2.2" fill="#6a5e56" />
       <Rect x="14.2" y="6" width="3.6" height="5" rx="1" fill="#6b5340" />
       <Path d="M16 6c2-3 6-3 7 0" stroke="#e0b44a" strokeWidth="1.4" fill="none" />
-      {cracked ? (
-        <Path d="M12 14l3 5-2 4m7-10l-2 6 3 3" stroke="#ff6b35" strokeWidth="1.3" fill="none" />
-      ) : null}
     </Svg>
   );
 }
@@ -173,43 +184,103 @@ export function ThemeIcon({ id, size = 24 }: { id: ThemeId; size?: number }) {
   );
 }
 
+const STONE_CRACKS = [
+  'M4 9l5 2 3 5 6 2M20 4l-2 5 4 3',
+  'M28 6l-6 4-2 6-5 2M6 22l4 2 2 5',
+  'M10 3l2 6-3 5 2 6M24 18l4 2',
+  'M4 14l6-1 4 3 7-2 6 3M18 28l2-4',
+  'M26 3l-3 7 2 4M3 24l7-2 3 2',
+];
+
+const STONE_MOSS = [
+  'M2.5 26c2-1 3.5.5 5 2.8-2 .6-4 .2-5-2.8z',
+  'M29.5 25c-2.2-.6-3.4 1-4.2 3.6 2 .3 3.8-.6 4.2-3.6z',
+  'M27 2.6c-.4 2 1 3.2 2.8 3.4-.2-1.8-1-3-2.8-3.4z',
+  '',
+  'M2.6 5c1.6.2 2.6 1.4 2.4 3-1.4 0-2.4-1-2.4-3z',
+];
+
+const WOOD_GRAIN = 'M6 2.5c1 5-1 9 0 14s1 8 0 13M12 2.5c-1 6 1 10 0 15s-1 7 0 12M19 2.5c1 4 0 9 1 13s-1 9 0 14M25.5 2.5c-1 5 1 11 0 16s1 6 0 11';
+
+function FaceSvg({ size, children }: { size: number; children: ReactNode }) {
+  return (
+    <Svg
+      pointerEvents="none"
+      width={size}
+      height={size}
+      viewBox="0 0 32 32"
+      style={{ position: 'absolute', top: 0, left: 0 }}
+    >
+      {children}
+    </Svg>
+  );
+}
+
+function Bevel({ theme }: { theme: ThemeTokens }) {
+  return (
+    <>
+      <Path d="M1.8 28.5V5.2a3.4 3.4 0 0 1 3.4-3.4h22" stroke={theme.bevelHi} strokeWidth="1.3" fill="none" />
+      <Path d="M30.2 3.6v23.2a3.4 3.4 0 0 1-3.4 3.4H4" stroke={theme.bevelLo} strokeWidth="1.9" fill="none" />
+    </>
+  );
+}
+
+function SunkenEdge() {
+  return <Path d="M1.6 29V6a4.4 4.4 0 0 1 4.4-4.4h23.4" stroke="rgba(0,0,0,0.5)" strokeWidth="2" fill="none" />;
+}
+
 export function CellFace({
   size,
   fill,
   theme,
+  raised = true,
+  seed = 0,
 }: {
   size: number;
   fill: string;
   theme: ThemeTokens;
+  raised?: boolean;
+  seed?: number;
 }) {
   const face = theme.cellFace;
   if (face === 'flat') return null;
   const grain = theme.grain;
-  if (face === 'neon') {
+  if (face === 'neon') return null;
+  if (face === 'stone') {
+    const moss = STONE_MOSS[(seed * 7) % STONE_MOSS.length];
+    if (!raised) {
+      return (
+        <FaceSvg size={size}>
+          <SunkenEdge />
+          {seed % 3 === 0 && moss ? <Path d={moss} fill={theme.moss} opacity="0.55" /> : null}
+        </FaceSvg>
+      );
+    }
     return (
-      <Svg
-        pointerEvents="none"
-        width={size}
-        height={size}
-        viewBox="0 0 32 32"
-        style={{ position: 'absolute', top: 0, left: 0 }}
-      >
-        <Rect x="1.4" y="1.4" width="29.2" height="29.2" rx="5" fill="none" stroke={theme.cellBorder} strokeWidth="1.4" />
-      </Svg>
+      <FaceSvg size={size}>
+        <Path d={STONE_CRACKS[seed % STONE_CRACKS.length]} stroke={grain} strokeWidth="0.6" fill="none" strokeLinejoin="round" opacity="0.8" />
+        {moss ? <Path d={moss} fill={theme.moss} /> : null}
+        <Bevel theme={theme} />
+      </FaceSvg>
     );
   }
   if (face === 'wood') {
+    const shift = ((seed * 5) % 3) - 1;
+    if (!raised) {
+      return (
+        <FaceSvg size={size}>
+          <Path d={WOOD_GRAIN} stroke={grain} strokeWidth="0.7" fill="none" opacity="0.35" transform={`translate(${shift} 0)`} />
+          <SunkenEdge />
+        </FaceSvg>
+      );
+    }
     return (
-      <Svg
-        pointerEvents="none"
-        width={size}
-        height={size}
-        viewBox="0 0 32 32"
-        style={{ position: 'absolute', top: 0, left: 0 }}
-      >
-        <Path d="M3 8h26M4 16h24M3 24h26" stroke={grain} strokeWidth="1.2" />
-        <Path d="M8 4v24M22 5v22" stroke={grain} strokeWidth="0.7" opacity="0.7" />
-      </Svg>
+      <FaceSvg size={size}>
+        <G transform={`translate(${shift * 1.4} 0)`}>
+          <Path d={WOOD_GRAIN} stroke={grain} strokeWidth="0.6" fill="none" />
+        </G>
+        <Bevel theme={theme} />
+      </FaceSvg>
     );
   }
   if (face === 'cloud') {
@@ -267,13 +338,75 @@ export function DoorIcon({ size = 24 }: GlyphProps) {
   );
 }
 
-export function ShovelIcon({ size = 24 }: GlyphProps) {
+export function ShovelIcon({ size = 24, color }: GlyphProps) {
+  if (color) {
+    return (
+      <Svg viewBox="0 0 32 32" width={size} height={size}>
+        <Path d="M21.6 3.6l1.8 1.2-6.4 10.4-1.8-1.2z" fill={color} />
+        <Path d="M13.4 12.6l6.2 4c1.2 3.6-.4 8.6-4.2 11.2-2 1.2-4.6 1-6.2-.2s-2.6-3.6-1.8-5.8c1.2-3.8 3.4-7.6 6-9.2z" fill={color} />
+      </Svg>
+    );
+  }
   return (
     <Svg viewBox="0 0 32 32" width={size} height={size}>
       <Path d="M15 4h2l1 14h-4L15 4z" fill="#c9b59a" />
       <Path d="M12 18h8l-1 10h-6l-1-10z" fill="#e0b44a" />
       <Path d="M13 20h6" stroke="#8a6419" strokeWidth="1" />
     </Svg>
+  );
+}
+
+/** Stretched stone cracks or wood grain behind a button or bar. */
+export function SurfaceGrain({ theme }: { theme: ThemeTokens }) {
+  if (theme.cellFace !== 'stone' && theme.cellFace !== 'wood') return null;
+  const d =
+    theme.cellFace === 'wood'
+      ? 'M0 7c20-1.5 40 1.5 60 0s30 1 40 0M0 15c25 1 45-1.5 70 0s20-1 30 0M0 24c15-1 35 1.5 55 0s35 1 45 0'
+      : 'M6 4l5 9 9 3 4 10M62 3l-4 8 6 6 10 2M84 30l3-9 9-4';
+  return (
+    <Svg
+      pointerEvents="none"
+      viewBox="0 0 100 32"
+      preserveAspectRatio="none"
+      style={StyleSheet.absoluteFill as object}
+    >
+      <Path d={d} stroke={theme.grain} strokeWidth="0.8" fill="none" opacity="0.5" />
+    </Svg>
+  );
+}
+
+/** Cut-corner outline sized to its parent; draws a soft glow pass under the edge. */
+export function ChamferFrame({
+  fill,
+  stroke,
+  cut = 9,
+  glow = false,
+}: {
+  fill: string;
+  stroke: string;
+  cut?: number;
+  glow?: boolean;
+}) {
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  const { w, h } = box;
+  const c = Math.min(cut, w / 4, h / 3);
+  const d = `M${c} 1H${w - c}L${w - 1} ${c}V${h - c}L${w - c} ${h - 1}H${c}L1 ${h - c}V${c}Z`;
+  return (
+    <View
+      pointerEvents="none"
+      style={StyleSheet.absoluteFill}
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        setBox((prev) => (prev.w === width && prev.h === height ? prev : { w: width, h: height }));
+      }}
+    >
+      {w > 0 && h > 0 ? (
+        <Svg width={w} height={h}>
+          {glow ? <Path d={d} fill="none" stroke={stroke} strokeWidth="4" opacity="0.25" /> : null}
+          <Path d={d} fill={fill} stroke={stroke} strokeWidth="1.3" />
+        </Svg>
+      ) : null}
+    </View>
   );
 }
 

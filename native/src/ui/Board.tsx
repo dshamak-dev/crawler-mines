@@ -11,8 +11,10 @@ import * as Haptics from 'expo-haptics';
 import {
   BOSS_COPY,
   activeTorchHintIndices,
+  boardFrameInset,
   cellVisual,
   gridNumberColor,
+  numberCellFill,
   type BossId,
   type Cell,
   type Game,
@@ -139,8 +141,21 @@ export default function Board({
 
   if (cellPx < 1) return null;
 
+  const framed = boardFrameInset(theme) > 0;
+
   return (
-    <View style={styles.wrap}>
+    <View
+      style={[
+        styles.wrap,
+        framed && {
+          padding: theme.boardPad,
+          borderWidth: 1,
+          borderColor: theme.boardBorder,
+          backgroundColor: theme.boardBg,
+          borderRadius: theme.cellRadius + 4,
+        },
+      ]}
+    >
       <Animated.View style={[styles.stage, shakeStyle]}>
         <View style={styles.board} accessibilityRole="none" accessibilityLabel="Dungeon floor">
           {rows.map((indexes, y) => (
@@ -268,6 +283,16 @@ const DungeonCell = memo(function DungeonCell({
   }, [reduce, wave, pop]);
 
   const flagged = visual === 'flagged' || visual === 'bomb-flagged';
+  const raised = visual === 'hidden' || (flagged && !theme.flaggedSunken);
+  const fill = cellFill(visual, theme, mineHint, cell.adjacentMines);
+  const numberColor = gridNumberColor(theme, cell.adjacentMines);
+  const engraved = theme.cellFace === 'stone' || theme.cellFace === 'wood';
+  const numberShadow =
+    theme.numberGlow > 0
+      ? { textShadowColor: numberColor, textShadowRadius: theme.numberGlow, textShadowOffset: { width: 0, height: 0 } }
+      : engraved
+        ? { textShadowColor: 'rgba(0,0,0,0.7)', textShadowRadius: 1, textShadowOffset: { width: 0, height: 1 } }
+        : null;
   const bossName = BOSS_COPY[bossId].name;
   const label = bossHere
     ? `${bossDead ? `Fallen ${bossName}` : bossName}${hearted ? ', heart covering the number' : ''}`
@@ -292,12 +317,12 @@ const DungeonCell = memo(function DungeonCell({
         accessibilityLabel={label}
         style={[
           styles.cell,
-          cellStyle(visual, bossHere, bossId, door, theme, mineHint),
+          cellStyle(visual, fill, raised, bossHere, bossId, door, theme, mineHint),
           { width: size, height: size },
           popStyle,
         ]}
       >
-        <CellFace size={size} fill={cellFill(visual, theme, mineHint)} theme={theme} />
+        <CellFace size={size} fill={fill} theme={theme} raised={raised} seed={index} />
         {flagged ? (
           <FlagIcon ember={visual === 'bomb-flagged'} paint={theme.flag} size={icon} />
         ) : mineHint ? (
@@ -316,19 +341,13 @@ const DungeonCell = memo(function DungeonCell({
           <DoorIcon size={Math.round(size * 0.78)} />
         ) : visual === 'number' && !bossHere ? (
           <Text
-            style={[
-              styles.rune,
-              { color: gridNumberColor(theme, cell.adjacentMines), fontSize: size * 0.46 },
-            ]}
+            style={[styles.rune, { color: numberColor, fontSize: size * 0.46 }, numberShadow]}
           >
             {cell.adjacentMines}
           </Text>
         ) : visual === 'number' && bossHere ? (
           <Text
-            style={[
-              styles.rune,
-              { color: gridNumberColor(theme, cell.adjacentMines), fontSize: size * 0.32, opacity: 0.35 },
-            ]}
+            style={[styles.rune, { color: numberColor, fontSize: size * 0.32, opacity: 0.35 }]}
           >
             {cell.adjacentMines}
           </Text>
@@ -378,37 +397,44 @@ function Burst({
   return <Animated.View pointerEvents="none" style={[styles.burst, kind === 'bomb' ? styles.burstBomb : { backgroundColor: t.gold2 }, style]} />;
 }
 
-function cellFill(visual: string, paint: ThemeTokens, hinted: boolean): string {
+function cellFill(visual: string, paint: ThemeTokens, hinted: boolean, adjacent: number): string {
+  const flagged = visual === 'flagged' || visual === 'bomb-flagged';
   const revealed =
     visual === 'empty' ||
     visual === 'number' ||
     visual === 'chest' ||
     visual === 'wrecked' ||
     visual === 'exploded';
-  if (hinted && visual !== 'flagged' && visual !== 'bomb-flagged') return paint.exploded;
+  if (hinted && !flagged) return paint.exploded;
   if (visual === 'chest') return paint.chest;
   if (visual === 'wrecked') return paint.wrecked;
   if (visual === 'exploded') return paint.exploded;
-  if (revealed) return paint.revealed;
+  if (visual === 'number') return numberCellFill(paint, adjacent);
+  if (revealed || (flagged && paint.flaggedSunken)) return paint.revealed;
   return paint.hidden;
 }
 
 function cellStyle(
   visual: string,
+  fill: string,
+  raised: boolean,
   bossHere: boolean,
   bossId: BossId,
   door: boolean,
   paint: ThemeTokens,
   hinted = false,
 ) {
-  const fill = cellFill(visual, paint, hinted);
+  const exploded = visual === 'exploded';
+  const edge = raised ? paint.cellBorder : exploded ? paint.explodedBorder : paint.revealedBorder;
+  const glow = paint.cellGlow && (raised || exploded) ? (exploded ? paint.explodedBorder : paint.cellGlow) : null;
   return [
     {
       backgroundColor: fill,
       borderRadius: paint.cellRadius,
       borderWidth: paint.cellBorderWidth,
-      borderColor: paint.cellBorder,
+      borderColor: edge,
     },
+    glow ? { boxShadow: `0 0 6px ${glow}` } : null,
     bossHere && (bossId === 'lust' ? styles.bossLust : styles.boss),
     door && styles.door,
     hinted && { borderWidth: 2, borderColor: paint.mineHintBorder },
