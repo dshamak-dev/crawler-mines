@@ -200,6 +200,17 @@ const STONE_MOSS = [
   'M2.6 5c1.6.2 2.6 1.4 2.4 3-1.4 0-2.4-1-2.4-3z',
 ];
 
+const MOTTLE = [
+  'M5 7c3-2 7-1 8 2s-2 5-5 4-5-3-3-6zM19 18c3-1 6 1 6 4s-3 4-6 3-3-6 0-7zM22 5c2 0 3 2 2 3s-3 1-3-1 0-2 1-2z',
+  'M7 19c3-1 6 1 5 4s-4 3-6 2-2-5 1-6zM18 6c4-1 7 2 6 5s-5 3-7 1-2-5 1-6zM24 23c1 0 2 1 1 2s-2 0-2-1 0-1 1-1z',
+  'M10 4c3 0 5 2 4 4s-4 2-5 1-2-5 1-5zM4 15c2-1 4 0 4 2s-2 3-4 2-2-3 0-4zM17 20c4-1 8 1 7 5s-6 3-8 1-2-5 1-6z',
+];
+
+/** Varies by row as well as column so a 3-wide repeat doesn't line up into stripes. */
+function mottlePath(seed: number): string {
+  return MOTTLE[(seed * 7 + (seed >> 2)) % MOTTLE.length];
+}
+
 const WOOD_GRAIN = 'M6 2.5c1 5-1 9 0 14s1 8 0 13M12 2.5c-1 6 1 10 0 15s-1 7 0 12M19 2.5c1 4 0 9 1 13s-1 9 0 14M25.5 2.5c-1 5 1 11 0 16s1 6 0 11';
 
 function FaceSvg({ size, children }: { size: number; children: ReactNode }) {
@@ -231,13 +242,11 @@ function SunkenEdge() {
 
 export function CellFace({
   size,
-  fill,
   theme,
   raised = true,
   seed = 0,
 }: {
   size: number;
-  fill: string;
   theme: ThemeTokens;
   raised?: boolean;
   seed?: number;
@@ -284,29 +293,28 @@ export function CellFace({
     );
   }
   if (face === 'cloud') {
+    if (!raised) return <FaceSvg size={size}><SunkenEdge /></FaceSvg>;
     return (
-      <Svg
-        pointerEvents="none"
-        width={size}
-        height={size}
-        viewBox="0 0 32 32"
-        style={{ position: 'absolute', top: 0, left: 0 }}
-      >
-        <Path d="M6 10c2-3 6-3 8 0 3-2 7 0 6 4H6c-1-1-1-3 0-4z" fill={grain} />
-      </Svg>
+      <FaceSvg size={size}>
+        <Path d={mottlePath(seed)} fill={grain} />
+        <Bevel theme={theme} />
+      </FaceSvg>
+    );
+  }
+  if (!raised) {
+    return (
+      <FaceSvg size={size}>
+        <Path d={mottlePath(seed)} fill={grain} opacity="0.5" />
+        <SunkenEdge />
+      </FaceSvg>
     );
   }
   return (
-    <Svg
-      pointerEvents="none"
-      width={size}
-      height={size}
-      viewBox="0 0 32 32"
-      style={{ position: 'absolute', top: 0, left: 0 }}
-    >
-      <Path d="M3 4c3 1 4 4 2 6M26 5c-2 2-2 5 1 6M5 26c2-2 6-1 6 2M24 24c2 2 4 1 5-1" stroke={grain} strokeWidth="1.4" fill="none" />
-      <Path d="M8 8h2v2H8zM22 20h2v2h-2z" fill={fill === theme.hidden ? grain : 'transparent'} />
-    </Svg>
+    <FaceSvg size={size}>
+      <Path d={mottlePath(seed)} fill={grain} />
+      <Path d={mottlePath(seed + 1)} fill={theme.moss} transform="rotate(90 16 16)" />
+      <Bevel theme={theme} />
+    </FaceSvg>
   );
 }
 

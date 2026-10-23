@@ -322,7 +322,7 @@ const DungeonCell = memo(function DungeonCell({
           popStyle,
         ]}
       >
-        <CellFace size={size} fill={fill} theme={theme} raised={raised} seed={index} />
+        <CellFace size={size} theme={theme} raised={raised} seed={index} />
         {flagged ? (
           <FlagIcon ember={visual === 'bomb-flagged'} paint={theme.flag} size={icon} />
         ) : mineHint ? (

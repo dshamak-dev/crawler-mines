@@ -224,8 +224,8 @@ export interface ThemeTokens extends ThemeChrome {
 
 const CLASSIC_NUMBERS: GridNumberColors = [
   '',
-  '#e0b44a',
-  '#6ee7a8',
+  '#7ccbff',
+  '#7eecb0',
   '#ff6b6b',
   '#c9a0ff',
   '#ffb347',
@@ -272,8 +272,8 @@ const WOODLAND_NUMBERS: GridNumberColors = [
 
 const OCEAN_NUMBERS: GridNumberColors = [
   '',
-  '#e8c96a',
-  '#5ee0c4',
+  '#a8e8ff',
+  '#7cf0b0',
   '#ff7a7a',
   '#9ad0ff',
   '#ffb347',
@@ -284,8 +284,8 @@ const OCEAN_NUMBERS: GridNumberColors = [
 
 const FOREST_NUMBERS: GridNumberColors = [
   '',
-  '#d4c06a',
-  '#7cbf4a',
+  '#f5c658',
+  '#adc866',
   '#e07048',
   '#a8c878',
   '#e8a04a',
@@ -298,8 +298,8 @@ const DEFAULT_FLAG: FlagPaint = { pole: '#c9b59a', cloth: '#c23b3b', shine: '#e2
 
 type BaseTokens = Omit<ThemeTokens, keyof ThemeChrome>;
 
-/** Chrome that reproduces the pre-board-A look: flat HUD, unframed board, muted idle labels. */
-function withPlainChrome(base: BaseTokens): ThemeTokens {
+/** Board B chrome: flat HUD, unframed board, muted idle labels unless overridden. */
+function withBoardBChrome(base: BaseTokens, chrome: Partial<ThemeChrome> = {}): ThemeTokens {
   return {
     ...base,
     revealedBorder: base.cellBorder,
@@ -336,11 +336,12 @@ function withPlainChrome(base: BaseTokens): ThemeTokens {
     dimIdleLabel: true,
     chamfer: false,
     backdrop: 'none',
+    ...chrome,
   };
 }
 
 export const THEME_TOKENS: Record<ThemeId, ThemeTokens> = {
-  'theme-classic-dark': withPlainChrome({
+  'theme-classic-dark': withBoardBChrome({
     id: 'theme-classic-dark',
     bg: '#120e0c',
     bg2: '#1a1410',
@@ -378,12 +379,12 @@ export const THEME_TOKENS: Record<ThemeId, ThemeTokens> = {
     numbers: CLASSIC_NUMBERS,
     flag: DEFAULT_FLAG,
     digGlyph: 'shovel',
-    foundAccent: '#e0b44a',
+    foundAccent: '#e8bd5e',
     brokenAccent: '#8a7a6a',
     flagAccent: '#ffb4b4',
     hudPillBorder: 'rgba(224, 180, 74, 0.25)',
     mineHintBorder: '#f3d27a',
-  }),
+  }, { flaggedSunken: true, numberGlow: 3, digIcon: '#e6b860' }),
   'theme-vintage-stone': {
     id: 'theme-vintage-stone',
     bg: '#1c1712',
@@ -618,9 +619,9 @@ export const THEME_TOKENS: Record<ThemeId, ThemeTokens> = {
     chamfer: false,
     backdrop: 'woodland',
   },
-  'theme-ocean-breeze': withPlainChrome({
+  'theme-ocean-breeze': withBoardBChrome({
     id: 'theme-ocean-breeze',
-    bg: '#0c1a28',
+    bg: '#061a2c',
     bg2: '#122434',
     stage: '#061018',
     stone: '#1a3048',
@@ -643,26 +644,39 @@ export const THEME_TOKENS: Record<ThemeId, ThemeTokens> = {
     accentSoft: 'rgba(126, 200, 255, 0.18)',
     cardBg: 'rgba(8, 20, 36, 0.45)',
     wellBg: 'rgba(8, 16, 28, 0.96)',
-    hidden: '#9aafc0',
-    revealed: '#3a5870',
-    chest: '#4a6880',
-    wrecked: '#2a3c4c',
-    exploded: '#3a3040',
-    cellBorder: '#7aa0b8',
+    hidden: '#6b869e',
+    revealed: '#17324e',
+    chest: '#4f6a84',
+    wrecked: '#132f4a',
+    exploded: '#2f252e',
+    cellBorder: '#5a7590',
     cellBorderWidth: 1,
-    cellRadius: 8,
+    cellRadius: 7,
     cellFace: 'cloud',
-    grain: 'rgba(255,255,255,0.18)',
+    grain: 'rgba(255,255,255,0.045)',
     numbers: OCEAN_NUMBERS,
     flag: { pole: '#c9b59a', cloth: '#c23b3b', shine: '#e25a5a' },
     digGlyph: 'shovel',
-    foundAccent: '#7ec8ff',
-    brokenAccent: '#8aa8c0',
+    foundAccent: '#eec466',
+    brokenAccent: '#8fa2b6',
     flagAccent: '#ffb4b4',
-    hudPillBorder: 'rgba(126, 200, 255, 0.4)',
+    hudPillBorder: 'rgba(200, 220, 235, 0.45)',
     mineHintBorder: '#b4e0ff',
+  }, {
+    revealedBorder: '#11294a',
+    explodedBorder: '#3a2a36',
+    bevelHi: 'rgba(255,255,255,0.22)',
+    bevelLo: 'rgba(0,20,40,0.35)',
+    flaggedSunken: true,
+    numberGlow: 6,
+    pillText: '#cfdbe6',
+    toggleActiveBg: '#1c3246',
+    digText: '#76d0f6',
+    flagText: '#c0d6e8',
+    digIcon: '#8ad4fa',
+    dimIdleLabel: false,
   }),
-  'theme-forest-trail': withPlainChrome({
+  'theme-forest-trail': withBoardBChrome({
     id: 'theme-forest-trail',
     bg: '#0c1610',
     bg2: '#142018',
@@ -687,24 +701,37 @@ export const THEME_TOKENS: Record<ThemeId, ThemeTokens> = {
     accentSoft: 'rgba(168, 200, 120, 0.2)',
     cardBg: 'rgba(8, 16, 10, 0.45)',
     wellBg: 'rgba(8, 14, 10, 0.96)',
-    hidden: '#2a3a28',
-    revealed: '#1a2418',
-    chest: '#2a3420',
-    wrecked: '#141c12',
-    exploded: '#241810',
-    cellBorder: '#3a4a32',
+    hidden: '#2c3a28',
+    revealed: '#182418',
+    chest: '#36321f',
+    wrecked: '#152317',
+    exploded: '#2d2017',
+    cellBorder: '#253222',
     cellBorderWidth: 1,
-    cellRadius: 8,
+    cellRadius: 7,
     cellFace: 'moss',
-    grain: 'rgba(20, 40, 16, 0.35)',
+    grain: 'rgba(14, 30, 12, 0.25)',
     numbers: FOREST_NUMBERS,
     flag: { pole: '#c9b59a', cloth: '#c23b3b', shine: '#e25a5a' },
     digGlyph: 'leaf',
-    foundAccent: '#8bc46a',
-    brokenAccent: '#7a8a72',
+    foundAccent: '#ecc464',
+    brokenAccent: '#918d82',
     flagAccent: '#ffb4b4',
-    hudPillBorder: 'rgba(139, 196, 106, 0.4)',
+    hudPillBorder: 'rgba(196, 188, 164, 0.4)',
     mineHintBorder: '#8bc46a',
+  }, {
+    revealedBorder: '#141e14',
+    explodedBorder: '#3a2a1e',
+    bevelHi: 'rgba(150, 180, 130, 0.22)',
+    bevelLo: 'rgba(0,0,0,0.35)',
+    moss: 'rgba(110, 140, 90, 0.16)',
+    numberGlow: 5,
+    pillText: '#c4bca4',
+    toggleActiveBg: '#24341f',
+    digText: '#c0c874',
+    flagText: '#aaa98e',
+    digIcon: '#8fae4a',
+    dimIdleLabel: false,
   }),
 };
 

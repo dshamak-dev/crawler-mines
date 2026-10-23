@@ -113,7 +113,6 @@ describe('#78 theme catalog', () => {
         expect(gridNumberColor(id, n)).toBe(paint.numbers[n]);
       }
     }
-    expect(gridNumberColor('theme-classic-dark', 1)).toBe('#e0b44a');
     expect(gridNumberColor(THEME_TOKENS['theme-classic-dark'], 99)).toBe(
       THEME_TOKENS['theme-classic-dark'].numbers[1],
     );
@@ -138,6 +137,7 @@ function luma(hex: string): number {
 }
 
 const BOARD_A = ['theme-vintage-stone', 'theme-neon-cyber', 'theme-woodland'] as const;
+const BOARD_B = ['theme-classic-dark', 'theme-ocean-breeze', 'theme-forest-trail'] as const;
 
 describe('theme board A matches docs/theme-refs/theme-board-a-vintage-neon-woodland.jpg', () => {
   it('paints 1 and 2 in the sampled reference colors', () => {
@@ -193,10 +193,9 @@ describe('theme board A matches docs/theme-refs/theme-board-a-vintage-neon-woodl
 
   it('frames the board on board A themes and leaves the others unframed', () => {
     for (const id of BOARD_A) expect(boardFrameInset(THEME_TOKENS[id])).toBeGreaterThan(0);
-    for (const id of ['theme-classic-dark', 'theme-ocean-breeze', 'theme-forest-trail'] as const) {
+    for (const id of BOARD_B) {
       const paint = THEME_TOKENS[id];
       expect(boardFrameInset(paint)).toBe(0);
-      expect(paint.flaggedSunken).toBe(false);
       expect(paint.numberTint).toBe(0);
       expect(paint.backdrop).toBe('none');
     }
@@ -208,6 +207,62 @@ describe('theme board A matches docs/theme-refs/theme-board-a-vintage-neon-woodl
     for (const id of BOARD_A) expect(THEME_TOKENS[id].dimIdleLabel).toBe(false);
     expect(THEME_TOKENS['theme-classic-dark'].dimIdleLabel).toBe(true);
     expect(THEME_TOKENS['theme-woodland'].digText).not.toBe(THEME_TOKENS['theme-woodland'].flagText);
+  });
+});
+
+describe('theme board B matches docs/theme-refs/theme-board-b-classic-ocean-forest.jpg', () => {
+  it('paints 1 and 2 in the sampled reference colors', () => {
+    const sampled: Record<(typeof BOARD_B)[number], [string, string]> = {
+      'theme-classic-dark': ['#88d6fc', '#8bf2bb'],
+      'theme-ocean-breeze': ['#b0eefd', '#88f3b5'],
+      'theme-forest-trail': ['#f8c963', '#b2cc6e'],
+    };
+    for (const id of BOARD_B) {
+      const [one, two] = sampled[id];
+      expect(distance(gridNumberColor(id, 1), one)).toBeLessThan(30);
+      expect(distance(gridNumberColor(id, 2), two)).toBeLessThan(30);
+    }
+  });
+
+  it('uses the sampled hidden, revealed, and exploded tile fills', () => {
+    const sampled: Record<(typeof BOARD_B)[number], [string, string, string]> = {
+      'theme-classic-dark': ['#2b2622', '#191410', '#2d130c'],
+      'theme-ocean-breeze': ['#6f889c', '#17324e', '#2f252e'],
+      'theme-forest-trail': ['#2c3928', '#182318', '#2c1f17'],
+    };
+    for (const id of BOARD_B) {
+      const [hidden, revealed, exploded] = sampled[id];
+      const paint = THEME_TOKENS[id];
+      expect(distance(paint.hidden, hidden)).toBeLessThan(20);
+      expect(distance(paint.revealed, revealed)).toBeLessThan(20);
+      expect(distance(paint.exploded, exploded)).toBeLessThan(20);
+    }
+  });
+
+  it('sinks flags on classic and ocean but keeps them raised on forest', () => {
+    expect(THEME_TOKENS['theme-classic-dark'].flaggedSunken).toBe(true);
+    expect(THEME_TOKENS['theme-ocean-breeze'].flaggedSunken).toBe(true);
+    expect(THEME_TOKENS['theme-forest-trail'].flaggedSunken).toBe(false);
+  });
+
+  it('labels Found in gold and keeps the idle Flag label readable', () => {
+    for (const id of BOARD_B) {
+      expect(distance(THEME_TOKENS[id].foundAccent, '#eec466')).toBeLessThan(30);
+    }
+    const ocean = THEME_TOKENS['theme-ocean-breeze'];
+    expect(ocean.dimIdleLabel).toBe(false);
+    expect(distance(ocean.flagText, '#c2d8e8')).toBeLessThan(30);
+    expect(distance(ocean.digText, '#76d2f6')).toBeLessThan(30);
+    expect(ocean.digIcon).not.toBeNull();
+    const forest = THEME_TOKENS['theme-forest-trail'];
+    expect(forest.dimIdleLabel).toBe(false);
+    expect(distance(forest.digText, '#c2ca77')).toBeLessThan(30);
+  });
+
+  it('bevels raised ocean and forest tiles', () => {
+    for (const id of ['theme-ocean-breeze', 'theme-forest-trail'] as const) {
+      expect(THEME_TOKENS[id].bevelHi).not.toBe('transparent');
+    }
   });
 });
 
