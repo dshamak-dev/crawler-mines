@@ -60,6 +60,8 @@ export class GameAudio {
   private sessionGen = 0;
   private readonly bgm: Record<BgmId, Clip | null> = emptyClips(BGM_IDS);
   private readonly sfx: Record<SfxId, Clip | null> = emptyClips(SFX_IDS);
+  private readonly bgmLoad = new Map<BgmId, Promise<void>>();
+  private readonly bgmTouched = new Set<BgmId>();
 
   async unlock(): Promise<void> {
     if (this.unlocked) {
@@ -172,16 +174,19 @@ export class GameAudio {
 
   private playCurrentBgm(): void {
     const next = this.pending;
-    const incoming = this.bgm[next];
-    this.stopOtherBgm(next);
-    this.current = next;
-    if (!incoming) return;
-    try {
-      incoming.volume = BGM_VOL[next];
-      incoming.play();
-    } catch {
-      /* ignore — do not lock the player */
-    }
+    void this.ensureBgm(next).then(() => {
+      if (this.hiddenSuspended || this.muted) return;
+      const incoming = this.bgm[next];
+      this.stopOtherBgm(next);
+      this.current = next;
+      if (!incoming) return;
+      try {
+        incoming.volume = BGM_VOL[next];
+        incoming.play();
+      } catch {
+        /* ignore — do not lock the player */
+      }
+    });
   }
 
   isHiddenSuspended(): boolean {
@@ -212,16 +217,6 @@ export class GameAudio {
     }
 
     const opts = { keepAudioSessionActive: true, updateInterval: 1000 };
-    for (const id of BGM_IDS) {
-      try {
-        const clip = audio.createAudioPlayer(BGM_ASSETS[id], opts);
-        clip.loop = true;
-        clip.volume = 0;
-        this.bgm[id] = clip;
-      } catch {
-        this.bgm[id] = null;
-      }
-    }
     for (const id of SFX_IDS) {
       try {
         const clip = audio.createAudioPlayer(SFX_ASSETS[id], opts);
@@ -234,9 +229,39 @@ export class GameAudio {
     }
   }
 
+  private ensureBgm(id: BgmId): Promise<void> {
+    const pending = this.bgmLoad.get(id);
+    if (pending) return pending;
+    if (this.bgmTouched.has(id)) return Promise.resolve();
+    const audio = this.audioApi;
+    if (!audio) return Promise.resolve();
+    const load = (async () => {
+      const opts = { keepAudioSessionActive: true, updateInterval: 1000 };
+      try {
+        const clip = audio.createAudioPlayer(BGM_ASSETS[id], opts);
+        clip.loop = true;
+        clip.volume = 0;
+        this.bgm[id] = clip;
+      } catch {
+        this.bgm[id] = null;
+      } finally {
+        this.bgmTouched.add(id);
+      }
+    })();
+    this.bgmLoad.set(id, load);
+    return load;
+  }
+
   private syncBgm(fromMute = false): void {
     if (!this.unlocked || this.muted || this.hiddenSuspended) return;
     const next = this.pending;
+    void this.ensureBgm(next).then(() => {
+      if (!this.unlocked || this.muted || this.hiddenSuspended) return;
+      this.applyBgm(fromMute, next);
+    });
+  }
+
+  private applyBgm(fromMute: boolean, next: BgmId): void {
     const incoming = this.bgm[next];
     const switching = this.current !== next;
     this.stopOtherBgm(next);

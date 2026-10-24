@@ -648,7 +648,7 @@ describe('title shop wiring', () => {
     expect(preview).toContain('Close');
     const board = readFileSync(resolve(__dirname, '../native/src/ui/Board.tsx'), 'utf8');
     expect(board).toContain('Gesture.LongPress()');
-    expect(board).toContain('onFlag(index)');
+    expect(board).toContain('onFlagRef.current(index)');
   });
 
   it('gives bone dust and the witchcraft bag their own stone-gold glyphs', () => {

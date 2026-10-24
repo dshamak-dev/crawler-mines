@@ -33,7 +33,6 @@ export interface Cell {
   loot: ItemId | null;
   /** Second drop. Null on normal chests. Legacy unlocked secrets may still carry one. */
   lootExtra: ItemId | null;
-  lootExtra: ItemId | null;
   /** Lust heart overlay. Hides a revealed number until a neighboring blast strips it. */
   hearted: boolean;
 }

@@ -12,6 +12,7 @@ import {
   dig,
   emptyInventory,
   emptyPerfectFloors,
+  cloneStash,
   emptyStash,
   extract,
   flag,
@@ -29,6 +30,7 @@ import {
   kitFromOfferings,
   rollBonusKey,
   RUN_KEY,
+  runFloorStartStash,
   runStash,
   sanitizePerfectFloors,
   buyGoods,
@@ -105,12 +107,14 @@ function freshRun(
   kit: Inventory = emptyInventory(),
 ): Run {
   const game = createGame(configFor(mode, 0), rng, mode, lockedBossId ?? null);
+  const atFloor = cloneStash(stash);
   return {
     mode,
     floor: 0,
     game,
     grantKey: newGrantKey(),
-    campaignStash: stash,
+    campaignStash: atFloor,
+    floorStartStash: cloneStash(atFloor),
     bonusKey: null,
     bossRevealPending: false,
     perfectFloors: emptyPerfectFloors(),
@@ -127,6 +131,7 @@ function freshRiteRun(rng: Rng, lockedBossId: NonNullable<Run['lockedBossId']>):
     game,
     grantKey: newGrantKey(),
     campaignStash: emptyStash(),
+    floorStartStash: emptyStash(),
     bonusKey: null,
     bossRevealPending: Boolean(game.boss),
     perfectFloors: emptyPerfectFloors(),
@@ -268,13 +273,15 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
           const floor = run.floor + 1;
           const locked = run.lockedBossId ?? null;
           const game = createGame(configFor('campaign', floor), rng, 'campaign', locked);
+          const atFloor = cloneStash(runStash(run));
           set({
             run: {
               mode: 'campaign',
               floor,
               game,
               grantKey: newGrantKey(),
-              campaignStash: runStash(run),
+              campaignStash: atFloor,
+              floorStartStash: cloneStash(atFloor),
               bonusKey: null,
               bossRevealPending: Boolean(game.boss),
               perfectFloors: sanitizePerfectFloors(run.perfectFloors),
@@ -297,6 +304,8 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
           if (run.mode === 'campaign' && run.floor >= 0 && run.floor < perfectFloors.length) {
             perfectFloors[run.floor] = false;
           }
+          const rolledBack =
+            run.mode === 'campaign' ? cloneStash(runFloorStartStash(run)) : run.campaignStash;
           set({
             run: {
               ...run,
@@ -306,6 +315,9 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
               bossRevealPending: Boolean(game.boss),
               perfectFloors,
               lockedBossId: locked,
+              ...(run.mode === 'campaign' && rolledBack
+                ? { campaignStash: rolledBack }
+                : {}),
             },
           });
         },
@@ -446,5 +458,3 @@ export function createGameStore(keyStore: KeyStore = defaultStore()) {
 
   return store;
 }
-
-export const useGameStore = createGameStore();

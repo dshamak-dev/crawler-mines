@@ -1,10 +1,14 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback } from 'react';
 import { playDeny } from '../src/audio';
 import { getAudio } from '../src/audio/player';
+import { useGuardedRunActions } from '../src/guardRun';
 import { useSafeBack } from '../src/nav';
 import { useGameStore } from '../src/store';
+import AbandonRunSheet from '../src/ui/AbandonRunSheet';
 import CollectionScreen from '../src/ui/CollectionScreen';
 import Shell from '../src/ui/Shell';
+import type { RitualSlots } from '../../src/engine';
 
 export default function CollectionRoute() {
   const router = useRouter();
@@ -17,8 +21,35 @@ export default function CollectionRoute() {
   const pickTheme = useGameStore((s) => s.selectTheme);
   const fromPlay = from === 'play' && Boolean(run);
 
+  const beginRite = useCallback(
+    (slots: RitualSlots) => {
+      const ok = startRite(slots);
+      if (ok) router.push('/play');
+      return ok;
+    },
+    [router, startRite],
+  );
+
+  const { pending, tryStartRite, confirmAbandon, cancelAbandon } = useGuardedRunActions(
+    run,
+    () => {},
+    beginRite,
+  );
+
   return (
     <Shell>
+      {pending && !fromPlay ? (
+        <AbandonRunSheet
+          onCancel={() => {
+            getAudio().playSfx('ui');
+            cancelAbandon();
+          }}
+          onConfirm={() => {
+            getAudio().playSfx('ui');
+            confirmAbandon();
+          }}
+        />
+      ) : null}
       <CollectionScreen
         meta={meta}
         runLoot={runLoot}
@@ -27,15 +58,7 @@ export default function CollectionRoute() {
         kit={fromPlay ? run?.kit : undefined}
         stashGold={run?.campaignStash?.gold ?? 0}
         onBack={onBack}
-        onStartRite={
-          fromPlay
-            ? undefined
-            : (slots) => {
-                const ok = startRite(slots);
-                if (ok) router.push('/play');
-                return ok;
-              }
-        }
+        onStartRite={fromPlay ? undefined : tryStartRite}
         onOpenSecret={
           fromPlay ? undefined : (socketed) => useGameStore.getState().openSecretChest(socketed)
         }

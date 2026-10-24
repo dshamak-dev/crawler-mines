@@ -10,6 +10,10 @@ export function emptyStash(): CampaignStash {
   return { gold: 0, items: emptyInventory() };
 }
 
+export function cloneStash(stash: CampaignStash): CampaignStash {
+  return { gold: Math.max(0, Math.floor(stash.gold)), items: { ...stash.items } };
+}
+
 export function mergeStash(
   stash: CampaignStash,
   rewards: ReadonlyArray<{ itemId: ItemId; gold: number }>,

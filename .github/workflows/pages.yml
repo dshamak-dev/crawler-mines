@@ -25,16 +25,23 @@ jobs:
         with:
           node-version: lts/*
           cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            native/package-lock.json
+          cache-dependency-path: package-lock.json
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: native/package.json
       - name: Install engine tests
         run: npm ci
       - name: Test engine
         run: npm test
+      - name: Typecheck engine
+        run: npx tsc --noEmit -p tsconfig.ci.json
       - name: Install Expo app
         working-directory: native
-        run: npm ci
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck Expo app
+        working-directory: native
+        run: pnpm exec tsc --noEmit -p tsconfig.json
       - name: Export Expo web
         working-directory: native
         run: npx expo export --platform web

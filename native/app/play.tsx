@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
+import { exitToTitle } from '../src/exitRun';
 import { useMuteStore } from '../src/mute';
 import { useGameStore } from '../src/store';
 import PlayScreen from '../src/ui/PlayScreen';
@@ -12,7 +13,7 @@ export default function PlayRoute() {
   const toggleMuted = useMuteStore((s) => s.toggle);
 
   useEffect(() => {
-    if (!run) router.replace('/');
+    if (!run) exitToTitle(router);
   }, [run, router]);
 
   if (!run) return null;
@@ -23,7 +24,7 @@ export default function PlayRoute() {
         muted={muted}
         onToggleMute={toggleMuted}
         onCollection={() => router.push({ pathname: '/collection', params: { from: 'play' } })}
-        onExitRun={() => router.replace('/')}
+        onExitRun={() => exitToTitle(router)}
       />
     </Shell>
   );

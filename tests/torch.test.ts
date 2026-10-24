@@ -346,14 +346,17 @@ describe('#62 UI wiring', () => {
   });
 
   it('shows a flag on a torch-hinted mine and keeps the hint ring', () => {
-    const cellFn = board.slice(board.indexOf('const DungeonCell'), board.indexOf('function Burst'));
+    const cellFn = board.slice(
+      board.indexOf('function DungeonCellInner'),
+      board.indexOf('const DungeonCell = memo'),
+    );
     const flagGlyph = cellFn.indexOf('{flagged ? (');
     const hintBomb = cellFn.indexOf('mineHint ? (');
     expect(flagGlyph).toBeGreaterThan(-1);
     expect(hintBomb).toBeGreaterThan(flagGlyph);
     expect(cellFn).toContain("<FlagIcon ember={visual === 'bomb-flagged'}");
-    expect(cellFn).toContain('onFlag(index)');
-    expect(cellFn).toContain('if (flagMode) onFlag(index)');
+    expect(cellFn).toContain('onFlagRef.current(index)');
+    expect(cellFn).toContain('if (flagModeRef.current) onFlagRef.current(index)');
     expect(cellFn).toContain('Gesture.LongPress()');
     expect(cellFn).toContain('Flagged mine hint');
     expect(cellFn).toContain('cellStyle(visual, fill, raised, bossHere, bossId, door, theme, mineHint)');
@@ -367,6 +370,7 @@ describe('#62 UI wiring', () => {
     const onFlag = play.slice(play.indexOf('const onFlag'), play.indexOf('const clearFx'));
     expect(onFlag).toContain('finishIfEnded(events)');
     expect(onFlag).toContain("playSfx('flag')");
+    expect(onFlag).toContain('after !== before');
     expect(onFlag.indexOf("playSfx('flag')")).toBeLessThan(onFlag.indexOf('finishIfEnded(events)'));
     const onDig = play.slice(play.indexOf('const onDig'), play.indexOf('const onExtract'));
     expect(onDig).toContain('finishIfEnded(events)');

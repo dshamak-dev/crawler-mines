@@ -35,6 +35,8 @@ export interface Run {
   game: Game;
   grantKey: string;
   campaignStash?: CampaignStash;
+  /** Campaign stash at the start of the current floor; replay restores this. */
+  floorStartStash?: CampaignStash;
   bonusKey?: ItemId | null;
   /** Fresh floor-5 entry shows the boss reveal once; resume skips it. */
   bossRevealPending?: boolean;
@@ -85,6 +87,10 @@ export function newGrantKey(): string {
 
 export function runStash(run: Run): CampaignStash {
   return run.campaignStash ?? emptyStash();
+}
+
+export function runFloorStartStash(run: Run): CampaignStash {
+  return run.floorStartStash ?? runStash(run);
 }
 
 /** This-run kit. Missing/legacy snapshots hydrate as empty. */
@@ -318,6 +324,7 @@ export function sanitizeRun(raw: unknown): Run | null {
     game: cloneGame(game),
     grantKey: r.grantKey,
     campaignStash: sanitizeStash(r.campaignStash),
+    floorStartStash: sanitizeStash(r.floorStartStash ?? r.campaignStash),
     bonusKey,
     // Resume never re-shows the floor-5 intro.
     bossRevealPending: false,

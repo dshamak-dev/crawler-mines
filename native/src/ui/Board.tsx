@@ -209,24 +209,7 @@ export default function Board({
   );
 }
 
-const DungeonCell = memo(function DungeonCell({
-  index,
-  cell,
-  size,
-  flagMode,
-  theme,
-  wave,
-  wreckedWave,
-  reduce,
-  bossHere,
-  bossId,
-  bossDead,
-  hearted,
-  hinted,
-  door,
-  onDig,
-  onFlag,
-}: {
+type DungeonCellProps = {
   index: number;
   cell: Cell;
   size: number;
@@ -243,28 +226,89 @@ const DungeonCell = memo(function DungeonCell({
   door: boolean;
   onDig: (i: number) => void;
   onFlag: (i: number) => void;
-}) {
+};
+
+function cellsEqual(a: Cell, b: Cell): boolean {
+  return (
+    a.kind === b.kind &&
+    a.state === b.state &&
+    a.adjacentMines === b.adjacentMines &&
+    a.wrecked === b.wrecked &&
+    a.exploded === b.exploded &&
+    a.gold === b.gold &&
+    a.tier === b.tier &&
+    a.loot === b.loot &&
+    a.lootExtra === b.lootExtra &&
+    a.hearted === b.hearted
+  );
+}
+
+function dungeonCellPropsEqual(prev: DungeonCellProps, next: DungeonCellProps): boolean {
+  if (prev.index !== next.index) return false;
+  if (prev.size !== next.size) return false;
+  if (prev.flagMode !== next.flagMode) return false;
+  if (prev.wave !== next.wave) return false;
+  if (prev.wreckedWave !== next.wreckedWave) return false;
+  if (prev.reduce !== next.reduce) return false;
+  if (prev.bossHere !== next.bossHere) return false;
+  if (prev.bossId !== next.bossId) return false;
+  if (prev.bossDead !== next.bossDead) return false;
+  if (prev.hearted !== next.hearted) return false;
+  if (prev.hinted !== next.hinted) return false;
+  if (prev.door !== next.door) return false;
+  if (prev.theme.id !== next.theme.id) return false;
+  return cellsEqual(prev.cell, next.cell);
+}
+
+function DungeonCellInner({
+  index,
+  cell,
+  size,
+  flagMode,
+  theme,
+  wave,
+  wreckedWave,
+  reduce,
+  bossHere,
+  bossId,
+  bossDead,
+  hearted,
+  hinted,
+  door,
+  onDig,
+  onFlag,
+}: DungeonCellProps) {
   const visual = cellVisual(cell);
   const icon = Math.round(size * 0.72);
   const mineHint = hinted && visual !== 'exploded';
 
-  const longPress = Gesture.LongPress()
-    .minDuration(LONG_MS)
-    .maxDistance(14)
-    .onStart(() => {
-      onFlag(index);
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    })
-    .runOnJS(true);
+  const flagModeRef = useRef(flagMode);
+  flagModeRef.current = flagMode;
+  const onDigRef = useRef(onDig);
+  onDigRef.current = onDig;
+  const onFlagRef = useRef(onFlag);
+  onFlagRef.current = onFlag;
 
-  const tap = Gesture.Tap()
-    .onEnd(() => {
-      if (flagMode) onFlag(index);
-      else onDig(index);
-    })
-    .runOnJS(true);
-
-  const gesture = useMemo(() => Gesture.Exclusive(longPress, tap), [longPress, tap]);
+  const gesture = useMemo(
+    () =>
+      Gesture.Exclusive(
+        Gesture.LongPress()
+          .minDuration(LONG_MS)
+          .maxDistance(14)
+          .onStart(() => {
+            onFlagRef.current(index);
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          })
+          .runOnJS(true),
+        Gesture.Tap()
+          .onEnd(() => {
+            if (flagModeRef.current) onFlagRef.current(index);
+            else onDigRef.current(index);
+          })
+          .runOnJS(true),
+      ),
+    [index],
+  );
 
   const pop = useSharedValue(1);
   const popStyle = useAnimatedStyle(() => ({
@@ -360,7 +404,9 @@ const DungeonCell = memo(function DungeonCell({
       </Animated.View>
     </GestureDetector>
   );
-});
+}
+
+const DungeonCell = memo(DungeonCellInner, dungeonCellPropsEqual);
 
 function Burst({
   index,

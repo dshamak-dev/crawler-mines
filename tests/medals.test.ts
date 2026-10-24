@@ -426,6 +426,34 @@ describe('campaign gold cup', () => {
     expect(loadCollection(store).items['gold-cup']).toBe(0);
   });
 
+  it('replay restores floor-start stash so cleared loot is not duplicated', () => {
+    const store = withWallet(100);
+    const s = createGameStore(store);
+    s.setState({
+      meta: loadCollection(store),
+      run: {
+        mode: 'campaign',
+        floor: 0,
+        game: createGameFromLayout(['.$', '.*'], 10, 'gem'),
+        grantKey: 'camp-stash-replay',
+        campaignStash: emptyStash(),
+        floorStartStash: emptyStash(),
+        bonusKey: null,
+        bossRevealPending: false,
+        perfectFloors: emptyPerfectFloors(),
+      },
+      runLoot: emptyInventory(),
+    });
+    revealAllOnStore(s, mulberry32(1));
+    expect(s.getState().run?.game.status).toBe('cleared');
+    expect(s.getState().run?.campaignStash?.items.gem).toBe(1);
+
+    s.getState().retryFloor(mulberry32(2));
+    expect(s.getState().run?.game.status).toBe('playing');
+    expect(s.getState().run?.campaignStash?.items.gem ?? 0).toBe(0);
+    expect(s.getState().run?.campaignStash?.gold).toBe(0);
+  });
+
   it('retrying a floor clears that slot and re-evaluates the next clear', () => {
     const store = withWallet(100);
     const s = createGameStore(store);

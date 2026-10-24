@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReducedMotion } from 'react-native-reanimated';
@@ -84,7 +84,15 @@ export default function PlayScreen({
   const fxId = useRef(1);
   const toastId = useRef(1);
   const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    return () => {
+      if (clearTimer.current) clearTimeout(clearTimer.current);
+      if (shakeTimer.current) clearTimeout(shakeTimer.current);
+    };
+  }, []);
 
   const cueUi = () => getAudio().playSfx('ui');
 
@@ -96,7 +104,8 @@ export default function PlayScreen({
       if (packed.sparkles.length) setSparkles(packed.sparkles);
       if (packed.wrecked && !reduceMotion) {
         setShaking(true);
-        setTimeout(() => setShaking(false), 520);
+        if (shakeTimer.current) clearTimeout(shakeTimer.current);
+        shakeTimer.current = setTimeout(() => setShaking(false), 520);
       }
       const maxWave = packed.blasts.reduce((m, b) => Math.max(m, b.wave), 0);
       if (after) {
@@ -161,13 +170,19 @@ export default function PlayScreen({
     finishIfEnded(events);
   }, [applyExtract, finishIfEnded]);
 
+  const dismissLootToast = useCallback((id: number) => {
+    setLootQueue((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
   const onFlag = useCallback(
     (index: number) => {
       const cell = useGameStore.getState().run?.game.cells[index];
       if (!cell || cell.state === 'revealed') return;
+      const before = cell.state;
       const events = applyFlag(index);
       setHoldPlayTip(false);
-      getAudio().playSfx('flag');
+      const after = useGameStore.getState().run?.game.cells[index]?.state;
+      if (after !== before) getAudio().playSfx('flag');
       for (const id of sfxFromEvents(events)) getAudio().playSfx(id);
       finishIfEnded(events);
     },
@@ -188,9 +203,7 @@ export default function PlayScreen({
 
   const nextFloor = () => {
     nextFloorAction();
-    const next = useGameStore.getState().run;
     clearFx();
-    if (!next) onExitRun();
   };
 
   const retryFloor = () => {
@@ -238,7 +251,8 @@ export default function PlayScreen({
   const salvage = report ? stackedEntries(report.loot) : [];
   const boss = game.boss;
   const bossName = boss ? BOSS_COPY[boss.id].name : 'Boss';
-  const showReplay = report && report.outcome !== 'lost' && report.outcome !== 'victory';
+  const showReplay =
+    report && report.outcome !== 'lost' && report.outcome !== 'victory' && mode !== 'hard';
   const goldCopy =
     report?.outcome === 'stashed'
       ? 'Held until the boss falls.'
@@ -350,7 +364,7 @@ export default function PlayScreen({
 
       <LootQueue
         queue={lootQueue}
-        onDismiss={(id) => setLootQueue((prev) => prev.filter((t) => t.id !== id))}
+        onDismiss={dismissLootToast}
         reduceMotion={reduceMotion}
         top={hudH + 8}
       />
