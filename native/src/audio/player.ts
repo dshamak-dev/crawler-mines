@@ -173,15 +173,16 @@ export class GameAudio {
   }
 
   private playCurrentBgm(): void {
-    const next = this.pending;
-    void this.ensureBgm(next).then(() => {
-      if (this.hiddenSuspended || this.muted) return;
-      const incoming = this.bgm[next];
-      this.stopOtherBgm(next);
-      this.current = next;
+    const requested = this.pending;
+    void this.ensureBgm(requested).then(() => {
+      if (this.hiddenSuspended || this.muted || !this.unlocked) return;
+      if (this.pending !== requested) return;
+      const incoming = this.bgm[requested];
+      this.stopOtherBgm(requested);
+      this.current = requested;
       if (!incoming) return;
       try {
-        incoming.volume = BGM_VOL[next];
+        incoming.volume = BGM_VOL[requested];
         incoming.play();
       } catch {
         /* ignore — do not lock the player */
@@ -254,14 +255,17 @@ export class GameAudio {
 
   private syncBgm(fromMute = false): void {
     if (!this.unlocked || this.muted || this.hiddenSuspended) return;
-    const next = this.pending;
-    void this.ensureBgm(next).then(() => {
+    const requested = this.pending;
+    this.fadeGen += 1;
+    void this.ensureBgm(requested).then(() => {
       if (!this.unlocked || this.muted || this.hiddenSuspended) return;
-      this.applyBgm(fromMute, next);
+      if (this.pending !== requested) return;
+      this.applyBgm(fromMute, requested);
     });
   }
 
   private applyBgm(fromMute: boolean, next: BgmId): void {
+    if (this.pending !== next) return;
     const incoming = this.bgm[next];
     const switching = this.current !== next;
     this.stopOtherBgm(next);

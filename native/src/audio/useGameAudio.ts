@@ -23,7 +23,29 @@ export function useGameAudio(
       else audio.suspendForHidden();
     };
     const sub = AppState.addEventListener('change', onChange);
-    return () => sub.remove();
+
+    const onVisibility = () => {
+      if (typeof document === 'undefined') return;
+      if (document.visibilityState === 'hidden') audio.suspendForHidden();
+      else audio.resumeFromHidden();
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibility);
+    }
+    const onPageHide = () => audio.suspendForHidden();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pagehide', onPageHide);
+    }
+
+    return () => {
+      sub.remove();
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibility);
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('pagehide', onPageHide);
+      }
+    };
   }, []);
 
   useEffect(() => {
